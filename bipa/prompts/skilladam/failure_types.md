@@ -1,0 +1,10 @@
+- **misread_task**: the agent misunderstood, skipped, or invented a task requirement
+- **wrong_tool_use**: the agent called the wrong tool or a tool with wrong arguments
+- **wrong_sequence**: the agent performed steps in the wrong order
+- **premature_stop**: the agent stopped before every requirement was met and checked
+- **action_loop**: the agent repeated the same action without progress
+- **constraint_violation**: the agent broke a rule or constraint stated by the task or environment
+- **rule_missing**: the skill lacks a relevant rule for this situation
+- **rule_wrong**: an existing skill rule is misleading or incorrect
+- **rule_ignored**: the skill has the right rule but the agent did not follow it
+- **other**: none of the above

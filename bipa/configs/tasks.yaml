@@ -1,0 +1,52 @@
+# Current campaign panels and executor settings. Sampling functions derive from historical slim,
+# Each optimizer keeps its upstream batch size (GEPA reflection_minibatch_size=3, SkillOpt train.batch_size=40,
+# SkillAdam --train-size 10);
+# every arm sees the same train budget (train_episodes) from the same panel, so T = ceil(budget / batch_size).
+# Task lists come from harness-bench's registry; the values below define this campaign's protocol.
+#   rounds          reshuffled passes generated over the train panel (cut at train_episodes)
+#   batch_size      per arm (upstream defaults, except GEPA 8 instead of 3 since 2026-10-08: 20 iterations, see adapters/gepa.py); 'default' for arms without training batches
+#   train_episodes  train episodes per optimizer run: batches are taken while their total stays within it
+#   steps           optional per-arm cap on T (none: since 2026-10-08 GEPA runs all its batches; its former cap of 20 plus D_sel early stop used ~60 of the 160 train episodes)
+#   panel_caps      tasks kept per split (stratified sample for train at main, else the prefix)
+#   panel_sampling  train: stratified (strata = group 1 of the task-id regex); {} = prefix
+#   sel             |D_sel|: the shared held-out panel, a stratified sample of the capped dev panel
+#   drop_tasks      optional per-split regex of task ids dropped before capping/sampling (LODO scales)
+
+backend:  # slim's frozen backend config (the episode cache key reads it; benchmark, harness, model per cell)
+  kind: harness-bench
+  bench_root: /mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-bench
+  injection: guidance
+  infrastructure_retries: 2
+cache_root: /mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/assets/cache
+
+benchmarks:
+  terminal-bench-2-1:
+    timeout_seconds: 57600
+    scales:
+      smoke: {rounds: 1, panel_sampling: {}, panel_caps: {train: 4, dev: 2, test: 2}, batch_size: 2, sel: 2}
+      main: {rounds: 3, train_episodes: 160, panel_sampling: {train: stratified}, panel_caps: {train: 62, dev: 9, test: 18},
+             batch_size: {gepa: 8, skillopt: 40, skilladam: 10, default: 16}, sel: 30}
+
+  tau3-bench:
+    timeout_seconds: 21600
+    scales:
+      smoke: {rounds: 1, panel_sampling: {}, panel_caps: {train: 4, dev: 2, test: 2}, batch_size: 2, sel: 2}
+      main: {rounds: 1, panel_sampling: {train: stratified, strata: '^tau3-([a-z_]+?)-'},
+             panel_caps: {train: 160, dev: 37, test: 75}, train_episodes: 160,
+             batch_size: {gepa: 8, skillopt: 40, skilladam: 10, default: 16}, sel: 30}
+      # leave-one-domain-out (OOD, 2026-10-15): banking_knowledge (the tau-Knowledge task family) is dropped from
+      # train and dev BEFORE capping/sampling, so neither the train batches nor D_sel ever see it; the test panel
+      # is the same 75 tasks as main, so the learned skill is measured in-domain (56 tasks) and on the held-out
+      # family (19 tasks) against the same cached Seed rows. Train budget, caps and batch sizes match main.
+      lodo-banking: {rounds: 1, panel_sampling: {train: stratified, strata: '^tau3-([a-z_]+?)-'},
+                     panel_caps: {train: 160, dev: 37, test: 75}, train_episodes: 160,
+                     batch_size: {gepa: 8, skillopt: 40, skilladam: 10, default: 16}, sel: 30,
+                     drop_tasks: {train: '^tau3-banking_knowledge-', dev: '^tau3-banking_knowledge-'}}
+
+  automationbench:
+    timeout_seconds: 21600
+    scales:
+      smoke: {rounds: 1, panel_sampling: {}, panel_caps: {train: 4, dev: 2, test: 2}, batch_size: 2, sel: 2}
+      main: {rounds: 1, panel_sampling: {train: stratified, strata: '^([a-z]+)-'},
+             panel_caps: {train: 160, dev: 60, test: 120}, train_episodes: 160,
+             batch_size: {gepa: 8, skillopt: 40, skilladam: 10, default: 16}, sel: 30}
