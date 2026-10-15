@@ -36,9 +36,9 @@ def boot(x, y, n=10000, seed=0):
 
 
 def compute():
-    sys.path[:0] = [str(HERE), str(ROOT / "baselines")]
+    sys.path[:0] = [str(HERE), str(ROOT / "bipa")]
     import main_table as M
-    from bipa.layout import SKILLS, current_run
+    from src.layout import SKILLS, current_run
     vid = M.version((SKILLS / "seed/SKILL.md").read_text())
     pts = []
     def add(kind, method, model, bench, Q, seedQ, rho, **kw):

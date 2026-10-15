@@ -3,7 +3,7 @@
 import argparse, hashlib, json, re, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from bipa.layout import SKILLS, BASELINE_ROOT, relocate, result_dir, current_run
+from src.layout import SKILLS, BASELINE_ROOT, relocate, result_dir, current_run
 
 ARMS = ('none', 'seed', 'skillopt', 'gepa', 'skilladam', 'ours')
 MODELS = ('deepseek-flash', 'gpt-6-luna')

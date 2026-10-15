@@ -1,6 +1,6 @@
 """Figure "noise": small selection panels cannot verify a workload budget.
-  compute (slim venv):  bach-harness/.venv/bin/python baselines/scripts/analysis/fig_noise.py compute
-  plot    (system py3): python3 baselines/scripts/analysis/fig_noise.py plot
+  compute (slim venv):  bach-harness/.venv/bin/python bipa/scripts/analysis/fig_noise.py compute
+  plot    (system py3): python3 bipa/scripts/analysis/fig_noise.py plot
 Reads execution/<model>/ours/<bench>/<tag>/zo-result.json + test evaluations and the seed evaluations in execution/; writes results/figures/noise.{json,pdf,png}."""
 import sys, json, glob, math, os, itertools, collections
 from pathlib import Path
@@ -15,7 +15,7 @@ def phi(x): return 0.5 * (1 + math.erf(x / math.sqrt(2)))
 
 def compute():
     import numpy as np
-    sys.path.insert(0, str(ROOT / "baselines/scripts/analysis")); sys.path.insert(0, str(ROOT / "baselines"))
+    sys.path.insert(0, str(ROOT / "bipa/scripts/analysis")); sys.path.insert(0, str(ROOT / "bipa"))
     import main_table as MT
     tags = {k: v for k, v in json.load(open(ROOT / "bach-harness/config/ours_runs.json")).items() if not k.startswith("_")}
     se = lambda x: float(np.std(x, ddof=1) / math.sqrt(len(x)))

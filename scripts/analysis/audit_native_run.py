@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from audit_trace_integrity import Evidence, audit_episode, refs
-from bipa.layout import relocate
+from src.layout import relocate
 
 
 def request_payload_matches(source, record):

@@ -9,14 +9,14 @@ from pathlib import Path
 from collections import defaultdict
 
 ROOT = Path(__file__).resolve().parents[3]
-sys.path[:0] = [str(ROOT / "baselines"), str(ROOT / "baselines/scripts/analysis"), str(ROOT / "bach-harness/src")]
+sys.path[:0] = [str(ROOT / "bipa"), str(ROOT / "bipa/scripts/analysis"), str(ROOT / "bach-harness/src")]
 PLOT = sys.argv[1:] == ["plot"]
 if PLOT:
     import matplotlib; matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 else:
     from bach.workload import soft
-from bipa.layout import SKILLS, ARTIFACTS, BASELINE_ROOT, run_path, current_run, relocate
+from src.layout import SKILLS, ARTIFACTS, BASELINE_ROOT, run_path, current_run, relocate
 if not PLOT:
     from main_table import evaluation, version
 

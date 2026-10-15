@@ -10,7 +10,7 @@ the model. Cells whose train run has no summary.json yet are skipped (listed in 
 Run resolution of the train cell (model, A): skillopt / gepa / skilladam = layout.current_run (must have summary.json);
 zo = layout.ours_run (ours_runs.json) or, with --ours-tag, that BACH tag; zo is reported as `ours`.
 
-Usage:  python baselines/scripts/jobs/transfer_bench.py [--models deepseek-flash] [--methods skillopt,gepa,skilladam,zo]
+Usage:  python bipa/scripts/jobs/transfer_bench.py [--models deepseek-flash] [--methods skillopt,gepa,skilladam,zo]
                                            [--ours-tag TAG] [--slots 16] [--execute]
 
 Outputs:
@@ -27,15 +27,15 @@ import sys
 
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from bipa import experiment_config as experiments
+from src import experiment_config as experiments
 experiments.configure_environment()
-from bipa.layout import EXECUTION, run_path
-from bipa.utils.executor import SEED, Cell, evaluate, evaluator
-from bipa.layout import ARM_DIR, RESULTS, current_run
-from bipa.panels import panels
+from src.layout import EXECUTION, run_path
+from src.utils.executor import SEED, Cell, evaluate, evaluator
+from src.layout import ARM_DIR, RESULTS, current_run
+from src.panels import panels
 
-# main_table lives with the baselines' analysis scripts, outside src/ (the one path edit this module keeps)
-sys.path.append(str(experiments.MITIGATION_ROOT / "baselines/scripts/analysis"))
+# main_table lives with the analysis scripts in bipa/scripts/analysis, outside src/ (the one path edit this module keeps)
+sys.path.append(str(experiments.MITIGATION_ROOT / "bipa/scripts/analysis"))
 from main_table import evaluation, pair, version  # noqa: E402
 
 BENCHES = experiments.BENCHMARKS
@@ -180,7 +180,7 @@ def execute(seeds, transfers, slots):
 
 def main(argv=None):
     """Dry run (default) or run (--execute) of the cross-benchmark transfer evaluation."""
-    a = argparse.ArgumentParser(prog="python baselines/scripts/jobs/transfer_bench.py", description=__doc__.splitlines()[0])
+    a = argparse.ArgumentParser(prog="python bipa/scripts/jobs/transfer_bench.py", description=__doc__.splitlines()[0])
     a.add_argument("--models", default="deepseek-flash")
     a.add_argument("--methods", default="skillopt,gepa,skilladam,zo")
     a.add_argument("--ours-tag", default=None)

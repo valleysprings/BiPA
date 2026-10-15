@@ -3,7 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 PY="$ROOT/bach-harness/.venv/bin/python"
-A="$ROOT/baselines/scripts/analysis"
+A="$ROOT/bipa/scripts/analysis"
 cd "$ROOT"
 "$PY" "$A/render_native_skill_history.py"
 "$PY" "$A/main_table.py"

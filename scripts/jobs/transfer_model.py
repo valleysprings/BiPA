@@ -9,9 +9,9 @@ the model. Evaluations already in the cache are read back.
 Run resolution: skillopt / gepa / skilladam = layout.current_run(method, A, bench) (what main_table.py scores; it must
 have summary.json); zo = layout.ours_run(A, bench) (ours_runs.json), reported as `ours`.
 
-Usage:  python baselines/scripts/jobs/transfer_model.py [--methods skillopt,gepa,skilladam,zo] [--slots 16] [--execute]
+Usage:  python bipa/scripts/jobs/transfer_model.py [--methods skillopt,gepa,skilladam,zo] [--slots 16] [--execute]
 In the background (the cache is read back, so a restart resumes):
-  setsid nohup python baselines/scripts/jobs/transfer_model.py --methods skillopt,gepa,skilladam,zo --slots 16 --execute >> LOG 2>&1 &
+  setsid nohup python bipa/scripts/jobs/transfer_model.py --methods skillopt,gepa,skilladam,zo --slots 16 --execute >> LOG 2>&1 &
   (LOG: assets/logs/ood-launch.log)
 
 Outputs:
@@ -27,15 +27,15 @@ import sys
 
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from bipa import experiment_config as experiments
+from src import experiment_config as experiments
 experiments.configure_environment()
-from bipa.layout import CACHE, EXECUTION
-from bipa.utils.executor import SEED, Cell, evaluate, evaluator
-from bipa.layout import RESULTS, current_run
-from bipa.panels import panels
+from src.layout import CACHE, EXECUTION
+from src.utils.executor import SEED, Cell, evaluate, evaluator
+from src.layout import RESULTS, current_run
+from src.panels import panels
 
-# main_table lives with the baselines' analysis scripts, outside src/ (the one path edit this module keeps)
-sys.path.append(str(experiments.MITIGATION_ROOT / "baselines/scripts/analysis"))
+# main_table lives with the analysis scripts in bipa/scripts/analysis, outside src/ (the one path edit this module keeps)
+sys.path.append(str(experiments.MITIGATION_ROOT / "bipa/scripts/analysis"))
 from main_table import evaluation, pair, version  # noqa: E402
 
 MODELS = tuple(experiments.CFG["models"])   # train and eval models of the transfer (config/experiments.yaml models)
@@ -160,7 +160,7 @@ def execute(seeds, transfers):
 
 def main(argv=None):
     """Dry run (default) or run (--execute) of the cross-model transfer evaluation."""
-    a = argparse.ArgumentParser(prog="python baselines/scripts/jobs/transfer_model.py", description=__doc__.splitlines()[0])
+    a = argparse.ArgumentParser(prog="python bipa/scripts/jobs/transfer_model.py", description=__doc__.splitlines()[0])
     a.add_argument("--methods", default="skillopt,gepa,skilladam,zo")
     a.add_argument("--benches", default=",".join(BENCHES), help="comma-separated benchmark ids (default: all)")
     a.add_argument("--eval", default=None, help="the eval model (default: every model, i.e. both directions)")

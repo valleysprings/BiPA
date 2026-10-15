@@ -25,7 +25,7 @@ def compute():
     import csv, re
     import main_table as MT
     from bach import decompose as D, lineage as LN, workload as M
-    from bipa.layout import SKILLS, current_run
+    from src.layout import SKILLS, current_run
     seed = MT.version((SKILLS / "seed/SKILL.md").read_text())
     ours = json.loads((ROOT / "bach-harness/config/ours_runs.json").read_text())
     table = {(r["model"], r["bench"], r["method"]): float(r["rho"]) for r in csv.DictReader(open(RES / "main-table.csv")) if r["status"] == "done" and r["rho"]}

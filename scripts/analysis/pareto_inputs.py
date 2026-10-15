@@ -10,7 +10,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(HERE))
 import main_table as M
-from bipa.layout import SKILLS, current_run
+from src.layout import SKILLS, current_run
 
 seed_vid = M.version((SKILLS / "seed/SKILL.md").read_text())
 ours = json.loads((ROOT / "bach-harness/config/ours_runs.json").read_text())
