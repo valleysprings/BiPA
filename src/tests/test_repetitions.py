@@ -103,6 +103,55 @@ def test_execute_recovers_only_missing_rows_and_keeps_source_unchanged(tmp_path,
     assert json.loads((out / "results.json").read_text())["repetitions_complete"]
 
 
+def test_persistent_unknown_is_adjudicated_failure(tmp_path):
+    run, out = tmp_path / "run", tmp_path / "reps"
+    evaluation(run, 0, {"a": True, "b": None})
+    evaluation(out, 1, {"a": True, "b": None})
+    evaluation(out, 2, {"a": False, "b": None})
+    result = repeat.collect(run, out, repeat.version("seed"), ["a", "b"], 3)
+    assert result["avg"] == 1 / 3  # b adjudicated as failure in every rep: Q = .5, .5, .0
+    assert result["adjudicated_failures"]["b"] == {"0": "unresolved", "1": "unresolved", "2": "unresolved"}
+    assert not result["repetitions_complete"]  # strict all-verdict coverage is still reported as-is
+    assert all(row["missing_tasks"] == [] for row in result["runs"])
+    assert [row["Q"] for row in result["runs"]] == [0.5, 0.5, 0.0]
+
+
+def test_unknown_without_episode_evidence_still_blocks(tmp_path):
+    run, out = tmp_path / "run", tmp_path / "reps"
+    evaluation(run, 0, {"a": True, "b": None})
+    evaluation(out, 1, {"a": True, "b": None})
+    evaluation(out, 2, {"a": False})  # b has no episode at all in rep 2
+    result = repeat.collect(run, out, repeat.version("seed"), ["a", "b"], 3)
+    assert result["avg"] is None and result["adjudicated_failures"] == {}
+    assert result["runs"][2]["missing_tasks"] == ["b"]
+
+
+def test_flaky_unknown_with_one_verdict_is_not_adjudicated(tmp_path):
+    run, out = tmp_path / "run", tmp_path / "reps"
+    evaluation(run, 0, {"a": True, "b": None})
+    evaluation(out, 1, {"a": True, "b": None})
+    evaluation(out, 2, {"a": False, "b": True})  # b produced a verdict once
+    result = repeat.collect(run, out, repeat.version("seed"), ["a", "b"], 3)
+    assert result["avg"] is None and result["adjudicated_failures"] == {}
+    assert result["runs"][0]["missing_tasks"] == ["b"]
+
+
+def test_adjudicated_failures_are_not_retried(tmp_path, monkeypatch):
+    from src.utils import executor
+    run, out = tmp_path / "run", tmp_path / "reps"
+    evaluation(run, 0, {"a": True, "b": None})
+    evaluation(out, 1, {"a": True, "b": None})
+    protocol = dict(benchmark="fixture", model="gpt-6-luna", harness="fixture", cache_root=str(tmp_path / "cache"))
+    monkeypatch.setattr(repeat, "source", lambda root: (protocol, "seed", ["a", "b"]))
+    monkeypatch.setattr(repeat.config, "repetition_dir", lambda root: out)
+    monkeypatch.setattr(repeat.config, "configure_environment", lambda: None)
+    calls = []
+    monkeypatch.setattr(executor, "evaluate", lambda *args: calls.append(args))
+    repeat.main(["--run", str(run), "--test-runs", "2", "--execute"])
+    assert calls == []  # adjudicated slots never trigger supplemental evaluations
+    assert json.loads((out / "results.json").read_text())["avg"] == 0.5
+
+
 @pytest.mark.parametrize("corruption", ["duplicate", "unplanned"])
 @pytest.mark.parametrize("location", ["source", "supplement"])
 def test_invalid_episode_slots_cannot_complete_repetitions(tmp_path, corruption, location):

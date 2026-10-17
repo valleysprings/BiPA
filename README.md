@@ -8,6 +8,8 @@ Code for the BiPA paper. BiPA verifies a learned skill by what it changes in the
 |---|---|
 | `src/` | Experiment harness: scheduling (`run.sh` → `launch.py`), single-cell runs (`run.py`), repeated test evaluation (`repeat.py`, `repeat_transfer.py`), episode tracing (`native_protocol.py`, `native_trace.py`), fixed panels (`panels.py`), and adapters (`adapters/`) to the upstream optimizers |
 | `src/optimizers/` | Canonical upstream sources: SkillOpt, SkillAdam, GEPA, EvoHarness |
+| `analysis/` | Offline analysis of finished runs (read-only on the execution artifacts): the avg@3 main table (`analysis/table1.py`), the Luna appendix table (`analysis/luna_table.py`), and the appendix analyses (`analysis/mech/`, `analysis/mechanism/`) |
+| `graph/` | Per-episode bipartite graph construction and metrics used by the analysis |
 | `scripts/analysis/` | Offline audits, run statistics, and the table/figure generators |
 | `scripts/jobs/` | Transfer evaluation jobs |
 | `assets/skills/seed/SKILL.md` | The common seed skill |
@@ -32,3 +34,5 @@ bash src/run.sh suite <model>                        # full suite for one model
 Add `--execute` to actually run, or `--detach` to run the schedule in the background. `run.sh` sources an optional `host.env` in the repository root for host-specific settings (e.g. proxy); `BASELINE_PYTHON` selects the interpreter.
 
 Raw execution artifacts and caches are not part of this repository.
+
+The repeated test evaluation (`src/repeat.py`, three repetitions per arm) scores a task whose episodes ran but never produced a verifier outcome in any repetition as a failure (listed under `adjudicated_failures`); slots without episode evidence still block the average. `analysis/table1.py` applies the same rule when it closes an avg@3 cell.

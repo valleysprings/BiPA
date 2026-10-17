@@ -40,7 +40,7 @@ bash bipa/src/run.sh suite gpt-6-luna --benches tau3 autob tb2
 
 `BASELINE_PYTHON` 默认取当前环境的 `python`（依赖环境使用 Python 3.12）。已有 venv 可以复用，也可以使用安装了 harness-bench 和上游依赖的独立 Python；BiPA 不导入 `bach`、`graph` 或 `utils.experiments`。主机代理设置在 `../host.env`。原来借用 BACH 的 native / replicate / test_reps 入口已归档，不保留兼容入口。
 
-重复评测读取原 run 的 `summary.json`、`final/SKILL.md`、`native_protocol.json`，使用原测试任务和缓存。即使返回 seed，也检查真实重复测试；相同 skill 的同一 repetition 由 harness-bench 缓存复用。输出为 `execution/<model>/test-reps/<bench>__<method>__<run>/results.json`。只有所请求的全部重复、全部任务结局齐全才给 `avg`；否则保留每次 `Q_known` 和覆盖率，`avg=null`。它是 Q 的重复测试报告，不替代请求/工具轨迹审计。已知 rep 0 不重跑；rep0 的未知或缺失槽位通过单独补充 evaluation 恢复，原 source 不改写。报告记录所有补充证据路径。论文 Table 1 的读取器也检查 avg3_complete，缺失的格保留待办。
+重复评测读取原 run 的 `summary.json`、`final/SKILL.md`、`native_protocol.json`，使用原测试任务和缓存。即使返回 seed，也检查真实重复测试；相同 skill 的同一 repetition 由 harness-bench 缓存复用。输出为 `execution/<model>/test-reps/<bench>__<method>__<run>/results.json`。episode 已执行但在全部请求的 repetition 中都无判决的槽位（如持续 verifier 超时）判负：计 0、列入 `adjudicated_failures`、不再触发补跑；仍有槽位连 episode 证据都没有时不给 `avg`，保留每次 `Q_known` 和覆盖率。它是 Q 的重复测试报告，不替代请求/工具轨迹审计。已知 rep 0 不重跑；rep0 的未知或缺失槽位通过单独补充 evaluation 恢复，原 source 不改写。报告记录所有补充证据路径。论文 Table 1 的读取器按同一判负规则检查 avg3_complete，缺失的格保留待办。
 
 `summary.json` 表示优化结束，`repetitions_complete` 表示重复评测覆盖，`completion_audit.json` 检查逐轮对象和完整轨迹，三者不能相互替代。[Luna 调查](docs/luna-20261014.md) 记录当前缺口。
 
@@ -50,4 +50,4 @@ bash bipa/src/run.sh suite gpt-6-luna --benches tau3 autob tb2
 "$BASELINE_PYTHON" -m pytest bipa/src/tests -q -p no:cacheprovider
 ```
 
-测试使用伪造的模型/任务结果，覆盖上游循环的 unknown、resume、失败提案、审计和调度，不启动真实模型。跨模型/跨 benchmark 的评测脚本在 [../scripts/jobs](../scripts/README.md)，报告与论文分析继续由单独的 analysis 脚本负责。
+测试使用伪造的模型/任务结果，覆盖上游循环的 unknown、resume、失败提案、审计和调度，不启动真实模型。跨模型/跨 benchmark 的评测脚本在 [../scripts/jobs](../scripts/README.md)，报告与论文分析由 [../analysis](../analysis/README.md) 负责。
