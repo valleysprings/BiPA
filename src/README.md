@@ -50,4 +50,4 @@ bash bipa/src/run.sh suite gpt-6-luna --benches tau3 autob tb2
 "$BASELINE_PYTHON" -m pytest bipa/src/tests -q -p no:cacheprovider
 ```
 
-测试使用伪造的模型/任务结果，覆盖上游循环的 unknown、resume、失败提案、审计和调度，不启动真实模型。跨模型/跨 benchmark 的评测脚本在 [../scripts/jobs](../scripts/README.md)，报告与论文分析由 [../analysis](../analysis/README.md) 负责。
+测试使用伪造的模型/任务结果，覆盖上游循环的 unknown、resume、失败提案、审计和调度，不启动真实模型。跨模型/跨 benchmark 的评测脚本在 [../scripts/jobs](../scripts/README.md)，报告与论文分析由 [analysis](analysis/README.md) 负责。
