@@ -51,13 +51,14 @@ Python 3.12 with `harness-bench`; the upstream optimizers' dependencies (`pip in
 
 ## Reproduction
 
-Run from the repo root; `python -m` resolves `src.*`. Everything previews by default — `--execute` executes, `--detach` backgrounds. Benchmark aliases: `tau3`, `autob`, `tb2`. Only training, repetitions and transfer call the model; all analysis is offline.
+Run from the repo root; `python -m` resolves `src.*`. The scripts are thin shell entries — the Python lives in `src/`. Everything previews by default — `--execute` executes, `--detach` backgrounds. Benchmark aliases: `tau3`, `autob`, `tb2`. Only training, repetitions and transfer call the model; all analysis is offline.
 
 **Main experiments** (the paper's study):
 
 ```bash
 # 1. train the three optimizers and the two controls, three benchmarks x two models
 bash scripts/baselines.sh suite deepseek-flash --execute
+#    one cell instead of the suite: baselines.sh run tau3 gpt-6-luna --arm skillopt
 # 2. avg@3 repeated test evaluation of each condition's frozen final skill
 bash scripts/baselines.sh repeat tau3 deepseek-flash --arm skillopt --execute
 # 3. Table 1 (both models) -> ../paper/assets/data/mech/mech_table1.md
@@ -72,14 +73,15 @@ A test slot that ran in all three repetitions but never got a verifier verdict s
 # RQ1-RQ4 analyses (offline; per target, compute first then figures, in dependency order)
 bash scripts/analysis.sh rq1        # rq2 rq3 rq4 paper table1, or "all"
 # transfer: a returned skill evaluated unchanged under another model / benchmark
+# (dry-run by default, the evaluation cache resumes an interrupted run)
 bash scripts/rq4_transfer.sh model|bench|tb2auto [--execute]
 # execution-evidence audits: completion certificate, trace integrity, skill history
 bash scripts/audit.sh native-run|trace|skill-history ...
-# refresh the derived tables under ../assets/artifacts/results/
+# refresh the derived tables under ../assets/artifacts/results/ (skills, main table, status)
 bash scripts/refresh.sh
 ```
 
-`analysis.sh all` runs `rq1 rq2 rq4 rq3 paper` — the order the cross-RQ cache dependencies require (rq3 reuses rq2's attribution cache, the cheatsheet audit reuses rq4's). What each target runs, module by module (`src/analysis/` unless noted):
+`analysis.sh all` runs `rq1 rq2 rq4 rq3 paper` — the order the cross-RQ cache dependencies require (rq3 reuses rq2's attribution cache, the cheatsheet audit reuses rq4's). Compute steps use `$BASELINE_PYTHON`, figure steps `${FIG_PYTHON:-python3}` with matplotlib. What each target runs, module by module (`src/analysis/` unless noted):
 
 **RQ1 — the success gains do not hold:**
 - `mech/stats.py` — paired seed-vs-skill test statistics from the raw `evaluation.json` files
