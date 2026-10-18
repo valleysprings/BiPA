@@ -5,7 +5,7 @@ it replaces the block between the AUTO markers in that file."""
 import argparse, json, re, sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.layout import current_run
 
 MODELS = ("deepseek-flash", "gpt-6-luna")

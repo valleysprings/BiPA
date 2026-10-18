@@ -7,11 +7,11 @@ version, whether the method returned the seed, the cache hits on the test panel 
 the model. Evaluations already in the cache are read back.
 
 Run resolution: skillopt / gepa / skilladam = layout.current_run(method, A, bench) (what main_table.py scores; it must
-have summary.json); zo = layout.ours_run(A, bench) (ours_runs.json), reported as `ours`.
+have summary.json).
 
-Usage:  python bipa/scripts/jobs/transfer_model.py [--methods skillopt,gepa,skilladam,zo] [--slots 16] [--execute]
+Usage:  python bipa/scripts/transfer_model.py [--methods skillopt,gepa,skilladam] [--slots 16] [--execute]
 In the background (the cache is read back, so a restart resumes):
-  setsid nohup python bipa/scripts/jobs/transfer_model.py --methods skillopt,gepa,skilladam,zo --slots 16 --execute >> LOG 2>&1 &
+  setsid nohup python bipa/scripts/transfer_model.py --methods skillopt,gepa,skilladam --slots 16 --execute >> LOG 2>&1 &
   (LOG: assets/logs/ood-launch.log)
 
 Outputs:
@@ -26,7 +26,9 @@ import json
 import sys
 
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))  # bipa root, for src.*
+sys.path.insert(0, str(HERE))         # this dir, for main_table
 from src import experiment_config as experiments
 experiments.configure_environment()
 from src.layout import CACHE, EXECUTION
@@ -34,8 +36,6 @@ from src.utils.executor import SEED, Cell, evaluate, evaluator
 from src.layout import RESULTS, current_run
 from src.panels import panels
 
-# main_table lives with the analysis scripts in bipa/scripts/analysis, outside src/ (the one path edit this module keeps)
-sys.path.append(str(experiments.MITIGATION_ROOT / "bipa/scripts/analysis"))
 from main_table import evaluation, pair, version  # noqa: E402
 
 MODELS = tuple(experiments.CFG["models"])   # train and eval models of the transfer (config/experiments.yaml models)
@@ -43,7 +43,7 @@ BENCHES = experiments.BENCHMARKS
 
 
 def run_of(method, model, bench):
-    """The returned-skill run of a train cell (zo -> ours_runs.json), or None when it has no summary.json."""
+    """The returned-skill run of a train cell, or None when it has no summary.json."""
     run = current_run(method, model, bench)
     if run and (run / "summary.json").is_file():
         return run
@@ -73,7 +73,7 @@ def build_cells(methods, slots, cache, benches=BENCHES, evals=None):
                         continue
                     text = json.loads((run / "summary.json").read_text())["final_skill"]
                     transfers.append({"bench": bench, "train": trained, "eval": evaluated,
-                                      "method": "ours" if method == "zo" else method,
+                                      "method": method,
                                       "run": str(run.relative_to(experiments.MITIGATION_ROOT)), "text": text,
                                       "returned_seed": text == SEED})
 
@@ -160,8 +160,8 @@ def execute(seeds, transfers):
 
 def main(argv=None):
     """Dry run (default) or run (--execute) of the cross-model transfer evaluation."""
-    a = argparse.ArgumentParser(prog="python bipa/scripts/jobs/transfer_model.py", description=__doc__.splitlines()[0])
-    a.add_argument("--methods", default="skillopt,gepa,skilladam,zo")
+    a = argparse.ArgumentParser(prog="python bipa/scripts/transfer_model.py", description=__doc__.splitlines()[0])
+    a.add_argument("--methods", default="skillopt,gepa,skilladam")
     a.add_argument("--benches", default=",".join(BENCHES), help="comma-separated benchmark ids (default: all)")
     a.add_argument("--eval", default=None, help="the eval model (default: every model, i.e. both directions)")
     a.add_argument("--slots", type=int, default=16)

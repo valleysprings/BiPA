@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 
-ANALYSIS = Path(__file__).resolve().parents[2] / 'scripts/analysis'
+ANALYSIS = Path(__file__).resolve().parents[2] / 'scripts'
 sys.path.insert(0, str(ANALYSIS))
 from audit_native_run import certify, skill_digest, ledger_segments, native_timeout_cutoff, file_hash
 from audit_trace_integrity import Evidence

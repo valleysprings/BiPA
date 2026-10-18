@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 BASE = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(BASE.parent), str(BASE.parent / "scripts/analysis")]
+sys.path[:0] = [str(BASE.parent), str(BASE.parent / "scripts")]
 from src.adapters import skilladam as arm
 from src import native_trace
 from audit_skill_history import Store, skilladam as derive

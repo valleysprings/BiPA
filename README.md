@@ -7,19 +7,21 @@ Code for the BiPA paper. BiPA verifies a learned skill by what it changes in the
 | Path | Contents |
 |---|---|
 | `src/` | Experiment harness: scheduling (`run.sh` → `launch.py`), single-cell runs (`run.py`), repeated test evaluation (`repeat.py`, `repeat_transfer.py`), episode tracing (`native_protocol.py`, `native_trace.py`), fixed panels (`panels.py`), and adapters (`adapters/`) to the upstream optimizers |
-| `src/optimizers/` | Canonical upstream sources: SkillOpt, SkillAdam, GEPA, EvoHarness |
+| `optimizers/` | Canonical upstream sources: SkillOpt, SkillAdam, GEPA, EvoHarness |
+| `configs/` | Run configuration: panels, budgets, and backends (`tasks.yaml`), experiment definitions (`experiments.yaml`) |
+| `docs/` | Investigation notes (e.g. `luna-20261014.md`) |
 | `src/analysis/` | Offline analysis of finished runs (read-only on the execution artifacts): the avg@3 main table (`src/analysis/table1.py`) and the appendix analyses (`src/analysis/mech/`, `src/analysis/mechanism/`) |
 | `src/graph/` | Per-episode bipartite graph construction and metrics used by the analysis |
-| `scripts/analysis/` | Offline audits, run statistics, and the table/figure generators |
-| `scripts/jobs/` | Transfer evaluation jobs |
-| `assets/skills/seed/SKILL.md` | The common seed skill |
+| `scripts/` | Scheduling and RQ-test drivers (transfer evaluation), the live status/progress table, and run-evidence audits |
+
+The seed skill is read from the shared artifacts tree (`../assets/skills/seed/SKILL.md` in the harness-mitigation workspace), not vendored in this repo.
 
 The adapters convert tasks, trajectories, and verifier scores into each upstream interface; the search, edit, acceptance, and return rules remain the upstream implementations. Adaptations relative to the original papers (benchmarks, budgets, starting skill, execution interface, caching, transport) are recorded in each adapter's `DEVIATIONS`.
 
 ## Requirements
 
 - Python 3.12 with `harness-bench` (task execution, caching, retry, and raw traces) installed
-- The dependencies of each upstream optimizer, see `src/optimizers/<name>/`
+- The dependencies of each upstream optimizer, see `optimizers/<name>/`
 
 ## Usage
 

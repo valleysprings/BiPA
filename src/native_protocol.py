@@ -25,13 +25,13 @@ def source_files(tree):
 def prepare(args, out, sample, schedule, seed):
     base = Path(__file__).resolve().parent
     files = [base / name for name in ('run.py', 'native_protocol.py', 'utils/executor.py', 'panels.py',
-                                     'utils/llm.py', 'native_trace.py', 'configs/tasks.yaml')]
+                                     'utils/llm.py', 'native_trace.py', '../configs/tasks.yaml')]
     if args.arm in ('skillopt', 'gepa', 'skilladam'):
         files.append(base / 'adapters' / (args.arm + '.py'))
     if args.arm == 'skilladam':  # the prompts its proposer and tracker read: upstream's core prompts and our 5 files
         files.extend(sorted((OPTIMIZERS / 'skilladam/skilladam/core/prompts').glob('*.md')))
         files.extend(sorted((base / 'prompts/skilladam').rglob('*.md')))
-    files.extend(base.parent / 'scripts/analysis' / name for name in ('audit_native_run.py', 'audit_skill_history.py'))
+    files.extend(base.parent / 'scripts' / name for name in ('audit_native_run.py', 'audit_skill_history.py'))
     upstream = OPTIMIZERS / args.arm
     if upstream.exists():
         files.extend(sorted(upstream.rglob('*.py')))

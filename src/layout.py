@@ -8,11 +8,11 @@ BASELINE_ROOT = Path(__file__).resolve().parent
 BASELINES_ROOT = BASELINE_ROOT.parent
 MITIGATION_ROOT = BASELINES_ROOT.parent
 # the harness-bench checkout: the campaign's backend (configs/tasks.yaml backend.bench_root), the one place it is set
-HARNESS_BENCH = Path(yaml.safe_load((BASELINE_ROOT / "configs/tasks.yaml").read_text(encoding="utf-8"))
+HARNESS_BENCH = Path(yaml.safe_load((BASELINES_ROOT / "configs/tasks.yaml").read_text(encoding="utf-8"))
                      ["backend"]["bench_root"])
 ASSETS = MITIGATION_ROOT / "assets"
 ARTIFACTS = ASSETS / "artifacts"
-OPTIMIZERS = BASELINE_ROOT / "optimizers"
+OPTIMIZERS = BASELINES_ROOT / "optimizers"
 SKILLS = ASSETS / "skills"
 RESULTS = ARTIFACTS / "results"
 EXECUTION = ARTIFACTS / "execution"
@@ -53,7 +53,6 @@ EXEC_ONLY_FILES = {_EXEC + rel: _EXEC_EVIDENCE / rel
 
 # every run writes directly to EXECUTION / <model> / <method> / <bench> / <run-id>; there is no separate live area
 ARM_DIR = {"none": "native-noseed", "noskill": "native-noseed", "seed": "native-seed", "zo": "ours"}
-OURS_RUNS = MITIGATION_ROOT / "bach-harness/config/ours_runs.json"  # the run each (model, bench) cell reports as `ours`
 _OLD_LIVE = re.compile(re.escape(_MIT) + r"/runs/(zo|skilladam|ood|probe)/([a-z0-9-]+)/([a-z0-9-]+)/([^/]+)")
 _LIVE_RUN = re.compile(re.escape(str(EXECUTION / "runs")) + r"/([a-z0-9_]+)/([a-z0-9-]+)/opencode/([a-z0-9-]+)/([^/]+)")
 
@@ -124,16 +123,8 @@ def run_dirs(arm, model, bench):
     return [d for d in cell.iterdir() if d.is_dir()] if cell.is_dir() else []
 
 
-def ours_run(model, bench):
-    """The BACH run the cell reports as `ours` (tag in bach-harness/config/ours_runs.json)."""
-    import json
-    return run_path("zo", model, bench, json.loads(OURS_RUNS.read_text())[model][bench])
-
-
 def current_run(arm, model, bench):
-    """Newest native-* run of a cell that is not ABORTED, preferring one with summary.json; `ours` (arm zo) is the run named in ours_runs.json."""
-    if arm in ("zo", "ours"):
-        return ours_run(model, bench)
+    """Newest native-* run of a cell that is not ABORTED, preferring one with summary.json."""
     runs = [d for d in run_dirs(arm, model, bench) if d.name.startswith("native-") and not (d / "ABORTED.md").exists()]
     done = [d for d in runs if (d / "summary.json").is_file()]
     return max(done or runs, key=lambda d: ((d / "summary.json") if d in done else (d / "native_protocol.json")).stat().st_mtime, default=None)

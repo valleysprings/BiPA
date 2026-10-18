@@ -5,7 +5,7 @@ import yaml
 
 from src.layout import BASELINE_ROOT, CACHE, EXECUTION, MITIGATION_ROOT
 
-CFG = yaml.safe_load((BASELINE_ROOT / "configs/experiments.yaml").read_text())
+CFG = yaml.safe_load((BASELINE_ROOT.parent / "configs/experiments.yaml").read_text())
 HARNESS = CFG["harness"]
 BENCHMARKS = tuple(CFG["benchmarks"])
 ALIASES = {spec["alias"]: bench for bench, spec in CFG["benchmarks"].items()}

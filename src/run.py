@@ -113,7 +113,7 @@ def main() -> None:
                    feedback_mode=args.feedback_mode, evaluated_panels=baseline_panels)
     (out / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     if protocol:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts/analysis"))
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
         from audit_native_run import certify
         certificate = certify(out)
         (out / "completion_audit.json").write_text(json.dumps(certificate, ensure_ascii=False, indent=2) + "\n")

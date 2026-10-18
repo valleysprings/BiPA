@@ -2,10 +2,10 @@
 """Export each cell's current run into results/<model>/<method>/<bench>/ (summary.json, rounds.json, per-round skills, final). Read-only on runs, idempotent, no API calls."""
 import argparse, hashlib, json, re, sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.layout import SKILLS, BASELINE_ROOT, relocate, result_dir, current_run
 
-ARMS = ('none', 'seed', 'skillopt', 'gepa', 'skilladam', 'ours')
+ARMS = ('none', 'seed', 'skillopt', 'gepa', 'skilladam')
 MODELS = ('deepseek-flash', 'gpt-6-luna')
 BENCHES = ('tau3-bench', 'automationbench', 'terminal-bench-2-1')
 

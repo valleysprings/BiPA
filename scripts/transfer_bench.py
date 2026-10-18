@@ -7,11 +7,10 @@ identical to the Seed shares the Seed row (reported, not executed again). Defaul
 version, whether the method returned the seed, the cache hits on B's test panel and the new episodes; --execute calls
 the model. Cells whose train run has no summary.json yet are skipped (listed in the dry run).
 
-Run resolution of the train cell (model, A): skillopt / gepa / skilladam = layout.current_run (must have summary.json);
-zo = layout.ours_run (ours_runs.json) or, with --ours-tag, that BACH tag; zo is reported as `ours`.
+Run resolution of the train cell (model, A): skillopt / gepa / skilladam = layout.current_run (must have summary.json).
 
-Usage:  python bipa/scripts/jobs/transfer_bench.py [--models deepseek-flash] [--methods skillopt,gepa,skilladam,zo]
-                                           [--ours-tag TAG] [--slots 16] [--execute]
+Usage:  python bipa/scripts/transfer_bench.py [--models deepseek-flash] [--methods skillopt,gepa,skilladam]
+                                           [--slots 16] [--execute]
 
 Outputs:
   execution/<model>/<method>/<B>/ood-from-bench-<A>/   evaluations, summary.json
@@ -26,33 +25,30 @@ import json
 import sys
 
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE.parent))  # bipa root, for src.*
+sys.path.insert(0, str(HERE))         # this dir, for main_table
 from src import experiment_config as experiments
 experiments.configure_environment()
-from src.layout import EXECUTION, run_path
+from src.layout import EXECUTION
 from src.utils.executor import SEED, Cell, evaluate, evaluator
 from src.layout import ARM_DIR, RESULTS, current_run
 from src.panels import panels
 
-# main_table lives with the analysis scripts in bipa/scripts/analysis, outside src/ (the one path edit this module keeps)
-sys.path.append(str(experiments.MITIGATION_ROOT / "bipa/scripts/analysis"))
 from main_table import evaluation, pair, version  # noqa: E402
 
 BENCHES = experiments.BENCHMARKS
 
 
-def train_run(method, model, bench, ours_tag=None):
+def train_run(method, model, bench):
     """The returned-skill run of a train cell, or None when it has no summary.json (yet)."""
-    if method == "zo" and ours_tag:
-        run = run_path("zo", model, bench, ours_tag)
-    else:
-        run = current_run(method, model, bench)
+    run = current_run(method, model, bench)
     if run and (run / "summary.json").is_file():
         return run
     return None
 
 
-def build_cells(models, methods, ours_tag=None, benches=BENCHES):
+def build_cells(models, methods, benches=BENCHES):
     """Seed references (one per model x eval bench) and the transfer cells: skill trained on A -> eval bench B != A."""
     seeds = []
     for model in models:
@@ -65,7 +61,7 @@ def build_cells(models, methods, ours_tag=None, benches=BENCHES):
     for model in models:
         for trained_on in benches:
             for method in methods:
-                run = train_run(method, model, trained_on, ours_tag)
+                run = train_run(method, model, trained_on)
                 # a train cell without a finished run has nothing to transfer
                 if not run:
                     skipped.append((model, method, trained_on))
@@ -75,7 +71,7 @@ def build_cells(models, methods, ours_tag=None, benches=BENCHES):
                     if bench == trained_on:
                         continue
                     transfers.append({"model": model, "bench": bench, "train": trained_on,
-                                      "method": "ours" if method == "zo" else method,
+                                      "method": method,
                                       "run": str(run.relative_to(experiments.MITIGATION_ROOT)), "text": text,
                                       "returned_seed": text == SEED})
 
@@ -180,15 +176,14 @@ def execute(seeds, transfers, slots):
 
 def main(argv=None):
     """Dry run (default) or run (--execute) of the cross-benchmark transfer evaluation."""
-    a = argparse.ArgumentParser(prog="python bipa/scripts/jobs/transfer_bench.py", description=__doc__.splitlines()[0])
+    a = argparse.ArgumentParser(prog="python bipa/scripts/transfer_bench.py", description=__doc__.splitlines()[0])
     a.add_argument("--models", default="deepseek-flash")
-    a.add_argument("--methods", default="skillopt,gepa,skilladam,zo")
-    a.add_argument("--ours-tag", default=None)
+    a.add_argument("--methods", default="skillopt,gepa,skilladam")
     a.add_argument("--slots", type=int, default=16)
     a.add_argument("--execute", action="store_true")
     args = a.parse_args(argv)
 
-    seeds, transfers, skipped = build_cells(args.models.split(","), args.methods.split(","), args.ours_tag)
+    seeds, transfers, skipped = build_cells(args.models.split(","), args.methods.split(","))
     for c in seeds + transfers:
         c["cached"] = cached(c, args.slots)
     if args.execute:
