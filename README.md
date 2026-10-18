@@ -36,7 +36,7 @@ bipa/
 │   ├── analysis/     # table1.py (Table 1), mech/ and mechanism/ (RQ analyses)
 │   ├── dynamics/     # transfer drivers, execution-evidence audits, status/refresh
 │   └── graph/        # per-episode bipartite-graph metrics
-├── scripts/          # entry points: baselines.sh, rq4_transfer.sh, audit.sh, refresh.sh
+├── scripts/          # entry points: baselines.sh, analysis.sh, rq4_transfer.sh, audit.sh, refresh.sh
 ├── optimizers/       # vendored upstream sources, pinned commits
 ├── configs/          # tasks / experiments / graph yaml
 ├── tests/            # 66 tests, fake model and tasks, no API calls
@@ -69,8 +69,8 @@ A test slot that ran in all three repetitions but never got a verifier verdict s
 **Secondary experiments**:
 
 ```bash
-# RQ1-RQ4 analyses (offline; one module per figure/table, docstring has its subcommands)
-"$BASELINE_PYTHON" -m src.analysis.mech.<module>          # or src.analysis.mechanism.<module>
+# RQ1-RQ4 analyses (offline; per target, compute first then figures, in dependency order)
+bash scripts/analysis.sh rq1        # rq2 rq3 rq4 paper table1, or "all"
 # transfer: a returned skill evaluated unchanged under another model / benchmark
 bash scripts/rq4_transfer.sh model|bench|tb2auto [--execute]
 # execution-evidence audits: completion certificate, trace integrity, skill history
@@ -79,7 +79,7 @@ bash scripts/audit.sh native-run|trace|skill-history ...
 bash scripts/refresh.sh
 ```
 
-RQ mapping (modules under `src/analysis/` unless noted):
+`analysis.sh all` runs `rq1 rq2 rq4 rq3 paper` — the order the cross-RQ cache dependencies require (rq3 reuses rq2's attribution cache, the cheatsheet audit reuses rq4's). What each target runs, module by module (`src/analysis/` unless noted):
 
 **RQ1 — the success gains do not hold:**
 - `mech/stats.py` — paired seed-vs-skill test statistics from the raw `evaluation.json` files
@@ -88,7 +88,7 @@ RQ mapping (modules under `src/analysis/` unless noted):
 - `mechanism/nullmodel.py` — winner's-curse null model and seed variability
 - `mechanism/paired.py` — task-level paired summary against Seed (`mech/paired_fig.py` draws the appendix "other aggregations" figure)
 - `mechanism/power.py` — power / minimum detectable effect of the comparison
-- `mechanism/pooled.py`, `mechanism/reproducibility.py`, `mechanism/appb.py` — pooled and per-repetition reproducibility of success and cost
+- `mechanism/pooled.py`, `mechanism/reproducibility.py`, `mechanism/appb.py`, `mech/reruns.py` — pooled and per-repetition reproducibility of success and cost
 
 **RQ2 — every learned skill levies a token tax:**
 - `mech/attribution.py` — the four-term split of the log input-token change (`mech/runs_fig.py` draws the per-repetition version)

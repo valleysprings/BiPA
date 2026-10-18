@@ -34,4 +34,13 @@ bash scripts/audit.sh skill-history [--output-dir DIR]           # 从优化器�
 bash scripts/refresh.sh
 ```
 
-论文表格与图的生成在 [../src/analysis](../src/analysis/README.md)。所有表格必须区分重复次数、结局覆盖和轨迹完整性。
+**analysis.sh** — 论文 RQ 分析的 composition（全离线，不调模型）：每个 target 内先 compute（venv python）再画图（系统 python3，可用 `FIG_PYTHON` 覆盖）；跨 target 有 cache 依赖（rq3 要 rq2 的 `appc/attr.json` 与 `mech/attribution.json`，cheatsheet 还要 rq4 的产物），`all` 按 `rq1 rq2 rq4 rq3 paper` 的顺序跑，满足全部约束：
+
+```bash
+bash scripts/analysis.sh rq1          # rq2 rq3 rq4 paper table1，可多个
+bash scripts/analysis.sh all          # 全部，按依赖顺序
+```
+
+RQ1–3 中 manifest 驱动的模块（`mechanism/{nullmodel,paired,power}`）读 `BACH_SUBMISSION_MANIFEST`，脚本默认指向 `assets/cache/analysis/submission-20261008/protocol.json`（不存在时由 `src/analysis/submission_protocol.py` 重新冻结生成）。
+
+论文表格与图的逐模块说明见主 README 的 RQ mapping。所有表格必须区分重复次数、结局覆盖和轨迹完整性。
