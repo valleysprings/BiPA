@@ -36,7 +36,7 @@ bipa/
 │   ├── analysis/     # table1.py (Table 1), mech/ and mechanism/ (RQ analyses)
 │   ├── dynamics/     # transfer drivers, execution-evidence audits, status/refresh
 │   └── graph/        # per-episode bipartite-graph metrics
-├── scripts/          # entry points: baselines.sh, analysis.sh, rq4_transfer.sh, audit.sh, refresh.sh
+├── scripts/          # baselines.sh (train + repeat) and analysis.sh (everything else)
 ├── optimizers/       # vendored upstream sources, pinned commits
 ├── configs/          # tasks / experiments / graph yaml
 ├── tests/            # 66 tests, fake model and tasks, no API calls
@@ -70,51 +70,21 @@ A test slot that ran in all three repetitions but never got a verifier verdict s
 **Secondary experiments**:
 
 ```bash
-# RQ1-RQ4 analyses (offline; per target, compute first then figures, in dependency order)
-bash scripts/analysis.sh rq1        # rq2 rq3 rq4 paper table1, or "all"
+# RQ1-RQ4 analyses and the main-text figures (offline; per target, compute first then figures)
+bash scripts/analysis.sh rq1        # rq2 rq3 rq4 mainfigs table1 refresh, or "all"
 # transfer: a returned skill evaluated unchanged under another model / benchmark
-# (dry-run by default, the evaluation cache resumes an interrupted run)
-bash scripts/rq4_transfer.sh model|bench|tb2auto [--execute]
+# (dry-run by default, the evaluation cache resumes; --execute calls the model)
+bash scripts/analysis.sh transfer model|bench|tb2auto [--execute]
 # execution-evidence audits: completion certificate, trace integrity, skill history
-bash scripts/audit.sh native-run|trace|skill-history ...
-# refresh the derived tables under ../assets/artifacts/results/ (skills, main table, status)
-bash scripts/refresh.sh
+bash scripts/analysis.sh audit native-run|trace|skill-history ...
 ```
 
-`analysis.sh all` runs `rq1 rq2 rq4 rq3 paper` — the order the cross-RQ cache dependencies require (rq3 reuses rq2's attribution cache, the cheatsheet audit reuses rq4's). Compute steps use `$BASELINE_PYTHON`, figure steps `${FIG_PYTHON:-python3}` with matplotlib. What each target runs, module by module (`src/analysis/` unless noted):
+`analysis.sh all` runs `rq1 rq2 rq4 rq3 mainfigs` — the order the cross-RQ cache dependencies require (rq2's paired figure reuses rq1's statistics, rq3 reuses rq2's attribution cache, the cheatsheet audit reuses rq4's). Compute steps use `$BASELINE_PYTHON`, figure steps `${FIG_PYTHON:-python3}` with matplotlib. What each target runs (`src/analysis/` unless noted):
 
-**RQ1 — the success gains do not hold:**
-- `mech/stats.py` — paired seed-vs-skill test statistics from the raw `evaluation.json` files
-- `mech/selection.py` — winner's-curse replay of each optimizer's acceptance rule on seed-identical candidates, and the dev-size replay (`mech/devsize_fig.py`, `mech/devtest_fig.py` draw the figures)
-- `mech/domains.py` — per-domain split of Table 1 success (`mech/domains_fig.py`)
-- `mechanism/nullmodel.py` — winner's-curse null model and seed variability
-- `mechanism/paired.py` — task-level paired summary against Seed (`mech/paired_fig.py` draws the appendix "other aggregations" figure)
-- `mechanism/power.py` — power / minimum detectable effect of the comparison
-- `mechanism/pooled.py`, `mechanism/reproducibility.py`, `mechanism/appb.py`, `mech/reruns.py` — pooled and per-repetition reproducibility of success and cost
-
-**RQ2 — every learned skill levies a token tax:**
-- `mech/attribution.py` — the four-term split of the log input-token change (`mech/runs_fig.py` draws the per-repetition version)
-- `mech/slopes.py`, `mech/slopes_input_fig.py` — within-task slopes of input tokens on turns
-- `mech/failcost.py`, `mech/failcost_fig.py` — the tax on solved vs failed tasks
-- `mech/price.py`, `mech/price_fig.py` — the tax under cached-input pricing
-- `mech/compaction.py` — counterfactual: the tax under a compacting harness
-- `mech/optcost.py`, `mech/optcost_fig.py` — the optimizer's own training bill
-- `mechanism/episodes.py`, `mechanism/slopes.py`, `mechanism/slopes_checks.py`, `mechanism/pricing.py`, `mechanism/reruns.py`, `mechanism/optcost.py`, `mechanism/facts.py`, `mechanism/appc.py`, `mechanism/fig1.py` — the Section-3 elasticity numbers and the Appendix-C records behind them
-
-**RQ3 — the optimizers accumulate procedure:**
-- `mech/skilltext.py` — coded rule categories of the 337 added units (`mech/rules_fig.py` draws the figure)
-- `mech/coder2.py` — second-coder reliability of the rule coding
-- `mech/callsperturn.py` — tool calls per turn, seed against each learned skill (`mech/calls_fig.py`)
-- `mech/edges_build.py` — rebuild the parent→child edit table of the optimizer runs
-- `mech/edges.py` — accepted vs rejected edits: the cost arrives with the proposals
-- `mech/edges_fig.py`, `mech/edges_holm.py` — keyword-group contrasts of the edits, Holm-adjusted
-- `mech/cheatsheet.py` — answer-leakage audit of the learned skills
-
-**RQ4 — the findings generalize:**
-- `mech/transfer.py`, `mech/transfer_fig.py` — cross-model and cross-benchmark transfer results
-- `mech/dynamics.py`, `mech/dynamics_fig.py` — the trajectory-dynamics hypotheses H1 / H2 / H4
-- `src/dynamics/transfer_model.py`, `src/dynamics/transfer_bench.py`, `src/dynamics/transfer_bench_tb2auto.py` — the transfer drivers (the only RQ4 pieces that call the model)
-
-**Paper-wide pieces:** `mech/teaser.py` (Figure 1), `mech/skills_fig.py` (Section 4.3: where each skill's tax goes, next to what its optimizer wrote), `mech/batching.py`, `mech/designev.py`, `mech/implications_fig.py`, `mech/selrules.py` (the Section-5 design-principle evidence), `mech/common.py` (shared paths, figure and audit writers), `mech/copies.py` (byte copies of the baseline-only figures under `mech_` names).
+- **RQ1** — `mech/stats.py` (paired test statistics), `mech/selection.py` + `devsize_fig.py`/`devtest_fig.py` (winner's-curse replay and its figures), `mech/domains.py` + `domains_fig.py` (per-domain success), `mech/reruns.py` (per-repetition reproducibility figure), `mechanism/{nullmodel,power,pooled,reproducibility,appb}.py` (selection-noise null model, power/MDE, pooled and per-repetition checks).
+- **RQ2** — `mech/attribution.py` (the four-term split), `mech/slopes.py` + `slopes_input_fig.py` (within-task slopes), `mech/failcost.py` (tax on solved vs failed), `mech/price.py` + `price_fig.py` (cached-input pricing), `mech/compaction.py` (compacting-harness counterfactual), `mech/optcost.py` (the optimizer's own bill), `mech/paired_fig.py` (the tax under other aggregations), `mechanism/{appc,slopes,slopes_checks,pricing,reruns,optcost,facts}.py` (the Section-3 elasticity numbers).
+- **RQ3** — `mech/skilltext.py` + `rules_fig.py` (the 337 coded rules), `mech/coder2.py` (second-coder reliability), `mech/callsperturn.py` + `calls_fig.py` (calls per turn), `mech/{edges_build,edges,edges_fig,edges_holm}.py` (the parent→child edit table, accepted vs rejected), `mech/cheatsheet.py` (answer-leakage audit).
+- **RQ4** — `mech/{transfer,transfer_fig,dynamics,dynamics_fig}.py` (cross-model / cross-benchmark transfer, trajectory dynamics H1/H2/H4); the model-calling drivers `src/dynamics/transfer_{model,bench,bench_tb2auto}.py` run through `analysis.sh transfer`.
+- **Main-text figures** (`mainfigs`) — `mech/teaser.py` (Fig. 1), `mech/skills_fig.py` (Sec. 4.3), `mech/{batching,designev,selrules,implications_fig}.py` (Sec. 5 design evidence).
 
 Each module writes its audit record to `../paper/assets/data/mech/`.

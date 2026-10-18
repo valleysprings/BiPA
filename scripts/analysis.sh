@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# Offline composition of the paper's analyses: per RQ, compute first (venv python),
-# then figures (system python3, matplotlib). No model calls anywhere in this script.
+# Composition of the paper's analyses: per target, compute first (venv python),
+# then figures (system python3, matplotlib). Only "transfer" can call the model,
+# and only with --execute; every other target is offline.
 #
-# Usage: bash scripts/analysis.sh rq1|rq2|rq3|rq4|paper|table1|all [more targets...]
+# Usage:
+#   bash scripts/analysis.sh rq1|rq2|rq3|rq4|mainfigs|table1|refresh|all
+#   bash scripts/analysis.sh transfer model|bench|tb2auto [args...]   # dry-run unless --execute
+#   bash scripts/analysis.sh audit native-run|trace|skill-history [args...]
 #
-# Cross-target cache dependencies (assets/cache/analysis/): rq3 needs rq2's
-# appc/attr.json and mech/attribution.json; cheatsheet (rq3) also needs rq4's
-# mech/dynamics.json and the executed transfer results; paper needs rq1-rq3.
-# "all" runs rq1 rq2 rq4 rq3 paper in that order, which satisfies every constraint.
+# Cross-target cache dependencies (assets/cache/analysis/): rq2's paired_fig needs
+# rq1's stats.json; rq3 needs rq2's appc/attr.json and mech/attribution.json;
+# cheatsheet (rq3) also needs rq4's dynamics.json and the executed transfer results;
+# mainfigs needs rq1-rq3. "all" runs rq1 rq2 rq4 rq3 mainfigs, satisfying every one.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PY="${BASELINE_PYTHON:-$ROOT/bach-harness/.venv/bin/python}"
@@ -16,11 +20,9 @@ CACHE="$ROOT/assets/cache/analysis"
 export BACH_SUBMISSION_MANIFEST="${BACH_SUBMISSION_MANIFEST:-$CACHE/submission-20261008/protocol.json}"
 cd "$ROOT/bipa"
 
-table1() {  # Table 1 (both models) -> ../paper/assets/data/mech/mech_table1.md
-  "$PY" -m src.analysis.table1
-}
+usage() { sed -n '5,10p' "$0"; exit 1; }
 
-need_manifest() {  # rq1's nullmodel/paired/power are driven by the frozen submission manifest
+need_manifest() {  # rq1's nullmodel/power are driven by the frozen submission manifest
   if [ ! -f "$BACH_SUBMISSION_MANIFEST" ]; then
     echo "submission manifest not found: $BACH_SUBMISSION_MANIFEST" >&2
     echo "freeze it first: $PY -m src.analysis.submission_protocol" >&2
@@ -28,10 +30,13 @@ need_manifest() {  # rq1's nullmodel/paired/power are driven by the frozen submi
   fi
 }
 
+table1() {  # Table 1 (both models) -> ../paper/assets/data/mech/mech_table1.md
+  "$PY" -m src.analysis.table1
+}
+
 rq1() {  # the success gains do not hold
   need_manifest
   "$PY" -m src.analysis.mechanism.nullmodel --out "$CACHE/nullmodel"
-  "$PY" -m src.analysis.mechanism.paired --out "$CACHE/paired"
   "$PY" -m src.analysis.mechanism.power --out "$CACHE/power"
   "$PY" -m src.analysis.mechanism.appb compute
   "$PY" -m src.analysis.mechanism.pooled
@@ -47,11 +52,9 @@ rq1() {  # the success gains do not hold
   "$FIG" -m src.analysis.mech.devsize_fig
   "$FIG" -m src.analysis.mech.devtest_fig
   "$FIG" -m src.analysis.mech.domains_fig
-  "$FIG" -m src.analysis.mech.paired_fig
 }
 
-rq2() {  # every learned skill levies a token tax
-  "$PY" -m src.analysis.mechanism.fig1 compute
+rq2() {  # every learned skill levies a token tax (paired_fig needs rq1's stats.json)
   "$PY" -m src.analysis.mechanism.appc compute
   "$PY" -m src.analysis.mechanism.slopes_checks
   "$PY" -m src.analysis.mechanism.slopes
@@ -66,18 +69,15 @@ rq2() {  # every learned skill levies a token tax
   "$PY" -m src.analysis.mech.price
   "$PY" -m src.analysis.mech.compaction compute
   "$PY" -m src.analysis.mech.optcost
-  "$FIG" -m src.analysis.mechanism.appc draw
   "$FIG" -m src.analysis.mech.attribution draw
   "$FIG" -m src.analysis.mech.slopes draw
   "$FIG" -m src.analysis.mech.slopes_input_fig
-  "$FIG" -m src.analysis.mech.failcost_fig
   "$FIG" -m src.analysis.mech.price_fig
   "$FIG" -m src.analysis.mech.compaction draw
-  "$FIG" -m src.analysis.mech.optcost_fig
-  "$FIG" -m src.analysis.mech.runs_fig
+  "$FIG" -m src.analysis.mech.paired_fig
 }
 
-rq4() {  # the findings generalize (analysis only; the model-calling drivers are scripts/rq4_transfer.sh)
+rq4() {  # the findings generalize (offline analysis of the executed transfers)
   "$PY" -m src.analysis.mech.transfer
   "$PY" -m src.analysis.mech.dynamics
   "$FIG" -m src.analysis.mech.transfer_fig
@@ -98,26 +98,42 @@ rq3() {  # the optimizers accumulate procedure (needs rq2's caches; cheatsheet a
   "$FIG" -m src.analysis.mech.calls_fig
 }
 
-paper() {  # paper-wide pieces (needs rq1-rq3 caches and the appb/appc figures)
+mainfigs() {  # main-text figures: Fig. 1, Sec. 4.3, the Sec. 5 design evidence (needs rq1-rq3 caches)
   "$PY" -m src.analysis.mech.teaser compute
   "$PY" -m src.analysis.mech.batching compute
   "$PY" -m src.analysis.mech.designev compute
   "$PY" -m src.analysis.mech.selrules compute
   "$FIG" -m src.analysis.mech.teaser draw
-  "$FIG" -m src.analysis.mech.batching draw
-  "$FIG" -m src.analysis.mech.designev draw
-  "$FIG" -m src.analysis.mech.selrules draw
   "$FIG" -m src.analysis.mech.implications_fig
   "$FIG" -m src.analysis.mech.skills_fig
-  "$FIG" -m src.analysis.mech.copies
 }
 
-usage() { sed -n '2,9p' "$0"; exit 1; }
+refresh() {  # derived tables under assets/artifacts/results/ (skill export, main table, status)
+  "$PY" -m src.dynamics.render_native_skill_history
+  "$PY" -m src.dynamics.main_table
+  "$PY" -m src.dynamics.weekly_status
+}
+
 [ $# -ge 1 ] || usage
-for t in "$@"; do
-  case "$t" in
-    rq1|rq2|rq3|rq4|paper|table1) "$t" ;;
-    all) rq1; rq2; rq4; rq3; paper ;;
-    *) usage ;;
-  esac
-done
+t="$1"; shift
+case "$t" in
+  rq1|rq2|rq3|rq4|mainfigs|table1|refresh) "$t" ;;
+  all) rq1; rq2; rq4; rq3; mainfigs ;;
+  transfer)
+    case "${1:-}" in
+      model)   m=transfer_model ;;
+      bench)   m=transfer_bench ;;
+      tb2auto) m=transfer_bench_tb2auto ;;
+      *)       echo "usage: bash scripts/analysis.sh transfer model|bench|tb2auto [args...]" >&2; exit 2 ;;
+    esac
+    shift; exec "$PY" -m "src.dynamics.$m" "$@" ;;
+  audit)
+    case "${1:-}" in
+      native-run)    m=audit_native_run ;;
+      trace)         m=audit_trace_integrity ;;
+      skill-history) m=audit_skill_history ;;
+      *)             echo "usage: bash scripts/analysis.sh audit native-run|trace|skill-history [args...]" >&2; exit 2 ;;
+    esac
+    shift; exec "$PY" -m "src.dynamics.$m" "$@" ;;
+  *) usage ;;
+esac

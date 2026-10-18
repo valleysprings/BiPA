@@ -30,8 +30,6 @@ SPECS = {
                            files="typed by hand in the tex", notes=["Cells without a finished run stay pending (\\tbd in the draft)."]),
     "sec05_evolution": dict(pub="method", paper=[("fig:evolution", "appendix/b-noise.tex", r"label\{fig:evolution\}", "BACH: success (row 1, with the baselines' final skills' test avg@3 success from Table 1 as horizontal reference lines) and input-token ratio rho (row 2) of the incumbent skill after each round against the training tasks consumed, on dev (solid) and test (dashed, where evaluated), per benchmark")],
                             files="fig/method/sec05_evolution.pdf, fig/method/sec05_evolution.svg", notes=["Baseline reference lines are the final skills' test avg@3 from Table 1 (assets/cache/analysis/table1/table1.json).", "Runs without summary.json are in progress; this is noted here only, the plot does not mark it."]),
-    "appC_luna": dict(pub="mech", paper=[("tab:luna", "appendix/b-noise.tex", r"label\{tab:luna\}", "GPT-6 Luna without a skill and with the seed skill, one test run each: test success Q and the ratios of input tokens (rho) and tool calls (rho^calls) to the Seed skill run")],
-                      files="typed by hand in the tex", notes=["Run id native-20261011 of gpt-6-luna (native-seed, native-noseed); no optimizer runs on this model."]),
     "appE_levertest": dict(pub="method", paper=[("fig:appd-rewrite", "appendix/c-analysis.tex", r"label\{fig:appd-rewrite\}", "dev-set prediction of the dominant lever and removable part; measured saving of the economize rewrite on test (per-skill table dropped 2026-10-10; headline numbers in Section 5.4)")],
                            files="typed by hand in the tex", notes=["SkillAdam on TB2 was not run. The caption's seed spreads (0.050, 0.129, 0.037 log input tokens; 0.052, 0.043, 0.054 log tool calls; 4.0, 8.4, 5.6 points) come from `src/analysis/mechanism/reruns.py` (`seed_spread.json`), not from this table's script.",
                                                                     "Draft column mapping: Lever `turns` = `dominant: merge`; Remov. = `predicted_removable`; Saving = `realized_saving`; Turns / Calls = (exp(dlog) - 1) in percent of `turns_dlog` / `actions_dlog`; Words = `words`; Success = parent -> child."]),
@@ -44,15 +42,15 @@ SPECS["appC_attribution"] = dict(pub="mech", paper=[("Appendix C (Additional Ana
                                         BACH_NOTE])
 
 # Paper 1 (mech) new records. Location: draft2mech; the sections/appendix file and label are filled in by the agent that writes the tex.
-SPECS["mech_table1"] = dict(pub="mech", paper=[("tab:mech-main (Table 1)", "sections/05-experiments.tex", r"label\{tab:mech-main\}", "test success Q and the ratios of input tokens (rho) and tool calls to the Seed row for No skill, Seed, GEPA, SkillOpt, SkillAdam on TB2, tau3-bench, AutoBench (avg@3)")],
+SPECS["mech_table1"] = dict(pub="mech", paper=[("tab:main (Table 1)", "sections/04-setup.tex", r"label\{tab:main\}", "test success Q and the ratios of input tokens (rho) and tool calls to the Seed row for No skill, Seed, GEPA, SkillOpt, SkillAdam on TB2, tau3-bench, AutoBench (avg@3)")],
                             files="typed by hand in the tex", notes=[BASELINE_NOTE])
-SPECS["mech_teaser"] = dict(pub="mech", paper=[("fig:mech-teaser (Figure 1)", "sections/01-intro.tex", r"label\{fig:mech-teaser\}", "teaser figure of paper 1")],
+SPECS["mech_teaser"] = dict(pub="mech", paper=[("fig:teaser (Figure 1)", "sections/01-intro.tex", r"label\{fig:teaser\}", "teaser figure of paper 1")],
                             files="fig/mech/mech_teaser.pdf, fig/mech/mech_teaser.svg", notes=[BASELINE_NOTE])
-SPECS["mech_reruns"] = dict(pub="mech", paper=[("fig:mech-reruns", "appendix/b-noise.tex", r"label\{fig:mech-reruns\}", "every test run of the seed and of the optimized skills against the seed's run-to-run spread")],
+SPECS["mech_reruns"] = dict(pub="mech", paper=[("fig:reruns", "sections/05-findings.tex", r"label\{fig:reruns\}", "every test run of the seed and of the optimized skills against the seed's run-to-run spread")],
                             files="fig/mech/mech_reruns.pdf, fig/mech/mech_reruns.svg", notes=[BASELINE_NOTE])
-SPECS["mech_selection"] = dict(pub="mech", paper=[("fig:mech-selection", "appendix/b-noise.tex", r"label\{fig:mech-selection\}", "dev-set selection under the null: the gain a success-only selector reports when no candidate helps")],
+SPECS["mech_selection"] = dict(pub="mech", paper=[("fig:selection", "appendix/c-rq1.tex", r"label\{fig:selection\}", "dev-set selection under the null: the gain a success-only selector reports when no candidate helps")],
                                files="fig/mech/mech_selection.pdf, fig/mech/mech_selection.svg", notes=[BASELINE_NOTE])
-SPECS["mech_slopes"] = dict(pub="mech", paper=[("fig:mech-slopes", "appendix/c-analysis.tex", r"label\{fig:mech-slopes\}", "within-task slopes of log input tokens, output tokens and calls on log turns")],
+SPECS["mech_slopes"] = dict(pub="mech", paper=[("fig:slopes", "appendix/d-rq2.tex", r"label\{fig:slopes\}", "within-task slopes of log input tokens, output tokens and calls on log turns")],
                             files="fig/mech/mech_slopes.pdf, fig/mech/mech_slopes.svg", notes=[BASELINE_NOTE])
 ORDER = ["sec01_teaser", "sec05_table1", "sec05_ablation", "sec05_evolution", "appE_levertest"]
 
