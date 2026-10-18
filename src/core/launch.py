@@ -7,10 +7,10 @@ import shlex
 import subprocess
 import sys
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # bipa root
 
-from src import experiment_config as config
-from src.layout import BASELINE_ROOT, EXECUTION
+from src.core import experiment_config as config
+from src.core.layout import BASELINE_ROOT, EXECUTION
 
 ARMS = ("seed", "none", "skillopt", "gepa", "skilladam")
 
@@ -21,7 +21,7 @@ def job(model, bench, arm, *, repeat=False, tag=None, slots=None, test_runs=None
     slots = slots or base["slots"]
     scale = scale or config.CFG["scale"]
     if repeat:
-        argv = [str(BASELINE_ROOT / "repeat.py"), "--run", str(run), "--slots", str(slots),
+        argv = [str(BASELINE_ROOT / "core/repeat.py"), "--run", str(run), "--slots", str(slots),
                 "--test-runs", str(test_runs or config.CFG["test_runs"]), "--execute"]
         out = config.repetition_dir(run)
     else:

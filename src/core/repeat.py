@@ -7,10 +7,10 @@ import sys
 from pathlib import Path
 
 if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # bipa root
 
-from src import experiment_config as config
-from src.layout import relocate
+from src.core import experiment_config as config
+from src.core.layout import relocate
 
 
 def version(text):

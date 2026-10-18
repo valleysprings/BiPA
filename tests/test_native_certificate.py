@@ -115,7 +115,7 @@ def test_official_unknown_unknown_known_retry_preserves_aborted_evidence(tmp_pat
 
 
 def test_audit_reads_immutable_round_snapshot_after_live_metadata_changes(tmp_path):
-    from src.native_trace import record_round_evaluation
+    from src.core.native_trace import record_round_evaluation
     retry_run(tmp_path)
     path = tmp_path / 'results/evaluations/test/v/evaluation.json'
     record_round_evaluation(tmp_path, arm='none', step=0, role='final_test',

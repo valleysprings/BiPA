@@ -10,8 +10,8 @@ import yaml
 from harness_bench.eval import normalize_panel, registry, registry_panel
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 
-ROOT = Path(__file__).resolve().parent
-CONFIG = yaml.safe_load((ROOT.parent / "configs/tasks.yaml").read_text(encoding="utf-8"))
+ROOT = Path(__file__).resolve().parent  # bipa/src/core
+CONFIG = yaml.safe_load((ROOT.parents[1] / "configs/tasks.yaml").read_text(encoding="utf-8"))
 STREAM_SCHEMA = "bach-training-stream-v1"  # slim's schema string: every sampling seed hashes it
 
 
@@ -60,7 +60,7 @@ def plan_stream(panel: list[dict], epochs: int, stream: dict) -> list[list[dict]
 
 def sensitive(benchmark: str) -> tuple:
     """Train tasks the model gateway refuses (configs/sensitive-train.yaml)."""
-    listed = yaml.safe_load((Path(__file__).resolve().parent.parent / "configs/sensitive-train.yaml").read_text()) or {}
+    listed = yaml.safe_load((Path(__file__).resolve().parents[2] / "configs/sensitive-train.yaml").read_text()) or {}
     return tuple(listed.get(benchmark) or ())
 
 

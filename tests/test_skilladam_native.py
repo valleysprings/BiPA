@@ -8,9 +8,9 @@ from types import SimpleNamespace
 import pytest
 
 BASE = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(BASE.parent)]
+sys.path[:0] = [str(BASE)]
 from src.adapters import skilladam as arm
-from src import native_trace
+from src.core import native_trace
 from src.dynamics.audit_skill_history import Store, skilladam as derive
 
 SEED = "# Skill\n\nStep one.\nStep two.\n"
@@ -175,7 +175,7 @@ def test_legacy_scores_unknown_zero(tmp_path, monkeypatch):
 
 
 def test_upstream_batch_size_and_budget():
-    from src.panels import batches
+    from src.core.panels import batches
     for benchmark, (T, episodes) in {"tau3-bench": (16, 155), "automationbench": (15, 148),
                                      "terminal-bench-2-1": (18, 160)}.items():
         planned = batches(benchmark, "main", "skilladam")

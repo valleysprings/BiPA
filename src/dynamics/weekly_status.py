@@ -5,7 +5,7 @@ it replaces the block between the AUTO markers in that file."""
 import argparse, json, re
 from pathlib import Path
 
-from src.layout import current_run
+from src.core.layout import current_run
 
 MODELS = ("deepseek-flash", "gpt-6-luna")
 BENCHES = (("tau3-bench", "τ³"), ("automationbench", "AutoB"), ("terminal-bench-2-1", "TB2"))
@@ -48,7 +48,7 @@ def progress(run, arm):
 
 def _progress(run, arm):
     protocol = run / "native_protocol.json"
-    from src.panels import batches  # the current per-arm cap (a resumed run keeps its first recorded schedule)
+    from src.core.panels import batches  # the current per-arm cap (a resumed run keeps its first recorded schedule)
     total = len(batches(run.parent.name, "main", arm)) if arm in ("gepa", "skillopt", "skilladam") else None
     if arm == "gepa" and (run / "gepa/run_log.txt").is_file():
         steps = re.findall(r"^Iteration (\d+)", (run / "gepa/run_log.txt").read_text(errors="ignore"), re.M)

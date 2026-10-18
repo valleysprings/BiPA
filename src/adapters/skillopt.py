@@ -143,7 +143,7 @@ class Harness(EnvAdapter, BaseDataLoader):  # upstream's env adapter, and its da
                 require_known(rows, self.root, split, out_dir, native=os.environ.get("HARNESS_PROTOCOL") == "native-v1")
         if os.environ.get("HARNESS_PROTOCOL") == "native-v1":
             import re
-            from src.native_trace import record_round_evaluation
+            from src.core.native_trace import record_round_evaluation
             match = re.search(r"step_(\d+)", str(out_dir))
             record_round_evaluation(self.cell.root, arm="skillopt", step=int(match[1]) if match else None,
                                     role=str(Path(out_dir).relative_to(self.root)), skill_text=skill,

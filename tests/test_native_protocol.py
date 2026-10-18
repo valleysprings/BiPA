@@ -6,12 +6,12 @@ import sys
 import pytest
 
 BASE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BASE.parent))
-from src.native_protocol import prepare, require_complete
+sys.path.insert(0, str(BASE))
+from src.core.native_protocol import prepare, require_complete
 
 
 def test_protocol_fresh_and_resume(tmp_path, monkeypatch):
-    monkeypatch.setattr("src.native_protocol.source_files", lambda root: [])
+    monkeypatch.setattr("src.core.native_protocol.source_files", lambda root: [])
     out = tmp_path / 'run'
     args = SimpleNamespace(arm='seed', protocol='native-v1', feedback_mode='full',
                            model='offline', benchmark='tau3-bench', harness='opencode',

@@ -26,9 +26,9 @@ from skilladam.types import BenchmarkCase, MetricResult, RolloutResult, UsageRec
 
 from src.utils import executor
 from src.utils.llm import GatewayRejected
-from src.panels import ROOT
+from src.core.panels import ROOT
 
-PROMPTS = ROOT / "prompts/skilladam"
+PROMPTS = ROOT.parent / "prompts/skilladam"  # ROOT is src/core; the prompts live at src/prompts
 # Upstream defaults (paper profile, main_results.json / ALFWorld; the product defaults coincide): beta 0.9, base 4,
 # min 1, V_max 0.1 on the binary metric, 3 patch attempts; 99 = no early stop. max/min_iterations are set to T.
 LOOP = FeedbackLoopConfig(max_iterations=10, min_iterations=10, max_consecutive_failures=99, patch_attempts=3,
@@ -140,7 +140,7 @@ class Runner(SkillAdamRunner):
                  "semantics": "whole batch aborted before scoring; resume reruns the iteration"}, indent=2) + "\n")
             raise IncompleteSkillAdamEvaluation(f"{stage} step {step}: {len(unknown)} unknown outcomes")
         if self.native:
-            from src.native_trace import record_round_evaluation
+            from src.core.native_trace import record_round_evaluation
             role = stage if stage == "training_rollout" else (  # upstream's own count: baseline first, then candidate
                 "validation_candidate" if self._validation_rollout_counts.get(step - 1) else "validation_baseline")
             record_round_evaluation(self.cell.root, arm="skilladam", step=step, role=role, skill_text=skill,

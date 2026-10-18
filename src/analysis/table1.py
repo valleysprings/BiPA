@@ -10,7 +10,7 @@ Outputs: assets/cache/analysis/table1/{table1.json (read by fig1, reruns, facts)
 """
 import argparse, json, math
 from src.analysis.common import *
-from src.experiment_config import repetition_dir
+from src.core.experiment_config import repetition_dir
 
 MODEL = "deepseek-flash"
 MODEL_TEX = {"deepseek-flash": "DeepSeek-V4.1-Flash", "gpt-6-luna": "GPT-6 Luna"}

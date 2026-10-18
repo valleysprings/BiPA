@@ -3,7 +3,7 @@ import ast
 import json
 from pathlib import Path
 import tempfile
-source=Path(__file__).resolve().parents[1] / 'adapters'/'skillopt.py'
+source=Path(__file__).resolve().parents[1] / 'src' / 'adapters'/'skillopt.py'
 tree=ast.parse(source.read_text())
 names={'STRICT_POLICY','UnknownOutcome','outcome_policy','require_known'}
 nodes=[n for n in tree.body if (isinstance(n,(ast.FunctionDef,ast.ClassDef)) and n.name in names) or (isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id in names for t in n.targets))]

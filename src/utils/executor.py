@@ -8,8 +8,8 @@ from pathlib import Path
 from harness_bench.eval import Evaluator, NATIVE_V1_POLICY, run, evaluator_for, verifier_detail, version_from_files
 from harness_bench.eval.traces import SKILL_FRAME as _SKILL, chat_messages as _chat, content_text as _text
 from harness_bench.eval.traces import trajectory_text as _trajectory  # shared formatting for optimizer adapters
-from src.panels import CONFIG
-from src.layout import CACHE, SKILLS, relocate
+from src.core.panels import CONFIG
+from src.core.layout import CACHE, SKILLS, relocate
 
 SEED = (SKILLS / "seed/SKILL.md").read_text(encoding="utf-8")
 

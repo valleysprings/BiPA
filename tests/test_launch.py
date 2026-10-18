@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from src import launch
+from src.core import launch
 def test_suite_schedules_repetitions_for_all_five_methods(tmp_path, monkeypatch):
     monkeypatch.setattr(launch.config, "EXECUTION", tmp_path)
     args = SimpleNamespace(action="suite", model="gpt-6-luna", benches=["tau3"],

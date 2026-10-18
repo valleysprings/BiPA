@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export each cell's current run into results/<model>/<method>/<bench>/ (summary.json, rounds.json, per-round skills, final). Read-only on runs, idempotent, no API calls."""
 import argparse, hashlib, json, re
-from src.layout import SKILLS, BASELINE_ROOT, relocate, result_dir, current_run
+from src.core.layout import SKILLS, BASELINE_ROOT, relocate, result_dir, current_run
 
 ARMS = ('none', 'seed', 'skillopt', 'gepa', 'skilladam')
 MODELS = ('deepseek-flash', 'gpt-6-luna')

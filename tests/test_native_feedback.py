@@ -4,8 +4,8 @@ import sys
 import pytest
 
 BASE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BASE.parent))
-from src.layout import OPTIMIZERS
+sys.path.insert(0, str(BASE))
+from src.core.layout import OPTIMIZERS
 sys.path.insert(0, str(OPTIMIZERS / 'skillopt'))
 from src.adapters import skillopt, gepa
 

@@ -18,7 +18,7 @@ the dR > 0 tasks and of all tasks. For tasks with dR > 0: the seed curve's succe
 (origin) and at the bin of its skill mean R (destination) — whether the extra turns buy curve segments that still pay.
 
 Runs: DeepSeek-V4.1-Flash = Table 1's own runs (seed native-seed + rep-1/rep-2; skills and no-skill native-* + test-reps rep 1/2,
-picked by analysis.table1.rep_files exactly as Table 1). GPT-6 Luna = the avg@3 repeat protocol of bipa/src/repeat.py re-implemented
+picked by analysis.table1.rep_files exactly as Table 1). GPT-6 Luna = the avg@3 repeat protocol of bipa/src/core/repeat.py re-implemented
 here (rep 0 = the source run's first evaluation; rep 1/2 = assets/artifacts/execution/gpt-6-luna/test-reps/<bench>__<arm>__<tag>,
 unknown-only supplement evaluations merged per slot; TB2's three optimizer arms returned the seed text and report the seed row).
 Episode fields are read straight from evaluation.json as analysis.mech.transfer / analysis.mech.callsperturn do: requests deduplicated
@@ -90,7 +90,7 @@ def deepseek_reps(arm, bench):
     return T.rep_files(dirs, vid(text))
 
 
-# ---------- Luna: repeat.py's avg@3 merge, re-implemented (importing bipa/src/repeat.py pulls the executor stack) ----------
+# ---------- Luna: repeat.py's avg@3 merge, re-implemented (importing bipa/src/core/repeat.py pulls the executor stack) ----------
 
 def _slot(row):
     return (row, 0) if isinstance(row, str) else (row["task_id"], row.get("repetition", 0))
@@ -370,7 +370,7 @@ def record(res):
             "seed; 'wasted squeeze' = tasks with more turns but no success gain.")
     runs = ("DeepSeek: seed = native-seed + rep-1/rep-2; no-skill and skills = their native runs + test-reps rep 1/2 (analysis.table1.rep_files, "
             "Table 1's selection). Luna: rep 0 = source run (native-20261011 native arms, native-20261012 optimizers), rep 1/2 = "
-            "assets/artifacts/execution/gpt-6-luna/test-reps/<bench>__<arm>__<tag>, unknown-only supplements merged per slot (bipa/src/repeat.py's "
+            "assets/artifacts/execution/gpt-6-luna/test-reps/<bench>__<arm>__<tag>, unknown-only supplements merged per slot (bipa/src/core/repeat.py's "
             "protocol). Luna TB2's GEPA/SkillOpt/SkillAdam returned the seed text: their rows are the Seed row and are marked, not recomputed.")
     agg = ("Episode fields from evaluation.json: requests deduplicated by request_id, provider-failed requests (no usage) dropped; X = summed input "
            "tokens, N = executed tool calls, R = completed requests, signature = executed tool names in turn order. Verified outcome = boolean "

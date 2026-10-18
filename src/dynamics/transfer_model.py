@@ -24,12 +24,12 @@ Outputs:
 import argparse
 import json
 
-from src import experiment_config as experiments
+from src.core import experiment_config as experiments
 experiments.configure_environment()
-from src.layout import CACHE, EXECUTION
+from src.core.layout import CACHE, EXECUTION
 from src.utils.executor import SEED, Cell, evaluate, evaluator
-from src.layout import RESULTS, current_run
-from src.panels import panels
+from src.core.layout import RESULTS, current_run
+from src.core.panels import panels
 
 from src.dynamics.main_table import evaluation, pair, version  # noqa: E402
 

@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from src import repeat, repeat_transfer
+from src.core import repeat, repeat_transfer
 
 
 def transfer_run(root, outcomes, text="skill"):

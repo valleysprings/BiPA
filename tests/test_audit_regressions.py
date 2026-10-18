@@ -4,7 +4,7 @@ import pytest
 
 from src.dynamics.audit_native_run import certify, request_payload_matches, skill_digest
 from src.dynamics.audit_trace_integrity import Evidence, audit_episode
-from src.native_trace import record_round_state, skill_identity
+from src.core.native_trace import record_round_state, skill_identity
 
 
 def test_empty_response_normalization_does_not_certify_incomplete_capture():
@@ -45,7 +45,7 @@ def test_audit_checks_every_frozen_round_without_requiring_ten(tmp_path, monkeyp
 
 
 def test_historical_source_paths_resolve_after_rename():
-    from src.layout import BASELINE_ROOT, MITIGATION_ROOT, OPTIMIZERS, SKILLS, relocate
+    from src.core.layout import BASELINE_ROOT, MITIGATION_ROOT, OPTIMIZERS, SKILLS, relocate
     old = "/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/baselines/candidate-skill"
     assert relocate(old + "/arms/gepa.py") == BASELINE_ROOT / "adapters/gepa.py"
     assert relocate(old + "/skills/seed/SKILL.md") == SKILLS / "seed/SKILL.md"
@@ -75,7 +75,7 @@ def test_gepa_resumed_log_requires_unique_committed_block():
 
 
 def test_round_witness_survives_effective_evaluation_retry_update(tmp_path):
-    from src.native_trace import record_round_evaluation
+    from src.core.native_trace import record_round_evaluation
     identity = skill_identity("seed")
     path = tmp_path / "evaluation.json"
     initial = {"version_id": identity["version_id"], "split": "dev", "panel": ["task"],

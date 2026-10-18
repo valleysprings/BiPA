@@ -6,7 +6,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.layout import MITIGATION_ROOT, OPTIMIZERS, relocate
+from src.core.layout import MITIGATION_ROOT, OPTIMIZERS, relocate
 
 
 def digest(value):
@@ -23,21 +23,21 @@ def source_files(tree):
 
 
 def prepare(args, out, sample, schedule, seed):
-    base = Path(__file__).resolve().parent
-    files = [base / name for name in ('run.py', 'native_protocol.py', 'utils/executor.py', 'panels.py',
-                                     'utils/llm.py', 'native_trace.py', '../configs/tasks.yaml')]
+    base = Path(__file__).resolve().parent  # bipa/src/core
+    files = [base / name for name in ('../run.py', 'native_protocol.py', '../utils/executor.py', 'panels.py',
+                                     '../utils/llm.py', 'native_trace.py', '../../configs/tasks.yaml')]
     if args.arm in ('skillopt', 'gepa', 'skilladam'):
-        files.append(base / 'adapters' / (args.arm + '.py'))
+        files.append(base / '../adapters' / (args.arm + '.py'))
     if args.arm == 'skilladam':  # the prompts its proposer and tracker read: upstream's core prompts and our 5 files
         files.extend(sorted((OPTIMIZERS / 'skilladam/skilladam/core/prompts').glob('*.md')))
-        files.extend(sorted((base / 'prompts/skilladam').rglob('*.md')))
-    files.extend(base / 'dynamics' / name for name in ('audit_native_run.py', 'audit_skill_history.py'))
+        files.extend(sorted((base / '../prompts/skilladam').rglob('*.md')))
+    files.extend(base / '../dynamics' / name for name in ('audit_native_run.py', 'audit_skill_history.py'))
     upstream = OPTIMIZERS / args.arm
     if upstream.exists():
         files.extend(sorted(upstream.rglob('*.py')))
         files.extend(sorted(upstream.rglob('*.yaml')))
     import harness_bench
-    from src.panels import CONFIG
+    from src.core.panels import CONFIG
     backend_roots = {"import": Path(harness_bench.__file__).resolve().parent.parent,
                      "worker": Path(CONFIG["backend"]["bench_root"]).resolve()}
     worker_python = os.environ.get("HARNESS_PYTHON") or str(Path(CONFIG["backend"]["bench_root"]) / ".venv/runtime/bin/python")

@@ -126,7 +126,7 @@ def run(cell, panels, batches, llm, out) -> dict:
                 abort("Executor returned an incomplete/mismatched panel")
             rows.update({(text, split, row["id"]): row for row in evaluated})
             if os.environ.get("HARNESS_PROTOCOL") == "native-v1":
-                from src.native_trace import record_round_evaluation
+                from src.core.native_trace import record_round_evaluation
                 record_round_evaluation(out, arm="gepa", step=schedule.step,
                                         role="minibatch" if split == "train" else "full_selection",
                                         skill_text=text, evaluation_path=evaluated[0]["evaluation_path"])

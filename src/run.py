@@ -14,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.utils.executor import SEED, Cell, evaluate
 from src.utils.llm import LLM
-from src.panels import CONFIG, batches, panels, sensitive
-from src.layout import run_path
+from src.core.panels import CONFIG, batches, panels, sensitive
+from src.core.layout import run_path
 
 
 def episodes(out: Path) -> dict:
@@ -68,7 +68,7 @@ def main() -> None:
     if args.protocol == "native-v1":
         if args.feedback_mode != "full" or args.cache_root is None or arm_name not in ("none", "seed", "skillopt", "gepa", "skilladam"):
             parser.error("native-v1 requires --feedback-mode full, --cache-root, and a native arm")
-        from src.native_protocol import prepare, require_complete
+        from src.core.native_protocol import prepare, require_complete
         protocol = prepare(args, out, sample, schedule, SEED)
         sample, schedule = protocol["panels"], protocol["batches"]
         os.environ.update(HARNESS_PROTOCOL="native-v1", HARNESS_FEEDBACK_MODE="full",
@@ -84,7 +84,7 @@ def main() -> None:
         "final_skill": None if args.arm == "none" else SEED, "episodes": {}, "extra": {}}
 
     if protocol and arm_name in ("skillopt", "gepa", "skilladam"):
-        from src.native_trace import materialize_round_states
+        from src.core.native_trace import materialize_round_states
         materialize_round_states(out, arm_name)
     final = result["final_skill"]
     consumed = episodes(out)  # the arm's own evaluations, before the test evaluations below
@@ -98,7 +98,7 @@ def main() -> None:
             rows = evaluate(cell, text, sample[panel], split)
             if protocol:
                 require_complete(rows, sample[panel])
-                from src.native_trace import record_round_evaluation
+                from src.core.native_trace import record_round_evaluation
                 record_round_evaluation(out, arm=arm_name, step=0 if arm is None else len(schedule),
                                         role=f"{name}_{split}", skill_text=text,
                                         evaluation_path=rows[0]["evaluation_path"])

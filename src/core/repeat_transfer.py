@@ -7,7 +7,7 @@ the run's own repetition-0 test evaluation (panel and version_id) and its hash-v
 repeat.collect then plans coverage and only missing (task, repetition) slots are executed, with
 supplemental evidence written to test-reps/<bench>__<method>__<tag>. Known verdicts are never re-run.
 
-Usage: python bipa/src/repeat_transfer.py --run <run dir> [--slots 8] [--test-runs 3] [--execute]
+Usage: python bipa/src/core/repeat_transfer.py --run <run dir> [--slots 8] [--test-runs 3] [--execute]
 Without --execute it only prints the coverage plan (which tasks each repetition still needs).
 """
 import argparse
@@ -16,10 +16,10 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # bipa root
 
-from src import experiment_config as config
-from src.repeat import collect, slot, valid_episode_slots, version
+from src.core import experiment_config as config
+from src.core.repeat import collect, slot, valid_episode_slots, version
 
 
 def source(run):

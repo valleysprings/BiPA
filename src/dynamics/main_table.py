@@ -6,7 +6,7 @@ Seed reference: the native-seed cell's current run (native-noseed, native-seed);
 Cells not scored yet show their status (weekly_status.progress). Writes results/main-table.{md,csv} and results/per_task.csv."""
 import csv, hashlib, json, math
 
-from src.layout import SKILLS, BASELINE_ROOT, RESULTS, current_run, relocate
+from src.core.layout import SKILLS, BASELINE_ROOT, RESULTS, current_run, relocate
 from src.dynamics.weekly_status import progress
 
 MODELS = ("deepseek-flash", "gpt-6-luna")

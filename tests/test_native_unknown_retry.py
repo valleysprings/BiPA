@@ -5,7 +5,7 @@ import json
 import pytest
 
 BASE = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(BASE.parent))
+sys.path.insert(0, str(BASE))
 from harness_bench.eval import Evaluator, NATIVE_V1_POLICY
 
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-BASELINE_ROOT = Path(__file__).resolve().parent
+BASELINE_ROOT = Path(__file__).resolve().parents[1]  # bipa/src (this module lives one level deeper in src/core)
 BASELINES_ROOT = BASELINE_ROOT.parent
 MITIGATION_ROOT = BASELINES_ROOT.parent
 # the harness-bench checkout: the campaign's backend (configs/tasks.yaml backend.bench_root), the one place it is set

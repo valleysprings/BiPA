@@ -21,7 +21,7 @@ import re
 
 from src.graph import _config as config
 
-# Characters per estimated token (graph/graph.yaml, graph.allocate.chars_per_token). Only the relative weights matter,
+# Characters per estimated token (configs/graph.yaml, graph.allocate.chars_per_token). Only the relative weights matter,
 # because the shares are rescaled to the exact provider count.
 CHARS_PER_TOKEN = float(config.load("bach")["graph"]["allocate"]["chars_per_token"])
 RECORD_SCHEMA = "bach-native-request-record-v1"

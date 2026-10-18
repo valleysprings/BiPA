@@ -46,11 +46,11 @@ from pathlib import Path
 import numpy as np
 from src.graph import allocate as H
 from src.graph import _config as config
-from src.layout import ARTIFACTS, CACHE as ASSET_CACHE  # historical records keep their old roots
+from src.core.layout import ARTIFACTS, CACHE as ASSET_CACHE  # historical records keep their old roots
 
 # ---- component of a tool call -------------------------------------------------------------------------------------------------------------------------
 
-# the vocabulary of tool-call components lives in src/graph/graph.yaml (graph.classify)
+# the vocabulary of tool-call components lives in configs/graph.yaml (graph.classify)
 GRAPH = config.load("bach")["graph"]
 ACTION = re.compile(GRAPH["classify"]["action"])          # tool names that change state
 LOOKUP = re.compile(GRAPH["classify"]["lookup"])          # tool names that read state

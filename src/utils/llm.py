@@ -13,7 +13,7 @@ import httpx
 import openai
 from dotenv import dotenv_values
 
-from src.layout import HARNESS_BENCH
+from src.core.layout import HARNESS_BENCH
 
 ENV_FILE = HARNESS_BENCH / ".env"
 ENDPOINTS = {"deepseek-flash": "_2", "glm-5.3-flash": "_2", "gpt-6-luna": "_2"}  # boyue gateway env suffix (Luna on boyue from 2026-10-07, lead)

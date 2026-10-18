@@ -1,5 +1,5 @@
 """Panel composition: the LODO scale drops the held-out domain before sampling; main is unchanged."""
-from src.panels import batches, panels
+from src.core.panels import batches, panels
 
 
 def test_lodo_banking_excludes_domain_everywhere_but_test():

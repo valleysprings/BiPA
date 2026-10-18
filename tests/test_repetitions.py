@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from src import repeat
+from src.core import repeat
 def evaluation(root, repetition, outcomes, text="seed"):
     path = root / f"results/evaluations/test/{repeat.version(text)[:12]}-{repetition}/evaluation.json"
     path.parent.mkdir(parents=True, exist_ok=True)

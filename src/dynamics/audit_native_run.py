@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 from src.dynamics.audit_trace_integrity import Evidence, audit_episode, refs
-from src.layout import relocate
+from src.core.layout import relocate
 
 
 def request_payload_matches(source, record):
