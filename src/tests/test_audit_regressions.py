@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from audit_native_run import certify, request_payload_matches, skill_digest
-from audit_trace_integrity import Evidence, audit_episode
+from src.dynamics.audit_native_run import certify, request_payload_matches, skill_digest
+from src.dynamics.audit_trace_integrity import Evidence, audit_episode
 from src.native_trace import record_round_state, skill_identity
 
 
@@ -22,7 +22,7 @@ def test_empty_response_normalization_does_not_certify_incomplete_capture():
 
 @pytest.mark.parametrize("rounds", [4, 5, 20])
 def test_audit_checks_every_frozen_round_without_requiring_ten(tmp_path, monkeypatch, rounds):
-    import audit_skill_history
+    from src.dynamics import audit_skill_history
     protocol = dict(protocol="native-v1", feedback_mode="full", arm="skillopt", model="offline",
                     benchmark="offline", harness="fixture", scale="main", batches=[[f"t{i}"] for i in range(rounds)])
     protocol["config_hash"] = skill_digest(protocol)
@@ -64,7 +64,7 @@ def test_historical_source_paths_resolve_after_rename():
 
 
 def test_gepa_resumed_log_requires_unique_committed_block():
-    from audit_skill_history import gepa_block_starts
+    from src.dynamics.audit_skill_history import gepa_block_starts
     record = {"selected_program_candidate": 2, "new_program_idx": 6}
     aborted = ["Iteration 12: Selected program 3 score: 0.6\n", "aborted\n"]
     committed = ["Iteration 12: Selected program 2 score: 0.5\n",

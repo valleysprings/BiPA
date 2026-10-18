@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-root="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+root="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../src" && pwd -P)"
 if [[ -f "$root/../host.env" ]]; then
     source "$root/../host.env"
 fi

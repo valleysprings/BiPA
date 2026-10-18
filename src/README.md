@@ -4,7 +4,7 @@
 
 | 层 | 文件 | 负责什么 |
 |---|---|---|
-| 调度 | `run.sh` → `launch.py`，`../configs/experiments.yaml` | 选择模型、run、并发；默认预览；完整套件包含五种方法的重复测试 |
+| 调度 | `../scripts/baselines.sh` → `launch.py`，`../configs/experiments.yaml` | 选择模型、run、并发；默认预览；完整套件包含五种方法的重复测试 |
 | 单格运行 | `run.py` | 冻结协议，调用 adapter，评测最终 skill，保存 summary，调用离线审计 |
 | 上游接口适配 | `adapters/skillopt.py`、`skilladam.py`、`gepa.py` | 转换任务、轨迹、verifier 分数与 LLM 接口；不实现另一套搜索算法 |
 | 外部评测接口 | `utils/executor.py` | 封装 `harness_bench.eval.run` 及返回轨迹；执行、缓存和重试归 harness-bench |
@@ -12,7 +12,7 @@
 | 任务设置 | `panels.py`、`../configs/tasks.yaml` | 固定面板和训练预算 |
 | 上游源码 | `../optimizers/skillopt`、`skilladam`、`gepa` | 各自原版优化循环，由 adapter 调用 |
 | 重复测试 | `repeat.py` | 冻结最终 skill 和原测试面板，执行 rep 1、2，逐次检查覆盖 |
-| 证据 | `native_protocol.py`、`native_trace.py`、`../scripts/` | 冻结设置、逐轮见证、完整性检查 |
+| 证据 | `native_protocol.py`、`native_trace.py`、`dynamics/` | 冻结设置、逐轮见证、完整性检查 |
 
 优化循环与返回规则：
 
@@ -31,9 +31,9 @@
 ```bash
 export BASELINE_PYTHON="$PWD/bach-harness/.venv/bin/python"
 # 单格优化、单格重复评测、整个模型的实验套件：均只预览。
-bash bipa/src/run.sh run tau3 gpt-6-luna --arm skillopt
-bash bipa/src/run.sh repeat tau3 gpt-6-luna --arm skillopt
-bash bipa/src/run.sh suite gpt-6-luna --benches tau3 autob tb2
+bash bipa/scripts/baselines.sh run tau3 gpt-6-luna --arm skillopt
+bash bipa/scripts/baselines.sh repeat tau3 gpt-6-luna --arm skillopt
+bash bipa/scripts/baselines.sh suite gpt-6-luna --benches tau3 autob tb2
 ```
 
 加 `--execute` 执行，或 `--detach` 后台顺序执行。suite 覆盖 Seed、No-skill、SkillOpt、GEPA、SkillAdam 的优化/控制运行及重复测试。已有 summary 的优化过程跳过；同一输出目录用锁防止调度器重复启动。单独使用 `run.py` 会直接执行，默认 native-v1，需要显式 cache root；历史 legacy 选项仅用于解释旧协议。
@@ -50,4 +50,4 @@ bash bipa/src/run.sh suite gpt-6-luna --benches tau3 autob tb2
 "$BASELINE_PYTHON" -m pytest bipa/src/tests -q -p no:cacheprovider
 ```
 
-测试使用伪造的模型/任务结果，覆盖上游循环的 unknown、resume、失败提案、审计和调度，不启动真实模型。跨模型/跨 benchmark 的评测脚本在 [../scripts](../scripts/README.md)，报告与论文分析由 [analysis](analysis/README.md) 负责。
+测试使用伪造的模型/任务结果，覆盖上游循环的 unknown、resume、失败提案、审计和调度，不启动真实模型。跨模型/跨 benchmark 的评测驱动在 [dynamics](dynamics/)（入口 [../scripts/rq4_transfer.sh](../scripts/README.md)），报告与论文分析由 [analysis](analysis/README.md) 负责。

@@ -74,10 +74,7 @@ def record_round_state(run_root, *, arm, step, input_skill, candidate_skill,
 
 def materialize_round_states(run_root, arm):
     """Derive states from original persisted optimizer logs; no decisions invented."""
-    import sys
-    analysis = Path(__file__).resolve().parents[1] / "scripts"
-    sys.path.insert(0, str(analysis))
-    from audit_skill_history import Store, skillopt, gepa, skilladam
+    from src.dynamics.audit_skill_history import Store, skillopt, gepa, skilladam
     root = Path(run_root).resolve()
     derive = {"skillopt": skillopt, "gepa": gepa, "skilladam": skilladam}[arm]
     events, _, _ = derive(root, Store(root / "round-evidence/derived"))

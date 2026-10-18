@@ -8,7 +8,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from audit_trace_integrity import Evidence, audit_episode, refs
+from src.dynamics.audit_trace_integrity import Evidence, audit_episode, refs
 from src.layout import relocate
 
 
@@ -205,7 +205,7 @@ def certify(run):
     expected_steps = len(protocol.get('batches', [])) if optimizer else 0
     original_events={}
     if optimizer:
-        from audit_skill_history import Store, skillopt, gepa, skilladam
+        from src.dynamics.audit_skill_history import Store, skillopt, gepa, skilladam
         try:
             with tempfile.TemporaryDirectory(prefix='native-state-audit-') as directory:
                 original,_,_={'skillopt':skillopt,'gepa':gepa,'skilladam':skilladam}[protocol['arm']](run,Store(Path(directory)))

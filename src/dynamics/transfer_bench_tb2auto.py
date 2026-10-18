@@ -4,16 +4,13 @@ Only the two task-type-similar directions: skills trained on terminal-bench-2-1 
 automationbench's test panel, and the reverse. Seed reference rows for both benches are included
 (they are cache hits of the Table 1 seed test rows). Default is a dry run; --execute calls the model.
 Rep 1/2 completion is handled separately by bipa's repeat_transfer.py once rep0 lands.
+
+Usage:  python -m src.dynamics.transfer_bench_tb2auto [--slots 16] [--execute]   (from the bipa root)
 """
 
-import importlib.util
 import sys
-from pathlib import Path
 
-HERE = Path(__file__).resolve()
-spec = importlib.util.spec_from_file_location("transfer_bench", HERE.parent / "transfer_bench.py")
-tb = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(tb)
+from src.dynamics import transfer_bench as tb
 
 PAIR = {("terminal-bench-2-1", "automationbench"), ("automationbench", "terminal-bench-2-1")}
 BENCHES = {"terminal-bench-2-1", "automationbench"}

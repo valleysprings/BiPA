@@ -6,13 +6,13 @@ Code for the BiPA paper. BiPA verifies a learned skill by what it changes in the
 
 | Path | Contents |
 |---|---|
-| `src/` | Experiment harness: scheduling (`run.sh` → `launch.py`), single-cell runs (`run.py`), repeated test evaluation (`repeat.py`, `repeat_transfer.py`), episode tracing (`native_protocol.py`, `native_trace.py`), fixed panels (`panels.py`), and adapters (`adapters/`) to the upstream optimizers |
+| `src/` | Experiment harness: single-cell runs (`run.py`), repeated test evaluation (`repeat.py`, `repeat_transfer.py`), episode tracing (`native_protocol.py`, `native_trace.py`), fixed panels (`panels.py`), adapters (`adapters/`) to the upstream optimizers, and the runtime drivers (`dynamics/`: RQ4 transfer, audits, results refresh) |
 | `optimizers/` | Canonical upstream sources: SkillOpt, SkillAdam, GEPA, EvoHarness |
 | `configs/` | Run configuration: panels, budgets, and backends (`tasks.yaml`), experiment definitions (`experiments.yaml`) |
 | `docs/` | Investigation notes (e.g. `luna-20261014.md`) |
 | `src/analysis/` | Offline analysis of finished runs (read-only on the execution artifacts): the avg@3 main table (`src/analysis/table1.py`) and the appendix analyses (`src/analysis/mech/`, `src/analysis/mechanism/`) |
 | `src/graph/` | Per-episode bipartite graph construction and metrics used by the analysis |
-| `scripts/` | Scheduling and RQ-test drivers (transfer evaluation), the live status/progress table, and run-evidence audits |
+| `scripts/` | Shell entry points only: `baselines.sh` (scheduling: `run`/`repeat`/`suite` → `src/launch.py`), `rq4_transfer.sh` (RQ4 transfer drivers), `audit.sh` (run-evidence audits), `refresh.sh` (offline results refresh) |
 
 The seed skill is read from the shared artifacts tree (`../assets/skills/seed/SKILL.md` in the harness-mitigation workspace), not vendored in this repo.
 
@@ -28,12 +28,12 @@ The adapters convert tasks, trajectories, and verifier scores into each upstream
 From the repository root, everything previews by default (no model calls):
 
 ```bash
-bash src/run.sh run tau3 <model> --arm skillopt      # one optimization cell
-bash src/run.sh repeat tau3 <model> --arm skillopt   # repeated test evaluation
-bash src/run.sh suite <model>                        # full suite for one model
+bash scripts/baselines.sh run tau3 <model> --arm skillopt      # one optimization cell
+bash scripts/baselines.sh repeat tau3 <model> --arm skillopt   # repeated test evaluation
+bash scripts/baselines.sh suite <model>                        # full suite for one model
 ```
 
-Add `--execute` to actually run, or `--detach` to run the schedule in the background. `run.sh` sources an optional `host.env` in the repository root for host-specific settings (e.g. proxy); `BASELINE_PYTHON` selects the interpreter.
+Add `--execute` to actually run, or `--detach` to run the schedule in the background. `baselines.sh` sources an optional `host.env` in the repository root for host-specific settings (e.g. proxy); `BASELINE_PYTHON` selects the interpreter. The RQ4 transfer drivers, run-evidence audits, and the offline results refresh have their own entry points (`scripts/rq4_transfer.sh`, `scripts/audit.sh`, `scripts/refresh.sh`; see [scripts/README.md](scripts/README.md)).
 
 Raw execution artifacts and caches are not part of this repository.
 

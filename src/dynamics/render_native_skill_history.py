@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Export each cell's current run into results/<model>/<method>/<bench>/ (summary.json, rounds.json, per-round skills, final). Read-only on runs, idempotent, no API calls."""
-import argparse, hashlib, json, re, sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import argparse, hashlib, json, re
 from src.layout import SKILLS, BASELINE_ROOT, relocate, result_dir, current_run
 
 ARMS = ('none', 'seed', 'skillopt', 'gepa', 'skilladam')
@@ -137,7 +135,7 @@ def gepa(reader, run):
 def skilladam(reader, run):
     """Committed iterations of upstream's checkpoint; parent/candidate/selected rebuilt from the persisted patches by
     upstream's applier (audit_skill_history.skilladam_rounds); the gate scores are on the training batch itself."""
-    from audit_skill_history import skilladam_rounds
+    from src.dynamics.audit_skill_history import skilladam_rounds
     folder = run / 'skilladam'
     if not (folder / 'checkpoint.json').is_file():
         return reader.skill(folder / 'seed.md'), []

@@ -8,10 +8,10 @@ from types import SimpleNamespace
 import pytest
 
 BASE = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(BASE.parent), str(BASE.parent / "scripts")]
+sys.path[:0] = [str(BASE.parent)]
 from src.adapters import skilladam as arm
 from src import native_trace
-from audit_skill_history import Store, skilladam as derive
+from src.dynamics.audit_skill_history import Store, skilladam as derive
 
 SEED = "# Skill\n\nStep one.\nStep two.\n"
 BATCHES = [["a", "b", "c"], ["d", "e", "f"]]
@@ -123,7 +123,7 @@ def test_round_states_derived_from_upstream_logs(cell, tmp_path, monkeypatch):
                                                (2, "validation_baseline"): 1, (2, "validation_candidate"): 1}
     assert states[1]["returned"]["text"] == result["final_skill"] and states[2]["decision"] == "reject"
     assert all(s["evaluation_records"] and s["source_files"] for s in states.values())
-    import render_native_skill_history as render  # per-round skills exported to results/<model>/skilladam/<bench>/skills
+    from src.dynamics import render_native_skill_history as render  # per-round skills exported to results/<model>/skilladam/<bench>/skills
     initial, rounds = render.skilladam(render.Reader(), tmp_path)
     assert initial["text"] == SEED and [r["decision"] for r in rounds] == ["accepted", "rejected"]
     assert rounds[0]["selected"]["text"] == result["final_skill"] == rounds[1]["parent"]["text"]
@@ -159,7 +159,7 @@ def test_failed_patches_replayed_and_derived(cell, tmp_path, monkeypatch):
     events, _, proposed = derive(tmp_path, Store(tmp_path / "derived"))
     assert [(e["decision"], e["record"]["patch_attempts"]) for e in events] == [("accept", 2), ("no_proposal", 3)]
     assert proposed == 1 and events[1]["proposed"]["status"] == "unknown" and events[1]["after"] == events[1]["before"]
-    import render_native_skill_history as render
+    from src.dynamics import render_native_skill_history as render
     _, rounds = render.skilladam(render.Reader(), tmp_path)
     assert [r["decision"] for r in rounds] == ["accepted", "patch_failed"] and rounds[1]["candidate"]["status"] == "unwitnessed"
 

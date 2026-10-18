@@ -2,10 +2,9 @@
 
 One row per model x benchmark x arm. The current run of a cell is layout.current_run(). Prints a markdown block; with --weekly FILE
 it replaces the block between the AUTO markers in that file."""
-import argparse, json, re, sys
+import argparse, json, re
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.layout import current_run
 
 MODELS = ("deepseek-flash", "gpt-6-luna")

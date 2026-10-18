@@ -31,7 +31,7 @@ def prepare(args, out, sample, schedule, seed):
     if args.arm == 'skilladam':  # the prompts its proposer and tracker read: upstream's core prompts and our 5 files
         files.extend(sorted((OPTIMIZERS / 'skilladam/skilladam/core/prompts').glob('*.md')))
         files.extend(sorted((base / 'prompts/skilladam').rglob('*.md')))
-    files.extend(base.parent / 'scripts' / name for name in ('audit_native_run.py', 'audit_skill_history.py'))
+    files.extend(base / 'dynamics' / name for name in ('audit_native_run.py', 'audit_skill_history.py'))
     upstream = OPTIMIZERS / args.arm
     if upstream.exists():
         files.extend(sorted(upstream.rglob('*.py')))

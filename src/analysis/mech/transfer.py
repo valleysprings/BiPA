@@ -72,7 +72,7 @@ def main():
         "evaluated unchanged with GPT-6 Luna on the tau3-bench test split, one run each, against Luna's own Seed skill and No skill runs.",
         "Luna runs: native-seed and native-noseed native-20261011 (test), native-seed ood-seed (the transfer job's Seed reference, a second "
         "independent run); transferred skills: <optimizer>/tau3-bench/ood-from-deepseek-flash "
-        "(bipa/scripts/transfer_model.py, trained runs native-20261008-https). Evaluation files: " + "; ".join(raw) + ".",
+        "(bipa/src/dynamics/transfer_model.py, trained runs native-20261008-https). Evaluation files: " + "; ".join(raw) + ".",
         "Q: success over verified outcomes. Common verified tasks: verified in both the row and the Seed skill run. rho, rho^calls: geometric mean "
         "over the tasks both runs have with a verified outcome and positive input tokens and calls of the per-task ratio to the Seed skill run "
         "(analysis/report.ratios). Input tokens sum over completed requests. One test run per row.",

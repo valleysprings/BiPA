@@ -9,8 +9,8 @@ the model. Cells whose train run has no summary.json yet are skipped (listed in 
 
 Run resolution of the train cell (model, A): skillopt / gepa / skilladam = layout.current_run (must have summary.json).
 
-Usage:  python bipa/scripts/transfer_bench.py [--models deepseek-flash] [--methods skillopt,gepa,skilladam]
-                                           [--slots 16] [--execute]
+Usage:  python -m src.dynamics.transfer_bench [--models deepseek-flash] [--methods skillopt,gepa,skilladam]
+                                          [--slots 16] [--execute]   (from the bipa root)
 
 Outputs:
   execution/<model>/<method>/<B>/ood-from-bench-<A>/   evaluations, summary.json
@@ -22,12 +22,7 @@ Outputs:
 
 import argparse
 import json
-import sys
 
-from pathlib import Path
-HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parent))  # bipa root, for src.*
-sys.path.insert(0, str(HERE))         # this dir, for main_table
 from src import experiment_config as experiments
 experiments.configure_environment()
 from src.layout import EXECUTION
@@ -35,7 +30,7 @@ from src.utils.executor import SEED, Cell, evaluate, evaluator
 from src.layout import ARM_DIR, RESULTS, current_run
 from src.panels import panels
 
-from main_table import evaluation, pair, version  # noqa: E402
+from src.dynamics.main_table import evaluation, pair, version  # noqa: E402
 
 BENCHES = experiments.BENCHMARKS
 
@@ -176,7 +171,7 @@ def execute(seeds, transfers, slots):
 
 def main(argv=None):
     """Dry run (default) or run (--execute) of the cross-benchmark transfer evaluation."""
-    a = argparse.ArgumentParser(prog="python bipa/scripts/transfer_bench.py", description=__doc__.splitlines()[0])
+    a = argparse.ArgumentParser(prog="python -m src.dynamics.transfer_bench", description=__doc__.splitlines()[0])
     a.add_argument("--models", default="deepseek-flash")
     a.add_argument("--methods", default="skillopt,gepa,skilladam")
     a.add_argument("--slots", type=int, default=16)

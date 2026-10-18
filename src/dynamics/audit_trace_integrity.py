@@ -2,8 +2,6 @@
 """Read-only, offline audit of selected DeepSeek test episodes and original evidence."""
 import argparse, collections, datetime, hashlib, json, math, importlib.util
 from pathlib import Path
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.layout import (BASELINE_ROOT, BASELINES_ROOT, MITIGATION_ROOT as ROOT,
                     ARTIFACTS, RESULTS, EXECUTION, ATTRIBUTION, PROFILING, CACHE, HARNESS_BENCH, relocate)
 
