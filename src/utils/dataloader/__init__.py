@@ -121,9 +121,9 @@ DS = EX/"deepseek-flash"
 BN = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
 
 # ---- mech cache ----
-CACHE = H / "assets/cache/analysis/mech"
+CACHE = H / "assets/cache/analysis/rq"
 def write_json(name, obj):
-    """Write assets/cache/analysis/mech/<name>.json."""
+    """Write <name>.json under the mech cache dir (CACHE)."""
     CACHE.mkdir(parents=True, exist_ok=True)
     path = CACHE / f"{name}.json"
     path.write_text(json.dumps(obj, indent=1))
