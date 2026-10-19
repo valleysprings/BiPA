@@ -8,8 +8,7 @@ import collections
 import json
 import sys
 import numpy as np
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 MODEL = "deepseek-flash"
 EXPECTED = {"tau3-bench": dict(input=1.349, output=1.025, calls=0.840, n=300),
             "automationbench": dict(input=1.556, output=0.881, calls=0.853, n=480),
@@ -18,7 +17,7 @@ EXPECTED = {"tau3-bench": dict(input=1.349, output=1.025, calls=0.840, n=300),
 
 def compute():
     """Pool seed and baseline episodes per benchmark, regress, and compute the e_R distribution; write mech/slopes.json."""
-    from src.analysis import common as C
+    from src.utils import dataloader as C
     from src.analysis.mechanism.slopes_checks import metrics, episodes
     from src.analysis.mechanism.fig1 import output_totals, fe_reg, BENCH
     reg, pts, raw, runs, elasticity = {}, {}, [], {}, {}
@@ -37,7 +36,7 @@ def compute():
             if m:
                 episodes_by_key[("seed", task)] = m
                 outputs_by_key[("seed", task)] = seed_out.get(task)
-        for disp, (run, text) in C.returned_skills(MODEL, bench, M.BASELINES).items():
+        for disp, (run, text) in C.returned_skills(MODEL, bench, dataloader.OPTIMIZERS).items():
             path = C.eval_file(run, "test", C.vid(text))
             if path is None:
                 continue
@@ -74,7 +73,7 @@ def compute():
         elasticity_stats[name] = dict(n=len(v), min=float(v.min()), p5=float(np.percentile(v, 5)), p50=float(np.percentile(v, 50)),
                                       p95=float(np.percentile(v, 95)), max=float(v.max()), mean=float(v.mean()))
     out = dict(reg=reg, pts=pts, raw=sorted(set(raw)), runs=runs, elasticity=elasticity_stats)
-    M.write_json("slopes", out)
+    dataloader.write_json("slopes", out)
     for bench, r in reg.items():
         print(bench, {qn: (round(v["slope"], 3), v["n"]) for qn, v in r.items()})
     print(json.dumps(elasticity_stats, indent=1))
@@ -86,8 +85,8 @@ def draw():
     plt = appc.style()
     # Liberation Serif is TrueType; the CFF Nimbus Roman cannot be embedded as Type 42
     plt.rcParams["font.serif"] = ["Liberation Serif"]
-    c = json.loads((M.CACHE / "slopes.json").read_text())
-    appc.save = lambda fig, name: M.save_figure(fig, "slopes")
+    c = json.loads((dataloader.CACHE / "slopes.json").read_text())
+    appc.save = lambda fig, name: fig.save_figure(fig, "slopes")
     appc.draw_slopes(plt, c)
     from src.analysis.mechanism.fig1 import BENCH
     names = {b: n for b, n, _ in BENCH}
@@ -96,16 +95,16 @@ def draw():
         for qn in ("input", "output", "calls"):
             v = c["reg"][bench][qn]
             rows.append([disp, qn, f"{v['slope']:.3f}", f"{v['se']:.3f}", v["n"], v["n_tasks"], f"{v['r2']:.2f}"])
-    table = M.md_table(["Benchmark", "quantity", "slope k", "SE", "episodes", "tasks", "R^2 (within)"], rows)
+    table = logger.md_table(["Benchmark", "quantity", "slope k", "SE", "episodes", "tasks", "R^2 (within)"], rows)
     e_rows = []
     for name in list(c["reg"]) + ["all"]:
         s = c["elasticity"][name]
         e_rows.append([names.get(name, name), s["n"], f"{s['min']:.3f}", f"{s['p5']:.3f}", f"{s['p50']:.3f}", f"{s['p95']:.3f}", f"{s['max']:.3f}", f"{s['mean']:.3f}"])
     table += "\n\nPer-episode turn elasticity e_R = 1 + s_H R / (R - 1) over the same episodes (s_H = 1 - s_F, history share of input tokens)\n\n"
-    table += M.md_table(["Benchmark", "episodes", "min", "p5", "p50", "p95", "max", "mean"], e_rows)
+    table += logger.md_table(["Benchmark", "episodes", "min", "p5", "p50", "p95", "max", "mean"], e_rows)
     run_rows = [[names[b], ", ".join(f"{k}: {v}" for k, v in r.items())] for b, r in c["runs"].items()]
-    table += "\n\nRun directories\n\n" + M.md_table(["Benchmark", "runs"], run_rows)
-    M.write_record(
+    table += "\n\nRun directories\n\n" + logger.md_table(["Benchmark", "runs"], run_rows)
+    logger.write_record(
         "slopes",
         "Within-task slope k of log input tokens / log output tokens / log executed tool calls on log requests (turns), per benchmark; the dashed line is k = 1. Axes show the ratio to the task's geometric mean.",
         "DeepSeek-V4.1-Flash in OpenCode, test split: the seed's run-0 test episode and one episode per task of each baseline skill (GEPA, SkillOpt, SkillAdam; the https reruns native-20261008-https). No BACH episodes.",

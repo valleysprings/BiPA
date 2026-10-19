@@ -9,8 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-from src.analysis.mech import common as MC
-
+from src.utils import fig, logger, dataloader
 OPT = [("GEPA", "gepa"), ("SkillOpt", "skillopt"), ("SkillAdam", "skilladam")]
 BENCH = [("$\\tau^3$-bench", "tau3-bench"), ("AutoBench", "automationbench"), ("TB2", "terminal-bench-2-1")]
 ORDER = ["verify", "serialize", "ask_stop", "domain", "format", "other", "parallelize"]
@@ -23,7 +22,7 @@ OPT_MARK = {"GEPA": "^", "SkillOpt": "o", "SkillAdam": "s"}
 
 
 def draw():
-    d = json.load(open(MC.CACHE / "skilltext.json"))
+    d = json.load(open(dataloader.CACHE / "skilltext.json"))
     plt.rcParams.update({"font.size": 7, "font.family": "sans-serif", "mathtext.default": "regular"})
     fig, ax = plt.subplots(figsize=(3.25, 2.8))
     rows, ypos, y = [], [], 0.0
@@ -73,10 +72,10 @@ def draw():
     fig.legend(handles=handles, loc="upper center", ncol=4, frameon=False, fontsize=7, handlelength=1, handletextpad=0.4,
                columnspacing=0.9, bbox_to_anchor=(0.5, 1.0))
     fig.subplots_adjust(left=0.265, right=0.575, top=0.79, bottom=0.13)
-    MC.save_figure(fig, "rules")
+    fig.save_figure(fig, "rules")
     head = ["optimizer", "benchmark"] + ORDER + ["limit_read", "words / seed"]
-    md = MC.md_table(head, [[o, b] + c + [0, f"{r:.2f}"] for o, b, c, r in table])
-    MC.write_record("rules", "Rules the optimizers add to the seed skill, by coded category (stacked bars, one per learned skill); text = words of the learned skill / words of the seed (580). limit reading = 0 in all nine skills.",
+    md = logger.md_table(head, [[o, b] + c + [0, f"{r:.2f}"] for o, b, c, r in table])
+    logger.write_record("rules", "Rules the optimizers add to the seed skill, by coded category (stacked bars, one per learned skill); text = words of the learned skill / words of the seed (580). limit reading = 0 in all nine skills.",
                     "native-20261008-https, deepseek-flash; GEPA, SkillOpt, SkillAdam x tau3 / AutoBench / TB2.",
                     "Count of coded units per final category (skilltext.json coded_units).", md,
                     commands="python3 -m src.analysis.mech.rules_fig")

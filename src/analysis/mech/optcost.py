@@ -25,8 +25,8 @@ from statistics import median
 import numpy as np
 
 from src.analysis import table1 as T
-from src.analysis.common import BENCHES, EX, SEED_TEXT, current_run, final_skill, task_row, vid
-from src.analysis.mech import common as MC
+from src.utils.dataloader import BENCHES, EX, SEED_TEXT, current_run, final_skill, task_row, vid
+from src.utils import logger, dataloader
 from src.analysis.mech import stats as S
 
 MODEL = "deepseek-flash"
@@ -175,10 +175,10 @@ def record(res):
                            m(r["total_in_executed"]), f"{r['seed_episodes_executed']:.0f}", f"{tax:+,.0f}", f"{100 * tax / r['tax']['x_seed_mean']:+.0f}%",
                            f"{be_n:,.0f}" if be_n else "never (tax <= 0)", f"{be_e:,.0f}" if be_e else "never (tax <= 0)"])
     table = "\n\n".join([
-        "**(a) Optimizer LLM calls** (llm/call-*.json; usage = prompt / completion tokens)", MC.md_table(head_a, rows_a),
-        "**(b) Agent rollouts of the optimization** (results/evaluations/train+dev; test split excluded)", MC.md_table(head_b, rows_b),
-        "**(c) Cost against the seed test episode and the per-episode tax**", MC.md_table(head_c, rows_c)])
-    MC.write_record(
+        "**(a) Optimizer LLM calls** (llm/call-*.json; usage = prompt / completion tokens)", logger.md_table(head_a, rows_a),
+        "**(b) Agent rollouts of the optimization** (results/evaluations/train+dev; test split excluded)", logger.md_table(head_b, rows_b),
+        "**(c) Cost against the seed test episode and the per-episode tax**", logger.md_table(head_c, rows_c)])
+    logger.write_record(
         "optcost",
         "Reviewer X2: the optimizer-side cost of each of the nine optimizer runs (optimizer LLM calls, training and development rollouts, input tokens), in units of one seed test episode, and the number of "
         "deployment episodes after which the learned skill's input-token tax exceeds that cost.",
@@ -191,7 +191,7 @@ def record(res):
 
 def main():
     res = compute()
-    MC.write_json("optcost", res)
+    dataloader.write_json("optcost", res)
     record(res)
 
 

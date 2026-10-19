@@ -23,7 +23,7 @@ import pickle
 import re
 from pathlib import Path
 
-from src.analysis import common as C
+from src.utils import dataloader as C
 from src.analysis.mech.edges import EXCLUDED_REASON, is_excluded
 
 H = C.H

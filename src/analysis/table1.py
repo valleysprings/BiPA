@@ -9,7 +9,7 @@ Bold and underline (rank best / second) are over the five rows of a benchmark; t
 Outputs: assets/cache/analysis/table1/{table1.json (read by fig1, reruns, facts), table1.tex (body rows)} and the audit record paper/assets/data/mech/mech_table1.md (paperout.record).
 """
 import argparse, json, math
-from src.analysis.common import *
+from src.utils.dataloader import *
 from src.core.experiment_config import repetition_dir
 
 MODEL = "deepseek-flash"
@@ -177,7 +177,7 @@ def tex(res, models=MODELS):
 
 def record(res, models=MODELS):
     """paper/assets/data/mech/mech_table1.md: Table 1 as the paper prints it, one block per model."""
-    from src.analysis import paperout as PO
+    from src.utils.logger import paperout as PO
     names = [n for n, _ in ROWS]
     def mark(v, txt): return f"**{txt}**" if v["rank"] == "best" else f"<u>{txt}</u>" if v["rank"] == "second" else txt
     blocks, cells = [], []

@@ -36,7 +36,7 @@ import numpy as np
 
 from src.analysis import table1 as T
 from src.analysis.mech import attribution as A
-from src.analysis.mech import common as MC
+from src.utils import logger, dataloader
 from src.graph.episode import LOOKUP
 
 READ_PROGRAMS = {"cat", "head", "tail", "ls", "grep", "find", "wc"}
@@ -222,7 +222,7 @@ def side_stats(files, tasks, episodes, extra=frozenset()):
 
 def compute():
     """All nine cells: seed and skill statistics on the cell's attribution task set."""
-    attribution = {(c["method"], c["bench"]): c["n"] for c in json.loads((MC.CACHE / "attribution.json").read_text())["cells"]}
+    attribution = {(c["method"], c["bench"]): c["n"] for c in json.loads((dataloader.CACHE / "attribution.json").read_text())["cells"]}
     cells = []
     for method_disp, method in A.OPT:
         for bench, short in A.BENCH:
@@ -237,7 +237,7 @@ def compute():
                         seed_lenient=side_stats(seed_files, tasks, seed_eps, LENIENT_EXTRA), skill_lenient=side_stats(own_files, tasks, own_eps, LENIENT_EXTRA))
             cells.append(cell)
             print(method_disp, short, len(tasks), "m seed/skill", round(cell["seed"]["m"], 3), round(cell["skill"]["m"], 3))
-    MC.write_json("callsperturn", dict(model=A.MODEL, cells=cells))
+    dataloader.write_json("callsperturn", dict(model=A.MODEL, cells=cells))
     return cells
 
 
@@ -276,17 +276,17 @@ def record(cells):
            "is a pure read (cat, head, tail, ls, grep, find without -delete/-exec/-ok/-fprint, wc, sed -n without -i, joined by | ; && ||, no redirect except /dev/null and 2>&1, no substitution or heredoc, leading cd/set/export/VAR= dropped); "
            "python, CLI tools, echo, awk, diff, unparsable commands are not read-only. A multi-call turn is never a single read-only call. Runs = maximal sequences of >= 2 consecutive turns each with exactly one read-only call; "
            "'saved' = sum over runs of (length - 1), the turns removed if each run were one turn.")
-    table = ("### A. Calls per turn\n\n" + MC.md_table(["Skill", "Bench", "n", "side", "turns", "0 calls %", "1 call %", "2+ calls %", "m", "m_task"], rows_mix)
-             + "\n\n### B. Single read-only-call turns\n\n" + MC.md_table(["Skill", "Bench", "n", "side", "single-call turns % of turns", "single read-only % of turns", "read-only % of single-call turns"], rows_ro)
+    table = ("### A. Calls per turn\n\n" + logger.md_table(["Skill", "Bench", "n", "side", "turns", "0 calls %", "1 call %", "2+ calls %", "m", "m_task"], rows_mix)
+             + "\n\n### B. Single read-only-call turns\n\n" + logger.md_table(["Skill", "Bench", "n", "side", "single-call turns % of turns", "single read-only % of turns", "read-only % of single-call turns"], rows_ro)
              + "\n\n### C. Runs of >= 2 consecutive single read-only turns (per episode)\n\n"
-             + MC.md_table(["Skill", "Bench", "n", "side", "runs / episode", "turns in runs / episode", "turns in runs % of turns", "turns saved / episode", "mean run length"], rows_runs)
+             + logger.md_table(["Skill", "Bench", "n", "side", "runs / episode", "turns in runs / episode", "turns in runs % of turns", "turns saved / episode", "mean run length"], rows_runs)
              + "\n\n### D. Change skill minus seed (m; percentage points; turns saved per episode)\n\n"
-             + MC.md_table(["Skill", "Bench", "d m", "d 0-call pp", "d 1-call pp", "d 2+-call pp", "d single read-only pp", "d saved / episode"], delta)
+             + logger.md_table(["Skill", "Bench", "d m", "d 0-call pp", "d 1-call pp", "d 2+-call pp", "d single read-only pp", "d saved / episode"], delta)
              + "\n\n### F. Sensitivity: lenient read-only rule (also echo, printf, sort, uniq, cut, tr, pwd, which, stat, file, tree, du, diff inside an otherwise pure-read command)\n\n"
-             + MC.md_table(["Skill", "Bench", "n", "side", "single read-only % of turns", "read-only % of single-call turns", "runs / episode", "turns saved / episode", "bash pure-read %"], rows_len)
+             + logger.md_table(["Skill", "Bench", "n", "side", "single read-only % of turns", "read-only % of single-call turns", "runs / episode", "turns saved / episode", "bash pure-read %"], rows_len)
              + "\n\n### E. Bash calls: share classified as pure reads, and the most frequent non-read commands\n\n"
-             + MC.md_table(["Skill", "Bench", "n", "side", "bash calls", "pure-read %", "top non-read command heads"], rows_bash))
-    MC.write_record("callsperturn", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.callsperturn")
+             + logger.md_table(["Skill", "Bench", "n", "side", "bash calls", "pure-read %", "top non-read command heads"], rows_bash))
+    logger.write_record("callsperturn", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.callsperturn")
 
 
 def main():

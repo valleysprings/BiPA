@@ -27,17 +27,17 @@ from pathlib import Path
 
 import numpy as np
 
-from src.analysis.common import BENCHES, DS, SEED_TEXT, vid
-from src.analysis.mech import common as C
+from src.utils.dataloader import BENCHES, DS, SEED_TEXT, vid
+from src.utils import dataloader
 from src.graph import episode as GE
 
 TAG = "native-20261008-https"
 # Per-task rows of the scratch builder (emp_baseline_2_pairs.py). The seed evaluations reused by the current runs recorded their request files
 # under the run native-20261004, which the 2026-10-12 disk cleanup deleted (.trash/cleanup-20261012.md); for exactly those panels the rows of this
 # frozen file stand in (read-only). Every other panel, and every edge the file does not hold, is rebuilt from the run artifacts.
-FROZEN_ROWS = C.H / ".scratch/evidence-20261011/emp_baseline_pairs.json"
+FROZEN_ROWS = dataloader.H / ".scratch/evidence-20261011/emp_baseline_pairs.json"
 OPTIMIZERS = ("skillopt", "gepa", "skilladam")
-OUT = C.CACHE / "edges_table.json"
+OUT = dataloader.CACHE / "edges_table.json"
 UNPARSEABLE = "(unparseable)"
 MIN_TERM_TASKS = 3  # an edge-panel needs at least this many tasks with a valid lever model
 TERMS = ["dlogX", "actions", "turnsplit", "content", "text", "resid"]
@@ -421,7 +421,7 @@ def build():
 def run():
     """Build the table and write assets/cache/analysis/mech/edges_table.json."""
     records = build()
-    C.CACHE.mkdir(parents=True, exist_ok=True)
+    dataloader.CACHE.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(records, default=float))
     dev = [r for r in records if r["split"] == "dev"]
     print("records", len(records), "dev edges", len(dev), {o: sum(r["opt"] == o for r in dev) for o in OPTIMIZERS})

@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
 
-from src.analysis.mech import common as MC
+from src.utils import fig, dataloader
 from src.analysis.mech import rules_fig as RF
 
 OPTS = ["GEPA", "SkillOpt", "SkillAdam"]
@@ -105,8 +105,8 @@ def draw_rules(ax, rows, text):
 def main():
     """Load the two caches and draw the full-width figure."""
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7, "axes.linewidth": 0.6})
-    cells = json.loads((MC.CACHE / "attribution.json").read_text())["cells"]
-    text = json.loads((MC.CACHE / "skilltext.json").read_text())
+    cells = json.loads((dataloader.CACHE / "attribution.json").read_text())["cells"]
+    text = json.loads((dataloader.CACHE / "skilltext.json").read_text())
     rows, bottom = row_positions()
 
     fig = plt.figure(figsize=(6.75, 2.05))
@@ -124,7 +124,7 @@ def main():
     # the SkillAdam rows are short, so the legend sits in the empty lower right of panel (b)
     ax_b.legend(handles=handles, loc="lower right", ncol=2, frameon=False, fontsize=6.3, handlelength=0.9, handletextpad=0.3,
                 columnspacing=0.6, labelspacing=0.2, borderaxespad=0.1)
-    MC.save_figure(fig, "skills")
+    fig.save_figure(fig, "skills")
 
 
 if __name__ == "__main__":

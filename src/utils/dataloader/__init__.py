@@ -1,4 +1,4 @@
-"""Shared paths and loaders for the analysis scripts: run directories, evaluation files, skill version ids, per-task rows."""
+"""Shared data loading for the analyses: run paths, evaluation files, per-task rows, the optimizer registry, and the mech cache (CACHE, write_json)."""
 import json, math, hashlib, re, os
 from pathlib import Path
 import numpy as np
@@ -116,13 +116,15 @@ def returned_skills(model, bench, names=OPTIMIZERS):
         if t != SEED_TEXT: out[disp] = (run, t)
     return out
 
-# ---- added by group new-analyses: DeepSeek cell root, short bench names, report writer ----
+# ---- added by group new-analyses: DeepSeek cell root, short bench names ----
 DS = EX/"deepseek-flash"
 BN = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
-class Report:
-    """print and keep the lines of an analysis; save() writes them to assets/cache/analysis/<module>/<name>.txt."""
-    def __init__(self): self.lines = []
-    def __call__(self, *a):
-        s = " ".join(str(x) for x in a); self.lines.append(s); print(s)
-    def save(self, module, name):
-        (out_dir(module)/name).write_text("\n".join(self.lines) + "\n")
+
+# ---- mech cache ----
+CACHE = H / "assets/cache/analysis/mech"
+def write_json(name, obj):
+    """Write assets/cache/analysis/mech/<name>.json."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = CACHE / f"{name}.json"
+    path.write_text(json.dumps(obj, indent=1))
+    return path

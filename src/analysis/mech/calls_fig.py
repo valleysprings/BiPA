@@ -5,15 +5,14 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 OPTS = ["GEPA", "SkillOpt", "SkillAdam"]
 COLORS = ["#D9D9D9", "#9ECAE1", "#2171B5"]
 LABELS = ["0 calls", "1 call", "2+ calls"]
 
 
 def draw():
-    cells = {c["method"]: c for c in json.loads((M.CACHE / "callsperturn.json").read_text())["cells"] if c["short"] == "AutoB"}
+    cells = {c["method"]: c for c in json.loads((dataloader.CACHE / "callsperturn.json").read_text())["cells"] if c["short"] == "AutoB"}
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7})
     fig, ax = plt.subplots(figsize=(4.0, 1.6))
     fig.subplots_adjust(left=0.23, right=0.79, bottom=0.04, top=0.84)
@@ -43,14 +42,14 @@ def draw():
     handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in COLORS]
     fig.legend(handles, LABELS, loc="upper center", ncol=3, frameon=False, fontsize=7, bbox_to_anchor=(0.45, 1.0),
                handlelength=1.0, columnspacing=1.5)
-    M.save_figure(fig, "calls")
+    fig.save_figure(fig, "calls")
     return numbers
 
 
 def main():
     numbers = draw()
-    table = M.md_table(["optimizer", "skill", "0 calls %", "1 call %", "2+ calls %", "calls/turn", "turns"], numbers)
-    M.write_record("calls", "Share of AutoBench turns with 0, 1, 2+ executed calls, seed vs learned skill; calls per turn at the right.",
+    table = logger.md_table(["optimizer", "skill", "0 calls %", "1 call %", "2+ calls %", "calls/turn", "turns"], numbers)
+    logger.write_record("calls", "Share of AutoBench turns with 0, 1, 2+ executed calls, seed vs learned skill; calls per turn at the right.",
                    "deepseek-flash, AutoBench, each optimizer's own seed and learned-skill AutoBench runs (callsperturn.json).", "Pooled over episodes and turns.", table,
                    "python3 -m src.analysis.mech.calls_fig")
 

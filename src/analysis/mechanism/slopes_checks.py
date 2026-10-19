@@ -12,7 +12,7 @@ Outputs (assets/cache/analysis/slopes_checks/):
 Command: <bach-harness venv python> -m src.analysis.mechanism.slopes_checks [--model deepseek-flash] [--out DIR]   (from bipa/)"""
 import argparse, collections, json, math
 import numpy as np
-from src.analysis import common as C
+from src.utils import dataloader as C
 from src.graph import episode as W
 
 METHODS3 = {"GEPA": "gepa", "SkillOpt": "skillopt", "SkillAdam": "skilladam"}

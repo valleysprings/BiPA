@@ -1,36 +1,11 @@
-"""Shared paths and helpers of the paper-1 analyses: the cache directory, the figure writer and the audit-record writer.
-Nothing here touches paperout.record() or any existing paper/assets file; every output is named mech_<name>."""
-import json
+"""Audit-record output for the analyses: paper/assets/data/mech record writer (write_record, md_table, find_existing), the Report line collector, and paperout (see paperout.py)."""
 from pathlib import Path
 
-H = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation")
-CACHE = H / "assets/cache/analysis/mech"
-FIG = H / "paper/assets/fig/mech"
+from src.utils.dataloader import H, out_dir
+
 DATA = H / "paper/assets/data/mech"
 # paper/assets was regrouped on 2026-10-12 (fig/mech, fig/method, data/mech, data/method); the existing BACH-paper files are looked up in either layout
-OLD_FIG_DIRS = [FIG, FIG.parent]
 OLD_DATA_DIRS = [DATA, DATA.parent]
-BASELINES = {"GEPA": "gepa", "SkillOpt": "skillopt", "SkillAdam": "skilladam"}
-
-
-def save_figure(fig, name):
-    """Write paper/assets/fig/mech/mech_<name>.pdf and .svg (svg.fonttype none, text stays editable) and a png preview into the mech cache."""
-    import matplotlib
-    FIG.mkdir(parents=True, exist_ok=True)
-    CACHE.mkdir(parents=True, exist_ok=True)
-    # TrueType (Type 42) fonts in pdf/ps so the PDFs embed without font-type warnings
-    with matplotlib.rc_context({"svg.fonttype": "none", "pdf.fonttype": 42, "ps.fonttype": 42}):
-        fig.savefig(FIG / f"mech_{name}.svg")
-        fig.savefig(FIG / f"mech_{name}.pdf")
-    fig.savefig(CACHE / f"mech_{name}.png", dpi=200)
-
-
-def write_json(name, obj):
-    """Write assets/cache/analysis/mech/<name>.json."""
-    CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / f"{name}.json"
-    path.write_text(json.dumps(obj, indent=1))
-    return path
 
 
 def write_record(name, what, runs, aggregation, table, commands, extra=""):
@@ -63,3 +38,12 @@ def find_existing(directories, filename):
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(filename)
+
+
+class Report:
+    """print and keep the lines of an analysis; save() writes them to assets/cache/analysis/<module>/<name>.txt."""
+    def __init__(self): self.lines = []
+    def __call__(self, *a):
+        s = " ".join(str(x) for x in a); self.lines.append(s); print(s)
+    def save(self, module, name):
+        (out_dir(module)/name).write_text("\n".join(self.lines) + "\n")

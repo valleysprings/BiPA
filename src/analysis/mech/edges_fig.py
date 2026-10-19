@@ -7,8 +7,7 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 GROUPS = ["verify", "reread", "enumerate", "test", "format", "business", "scope_stop", "economize", "serialize", "other"]
 # plain names of the keyword groups (patterns in edges_build.CATEGORY_PATTERNS); "one at a time" as in the rules figure
 NAME = {"verify": "verify", "reread": "re-read state", "enumerate": "check every item", "test": "run tests", "format": "output format",
@@ -17,8 +16,8 @@ TERMS = [("actions", "more actions", "#0072B2", "o"), ("turnsplit", "turn-splitt
 
 
 def draw():
-    pres = json.load(open(M.CACHE / "skilltext.json"))["emp_baseline_check"]["category_presence"]
-    holm = {(t["category"], t["term"]): t for t in json.load(open(M.CACHE / "edges_holm.json"))["tests"]}
+    pres = json.load(open(dataloader.CACHE / "skilltext.json"))["emp_baseline_check"]["category_presence"]
+    holm = {(t["category"], t["term"]): t for t in json.load(open(dataloader.CACHE / "edges_holm.json"))["tests"]}
     term_name = {"actions": "more actions", "turnsplit": "turn-splitting"}
     # rows sorted by their largest difference, biggest effect on top
     rows = sorted(GROUPS, key=lambda g: -max(pres[g]["contrast"]["actions"][0], pres[g]["contrast"]["turnsplit"][0]))
@@ -62,10 +61,10 @@ def draw():
     fig.legend(h, ["more actions", "turn-splitting", "hollow: not reliable after correcting for 20 comparisons"],
                loc="upper center", ncol=3, frameon=False, fontsize=6.5, handletextpad=0.3, columnspacing=1.0, bbox_to_anchor=(0.55, 1.0))
     fig.subplots_adjust(left=0.24, right=0.985, top=0.9, bottom=0.17)
-    M.save_figure(fig, "edges")
-    body = M.md_table(["group", "with", "without", "d actions", "[95%]", "d turn-splitting", "[95%]"],
+    fig.save_figure(fig, "edges")
+    body = logger.md_table(["group", "with", "without", "d actions", "[95%]", "d turn-splitting", "[95%]"],
                       [[r[0], r[1], r[2], f"{r[3]*100:+.1f}", f"[{r[4]*100:.1f}, {r[5]*100:.1f}]", f"{r[6]*100:+.1f}", f"[{r[7]*100:.1f}, {r[8]*100:.1f}]"] for r in table])
-    M.write_record("edges_fig", "Per keyword group of the added text, the with-minus-without difference of the actions and turn-splitting terms of the change in log input tokens per edit (59 dev edits), with 95% bootstrap intervals over edits. Replaces the appendix table of edit categories.",
+    logger.write_record("edges_fig", "Per keyword group of the added text, the with-minus-without difference of the actions and turn-splitting terms of the change in log input tokens per edit (59 dev edits), with 95% bootstrap intervals over edits. Replaces the appendix table of edit categories.",
                    "59 canonical dev edges of native-20261008-https (SkillAdam x TB2 excluded); an edit is 'with' a group when its added text holds >= 150 characters of the group's keywords.",
                    "Unweighted mean over edits, with minus without; 95% bootstrap over edits (3000 resamples, each side within itself). Values x100 log points in this table; the figure axis is in log units.",
                    body, "python3 -m src.analysis.mech.edges_fig")

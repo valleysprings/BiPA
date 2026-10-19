@@ -15,9 +15,8 @@ from pathlib import Path
 import numpy as np
 
 from src.analysis import table1 as T
-from src.analysis.common import BENCHES, EX, SEED_TEXT, current_run, final_skill, vid
-from src.analysis.mech import common as C
-
+from src.utils.dataloader import BENCHES, EX, SEED_TEXT, current_run, final_skill, vid
+from src.utils import logger, dataloader
 MODEL = "deepseek-flash"
 LUNA = "gpt-6-luna"
 LUNA_RUN = "native-20261011"
@@ -146,22 +145,22 @@ def table(res, bench):
     rows = []
     for name, cell in res[bench].items():
         rows.append([name] + [f"{cell[d]['q']:.1f}" for d in doms])
-    return C.md_table(head, rows)
+    return logger.md_table(head, rows)
 
 
 def se_table(res, bench):
     """Markdown table of the standard error over tasks (SD of per-task mean success / sqrt(tasks)) for the DeepSeek rows."""
     doms = list(DOMAINS[bench]) + ["all"]
     rows = [[name] + [f"{cell[d]['se_tasks']:.1f}" for d in doms] for name, cell in res[bench].items()]
-    return C.md_table(["Row"] + doms, rows)
+    return logger.md_table(["Row"] + doms, rows)
 
 
 def main():
     res = compute()
-    C.write_json("domains", res)
+    dataloader.write_json("domains", res)
     text = "\n\n".join(f"### {b}\n\n{table(res, b)}\n\nStandard error over tasks (points):\n\n{se_table(res, b)}" for b in res)
     extra = EXPLANATION
-    C.write_record(
+    logger.write_record(
         "domains",
         "Test success (avg@3, percent) per task domain of tau3-bench and AutomationBench for No skill, Seed, GEPA, SkillOpt, SkillAdam (DeepSeek-V4.1-Flash, OpenCode) and for GPT-6 Luna No skill / Seed (one run), and why our absolute success is above the published numbers (reviewer P0-4 / X8).",
         "Same runs as Table 1 (mech.stats): seed = native-seed native-20261003-trace-final + rep-1 + rep-2; optimizers = native-20261008-https + test-reps; No skill = latest native-noseed; Luna = native-20261011 test run of native-noseed / native-seed.",

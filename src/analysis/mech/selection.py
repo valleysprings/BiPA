@@ -35,9 +35,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from src.analysis.mech import common as M
-
-EXECUTION = M.H / "assets/artifacts/execution/deepseek-flash"
+from src.utils import fig, logger, dataloader
+EXECUTION = dataloader.H / "assets/artifacts/execution/deepseek-flash"
 RUN = "native-20261008-https"
 BENCHES = [("terminal-bench-2-1", "TB2"), ("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench")]
 SEED_VERSION = "4fd5ca441c55"
@@ -357,7 +356,7 @@ def devsize(dev, prior, index, j, baseline_quantile) -> dict:
 
 def records_from_cache():
     """Rewrite mech_selection.md and mech_devsize.md from selection.json."""
-    result = json.loads((M.CACHE / "selection.json").read_text())
+    result = json.loads((dataloader.CACHE / "selection.json").read_text())
     record_selection(result)
     record_devsize(result)
 
@@ -395,16 +394,16 @@ def record_selection(result):
         draws.append([bench, "summary", f"mean {np.mean(qs):.1f}, min {min(qs):.1f}, max {max(qs):.1f}",
                       f"run's start draw {r['observed']['SkillOpt']['baseline']}/{r['dev_tasks']} (mid-quantile {r['priors']['fitted']['seed_draw_mid_quantile']:.2f})",
                       f"expected seed success under the fitted posteriors: dev {e['dev']:.1f}, test {e['test']:.1f}; prior mean {e['prior_mean']:.1f}; test avg@3 {r['test_avg3']}"])
-    t1 = M.md_table(["bench", "prior", "rule", "K / iterations", "observed baseline", "observed gain", "E[gain], random baseline",
+    t1 = logger.md_table(["bench", "prior", "rule", "K / iterations", "observed baseline", "observed gain", "E[gain], random baseline",
                      "E[gain], observed baseline", "P(gain >= obs), random", "P(gain >= obs), observed"], rows)
-    t2 = M.md_table(["bench", "prior", "dev tasks", "P(accept | no effect)", "SD of net difference (tasks)",
+    t2 = logger.md_table(["bench", "prior", "dev tasks", "P(accept | no effect)", "SD of net difference (tasks)",
                      "P(accept | true gain 1 / 2 / 3 tasks)", "critical net difference (one-sided 0.05)", "MDE80"], rows2)
-    t3 = M.md_table(["bench", "seed dev draw (solved/verified)", "success %", "runs using it", "runs (first three)"], draws)
-    priors = M.md_table(["bench", "dev tasks", "seed executions per dev task", "test tasks", "fitted prior (a, b)", "mean success"],
+    t3 = logger.md_table(["bench", "seed dev draw (solved/verified)", "success %", "runs using it", "runs (first three)"], draws)
+    priors = logger.md_table(["bench", "dev tasks", "seed executions per dev task", "test tasks", "fitted prior (a, b)", "mean success"],
                         [[b, result[b]["dev_tasks"], result[b]["dev_executions_per_task"], result[b]["test_tasks"],
                           f"({result[b]['prior_fitted'][0]:.2f}, {result[b]['prior_fitted'][1]:.2f})", f"{result[b]['mean_success']:.3f}"]
                          for b, _ in BENCHES])
-    M.write_record(
+    logger.write_record(
         "selection",
         "The gain each optimizer's own selection rule announces on the dev panel when every candidate is identical to the seed (no effect), "
         "against the gain its Table 1 run announced; how an accept-if-better comparison of two single runs behaves on the dev panel; and the "
@@ -434,7 +433,7 @@ def record_devsize(result):
                              f"{r['SkillOpt']['E_gain_random_points']:.1f}", f"{r['SkillOpt']['E_gain_quantile_points']:.1f}",
                              f"{r['GEPA']['E_gain_random_points']:.1f}", f"{r['GEPA']['E_gain_quantile_points']:.1f}",
                              f"{r['MDE80_points']:.1f}", r["critical_net_tasks"]])
-    M.write_record(
+    logger.write_record(
         "devsize",
         "How the gain a success-only selector announces under no effect, and the smallest effect a single-run dev comparison detects, change "
         "with the size of the dev panel (SkillOpt's best of 4, GEPA's argmax over 7), in percentage points of the dev panel.",
@@ -444,7 +443,7 @@ def record_devsize(result):
         "baseline: the baseline fixed at the same mid-quantile of the seed-score distribution as the run's own seed draw at the real dev size "
         "(the quantile and the resulting score are listed). MDE80: the smallest true gain detected with probability 0.8 by a one-sided 0.05 "
         "comparison of two single runs. Random seed [20261012, benchmark index, prior index, 100 + size index].",
-        M.md_table(["bench", "prior", "dev size", "seed-draw quantile -> baseline", "SkillOpt E[gain] random (pts)", "SkillOpt E[gain] at quantile (pts)",
+        logger.md_table(["bench", "prior", "dev size", "seed-draw quantile -> baseline", "SkillOpt E[gain] random (pts)", "SkillOpt E[gain] at quantile (pts)",
                     "GEPA E[gain] random (pts)", "GEPA E[gain] at quantile (pts)", "MDE80 (pts)", "critical net difference (tasks)"], rows),
         ".venv/bin/python -m src.analysis.mech.selection compute\npython3 -m src.analysis.mech.selection draw")
 
@@ -452,7 +451,7 @@ def record_devsize(result):
 def compute():
     """Simulate every benchmark and write the cache and both audit records."""
     result = {bench: analyse(bench) for bench, _ in BENCHES}
-    M.write_json("selection", result)
+    dataloader.write_json("selection", result)
     record_selection(result)
     record_devsize(result)
 
@@ -515,7 +514,7 @@ def draw_selection(result):
                Line2D([], [], color="0.1", lw=1.8, ls="-", marker="v", markersize=4.5, label="SkillOpt run's gain"),
                Line2D([], [], color="0.1", lw=1.8, ls="--", marker="D", markersize=4, label="GEPA run's gain")]
     fig.legend(handles=handles, loc="upper center", ncol=4, fontsize=7.5, frameon=False, bbox_to_anchor=(0.53, 1.0))
-    M.save_figure(fig, "selection")
+    fig.save_figure(fig, "selection")
 
 
 def draw_devsize(result):
@@ -555,12 +554,12 @@ def draw_devsize(result):
     bench_handles = [Line2D([], [], color="0.3", lw=0, marker=m, markersize=4, label=d) for _, d, m in benches]
     axs[1].legend(handles=bench_handles, loc="upper right", fontsize=7, frameon=False, ncol=3, columnspacing=0.8, handletextpad=0.3,
                   borderaxespad=0.1)
-    M.save_figure(fig, "devsize")
+    fig.save_figure(fig, "devsize")
 
 
 def draw():
     """Both figures from the cache."""
-    result = json.load(open(M.CACHE / "selection.json"))
+    result = json.load(open(dataloader.CACHE / "selection.json"))
     draw_selection(result)
     draw_devsize(result)
 

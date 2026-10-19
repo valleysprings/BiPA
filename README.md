@@ -35,7 +35,9 @@ bipa/
 │   ├── adapters/     # per-optimizer interfaces (skillopt, skilladam, gepa)
 │   ├── analysis/     # table1.py (Table 1), mech/ and mechanism/ (RQ analyses)
 │   ├── dynamics/     # transfer drivers, execution-evidence audits, status/refresh
-│   └── graph/        # per-episode bipartite-graph metrics
+│   ├── graph/        # per-episode bipartite-graph metrics
+│   ├── utils/        # executor, llm, fig/, dataloader/, logger/ (audit records)
+│   └── prompts/      # skilladam optimizer prompt fragments (vendor role, metric, failure/success types, iteration example)
 ├── scripts/          # baselines.sh (train + repeat) and analysis.sh (everything else)
 ├── optimizers/       # vendored upstream sources, pinned commits
 ├── configs/          # tasks / experiments / graph yaml

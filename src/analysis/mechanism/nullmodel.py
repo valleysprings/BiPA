@@ -18,8 +18,9 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 from scipy.special import betaln, gammaln
-from src.analysis import common
-from src.analysis.common import BENCHES, SEED_TEXT, Report, eval_file, vid
+from src.utils import dataloader as common
+from src.utils.dataloader import BENCHES, SEED_TEXT, eval_file, vid
+from src.utils.logger import Report
 from src.analysis.submission_protocol import execution, fsha
 
 NS, SEED = 200000, 20261008

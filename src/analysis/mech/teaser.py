@@ -8,8 +8,7 @@ import json
 import math
 import sys
 import numpy as np
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 # constants copied from bach-harness/src/analysis/casestudy/teaser.py (the casestudy package is not part of bipa)
 BENCH, MODEL = "automationbench", "deepseek-flash"
 GROUPS = ["skill", "bash", "read", "other"]
@@ -35,7 +34,7 @@ TERM_COLOR = {"more_actions": "#0072B2", "more_requests": "#E69F00", "longer_con
 
 def compute():
     """Load the seed and SkillOpt episodes of the pinned task, record per-panel numbers and the four-term attribution of the pair."""
-    from src.analysis import common as C
+    from src.utils import dataloader as C
     from src.analysis.mechanism.slopes_checks import metrics
     from src.graph import episode as W
     seed_run = C.current_run("native-seed", MODEL, BENCH)
@@ -74,7 +73,7 @@ def compute():
     terms["dlogX"] = d["X"]
     out = dict(task=task, files={k: str(v) for k, v in files.items()}, runs=dict(seed=seed_run.name, skillopt=so_run.name),
                panels=panels, terms=terms, metrics=dict(seed=a, skillopt=b), k=k, s_f=s_f, r_mean=r_mean, logs=d)
-    M.write_json("teaser", out)
+    dataloader.write_json("teaser", out)
     print(json.dumps({"terms": terms, "k": k, "panels": {p: {x: v for x, v in q.items() if x in ("R", "N", "X", "success")} for p, q in panels.items()}}, indent=1))
 
 
@@ -260,7 +259,7 @@ def draw():
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.rcParams.update({"font.family": FONT, "font.size": 7.5, "svg.fonttype": "none", "pdf.fonttype": 42})
-    d = json.loads((M.CACHE / "teaser.json").read_text())
+    d = json.loads((dataloader.CACHE / "teaser.json").read_text())
     P = d["panels"]
     fig = plt.figure(figsize=(FIG_W, FIG_H))
     ax = fig.add_axes([0, 0, 1, 1])
@@ -282,7 +281,7 @@ def draw():
     ratio = P["skillopt"]["X"] / P["seed"]["X"]
     ax.text(x_c + width_c / 2, FOOTER_Y, f"Same pass, \u00d7{ratio:.2f} tokens \u2014 paid in extra turns.", fontsize=8, fontweight="bold",
             ha="center", va="center", color=INK)
-    M.save_figure(fig, "teaser")
+    fig.save_figure(fig, "teaser")
     record(d)
 
 
@@ -295,20 +294,20 @@ def record(d):
         rows.append([key, p["R"], p["N"], f"{p['X']:.0f}", str(p["success"]),
                      " / ".join(f"{g} {p['tokens_by_group'][g]:.0f}" for g in GROUPS), " / ".join(f"{g} {n}" for g, n in p["ncalls"].items())])
     table = f"AutoBench test task `{d['task']}` (DeepSeek-V4.1-Flash, OpenCode).\n\n"
-    table += M.md_table(["panel", "turns R", "tool calls N", "input tokens X", "success", "input tokens by component", "calls by group"], rows)
+    table += logger.md_table(["panel", "turns R", "tool calls N", "input tokens X", "success", "input tokens by component", "calls by group"], rows)
     t = d["terms"]
     trows = [[TERM_LABEL[k], f"{t[k]:+.4f}", f"{math.exp(t[k]):.3f}"] for k in TERMS]
     trows.append(["sum of the four terms", f"{t['segments_sum']:+.4f}", f"{math.exp(t['segments_sum']):.3f}"])
     trows.append(["total (measured), log(X_SkillOpt / X_seed)", f"{t['dlogX']:+.4f}", f"{math.exp(t['dlogX']):.3f}"])
     table += ("\n\nPanel (c), four-term attribution of this pair (log input tokens, SkillOpt minus seed); the waterfall steps are the factors exp(term)\n\n"
-              + M.md_table(["term", "value (log)", "factor"], trows))
+              + logger.md_table(["term", "value (log)", "factor"], trows))
     a, b = d["metrics"]["seed"], d["metrics"]["skillopt"]
     mrows = [[k, f"{a[k]:.4g}", f"{b[k]:.4g}"] for k in ("R", "N", "X", "F", "h", "sF", "eR")]
     table += (f"\n\nPer-episode inputs of the decomposition (slopes_checks.metrics): ratio SkillOpt/seed of X = {P['skillopt']['X'] / P['seed']['X']:.3f}; "
               f"k = 1 + s_H R/(R-1) with the pair-averaged s_F = {d['s_f']:.4f}, R = {d['r_mean']:.1f}: k = {d['k']:.4f}.\n\n")
-    table += M.md_table(["quantity", "seed", "SkillOpt"], mrows)
+    table += logger.md_table(["quantity", "seed", "SkillOpt"], mrows)
     table += "\n\nFiles\n\n" + "\n".join(f"- {k}: `{v}`" for k, v in d["files"].items())
-    M.write_record(
+    logger.write_record(
         "teaser",
         "Figure 1 of paper 1: one AutoBench test task solved by the seed skill and by SkillOpt's skill, each as its real episode graph (turns, tool calls, exposure of tool outputs in later turns), and panel (c): the four-term attribution of this pair as a multiplicative waterfall on a log token axis from the seed's input tokens to SkillOpt's (step factor = exp(term)).",
         f"DeepSeek-V4.1-Flash in OpenCode, AutoBench test split. Seed: native-seed/automationbench/{d['runs']['seed']} (the run-0 test episode). SkillOpt: skillopt/automationbench/{d['runs']['skillopt']} (its own test evaluation). Task pinned to casestudy.teaser.PIN `{d['task']}`; both episodes pass. No BACH episode.",

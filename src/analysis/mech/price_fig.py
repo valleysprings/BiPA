@@ -6,8 +6,7 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 BENCH = [("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench"), ("terminal-bench-2-1", "TB2")]
 OPT = ["GEPA", "SkillOpt", "SkillAdam"]
 OC = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}
@@ -15,7 +14,7 @@ OM = {"SkillOpt": "o", "SkillAdam": "s", "GEPA": "^"}
 
 
 def main():
-    d = json.loads((M.CACHE / "price3.json").read_text())["results"]
+    d = json.loads((dataloader.CACHE / "price3.json").read_text())["results"]
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
                          "font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7, "axes.linewidth": 0.6})
     fig, ax = plt.subplots(figsize=(4.5, 2.5))
@@ -53,10 +52,10 @@ def main():
     fig.legend(h, ["per task", "total", "range, nine weightings"], loc="lower center", bbox_to_anchor=(0.53, -0.005), ncol=3, frameon=False,
                fontsize=7, handlelength=1.3, columnspacing=1.2, handletextpad=0.3)
     ax.annotate("price ratio to the seed (cached 0.1, output 4)", xy=(0.5, -0.1), xycoords="axes fraction", ha="center", va="top", fontsize=7)
-    M.save_figure(fig, "price")
-    table = M.md_table(["benchmark", "skill", "per-task ratio", "total ratio", "min over 9", "max over 9", "cached share"],
+    fig.save_figure(fig, "price")
+    table = logger.md_table(["benchmark", "skill", "per-task ratio", "total ratio", "min over 9", "max over 9", "cached share"],
                        [[a, b, f"{c:.3f}", f"{e:.3f}", f"{f:.3f}", f"{g:.3f}", f"{h_:.3f}"] for a, b, c, e, f, g, h_ in rows])
-    M.write_record("price", "Price ratio of each learned skill to the seed at cached weight 0.1 and output weight 4, per task (geometric mean) and in total, with the min-max range of both over the nine weightings, and the cached share of input.",
+    logger.write_record("price", "Price ratio of each learned skill to the seed at cached weight 0.1 and output weight 4, per task (geometric mean) and in total, with the min-max range of both over the nine weightings, and the cached share of input.",
                    "Test runs of Table 1 (price3.json, see analysis.mech.price).", "Ratios as in price3.json (geo, sum, geo_min/max, sum_min/max); range = min of the two mins, max of the two maxes.", table,
                    "Figure 4.5 x 2.5 in.", "python3 -m src.analysis.mech.price_fig")
     print(table)

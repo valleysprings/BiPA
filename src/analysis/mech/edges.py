@@ -14,9 +14,8 @@ import json
 
 import numpy as np
 
-from src.analysis.mech import common as C
-
-TABLE = C.CACHE / "edges_table.json"
+from src.utils import logger, dataloader
+TABLE = dataloader.CACHE / "edges_table.json"
 # Excluded cell: SkillAdam on terminal-bench-2-1. Two versions of that run match the same patch (one is the other plus a later line), so the parent of its
 # edits is ambiguous in the logs; the table labels 11 of its 14 dev edges with the wrong parent. All its edges are dropped from every analysis here.
 EXCLUDED_CELL = ("skilladam", "terminal-bench-2-1")
@@ -146,18 +145,18 @@ def tables(res):
             p, lo, hi = diff["dQ" + suffix]
             cells.append(f"{p:+.1f} [{lo:.1f}, {hi:.1f}]" if lo is not None else f"{p:+.1f}")
             drows.append([scope, label] + cells)
-    return (C.md_table(head, rows_u), C.md_table(head, rows_w), C.md_table(dhead, drows))
+    return (logger.md_table(head, rows_u), logger.md_table(head, rows_w), logger.md_table(dhead, drows))
 
 
 def run():
     """Compute, write json and record."""
     res = compute()
-    C.write_json("edges", res)
+    dataloader.write_json("edges", res)
     unweighted, weighted, difference = tables(res)
     table = ("Mean change per edge against its parent, dev panel, log points x100 (dQ in success points). Unweighted over edges:\n\n" + unweighted +
              "\n\nTask-pair-weighted (weights n_pair):\n\n" + weighted +
              "\n\nAccepted minus rejected (bootstrap 95% over edges, 10,000 resamples, accepted and rejected resampled separately):\n\n" + difference)
-    C.write_record(
+    logger.write_record(
         "edges",
         "Whether rejected candidates also read more than their parents (the editor adds the input-token tax and success-only selection lets it through) "
         "or whether accepted ones read more than rejected ones (selection ratchets cost). Each edge is a scored candidate against its parent on the same dev tasks.",

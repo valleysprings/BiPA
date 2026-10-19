@@ -4,7 +4,8 @@ with the seed's own run-to-run floor (pairwise and leave-one-out ratios). Loader
 Output: assets/cache/analysis/pooled/pooled.json and pooled.txt. Run: <bach-harness venv python> -m src.analysis.mechanism.pooled   (from bipa/)"""
 import json, math
 import numpy as np
-from src.analysis.common import BN, Report, gmean, out_dir
+from src.utils.dataloader import BN, gmean, out_dir
+from src.utils.logger import Report
 from src.analysis.mechanism.reproducibility import load, run_files
 
 KEYS = ["X", "P", "R", "N", "O"]

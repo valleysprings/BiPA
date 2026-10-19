@@ -4,7 +4,8 @@ success differences, pairwise flip fraction and log-X / log-R correlation across
 Output: assets/cache/analysis/reproducibility/reproducibility.txt. Run: <bach-harness venv python> -m src.analysis.mechanism.reproducibility   (from bipa/)"""
 import itertools, json, math
 import numpy as np
-from src.analysis.common import BENCHES, DS, SEED_TEXT, Report, current_run, gmean, eval_file, returned_skills, vid
+from src.utils.dataloader import BENCHES, DS, SEED_TEXT, current_run, gmean, eval_file, returned_skills, vid
+from src.utils.logger import Report
 
 NAMES = {"GEPA": "gepa", "SkillOpt": "skillopt", "SkillAdam": "skilladam"}
 

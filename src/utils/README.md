@@ -5,4 +5,6 @@
 
 使用 `src.utils.executor`、`src.utils.llm` 导入，`PYTHONPATH` 包含 `bipa/`。不使用顶层 `utils` 或 `executor` 名称，避免与 BACH 的 `src/utils` 混淆。BiPA 启动入口和迁移脚本已设置包路径。
 
+分析共享层也在这里（2026-10-19 从 `src/analysis/` 迁入）：`dataloader/` 是 run 路径、evaluation 读取、per-task 行和 mech 缓存（`CACHE`、`write_json`）；`fig/` 是 paper figure 输出（`save_figure`、`FIG`）；`logger/` 是审计记录（`write_record`、`md_table`、`find_existing`、`Report`）和 `paperout.py`（两篇 paper 的 figure/record 落盘）。
+
 上游算法在 [../optimizers](../optimizers/README.md)，接口适配在 `../adapters/`；面板、冻结协议和审计仍由各自模块负责。

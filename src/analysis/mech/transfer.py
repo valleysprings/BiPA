@@ -15,9 +15,7 @@ import json
 from types import SimpleNamespace
 
 from src.analysis import report
-from src.analysis.mech import common as M
-
-
+from src.utils import logger, dataloader
 def episode(record: dict) -> SimpleNamespace:
     """One task's episode with the fields report.stats / report.ratios read: task, success (None when the outcome is not verified),
     X = input tokens summed over the episode's distinct completed requests, N = the tool calls the harness executed."""
@@ -29,7 +27,7 @@ def episode(record: dict) -> SimpleNamespace:
                            X=sum(r["input_tokens"] for r in requests),
                            N=len(calls))
 
-LUNA = M.H / "assets/artifacts/execution/gpt-6-luna"
+LUNA = dataloader.H / "assets/artifacts/execution/gpt-6-luna"
 BENCH = "tau3-bench"
 ROWS = [("No skill", f"native-noseed/{BENCH}/native-20261011"), ("Seed skill", f"native-seed/{BENCH}/native-20261011"),
         ("Seed skill, second run (noise reference)", f"native-seed/{BENCH}/ood-seed"),
@@ -64,9 +62,9 @@ def main():
         ratio = report.ratios([eps], seed)
         rows.append([label, f"{100 * own['success']:.1f} ({own['known']}/{own['tasks']})", f"{q_common:.1f} vs {q_seed_common:.1f}",
                      len(common), f"{ratio['input']:.2f}", f"{ratio['calls']:.2f}", ratio["tasks"]])
-    table = M.md_table(["arm (GPT-6 Luna, tau3-bench test)", "Q, own verified tasks", "Q vs Seed on common verified tasks", "common verified tasks",
+    table = logger.md_table(["arm (GPT-6 Luna, tau3-bench test)", "Q, own verified tasks", "Q vs Seed on common verified tasks", "common verified tasks",
                         "rho (input tokens)", "rho^calls", "tasks in the ratios"], rows)
-    M.write_record(
+    logger.write_record(
         "transfer",
         "Cross-model transfer: the final skills of GEPA, SkillOpt and SkillAdam trained with DeepSeek-V4.1-Flash on tau3-bench (the Table 1 runs), "
         "evaluated unchanged with GPT-6 Luna on the tau3-bench test split, one run each, against Luna's own Seed skill and No skill runs.",

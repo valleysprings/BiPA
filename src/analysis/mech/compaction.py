@@ -29,8 +29,7 @@ import numpy as np
 
 from src.analysis import table1 as T
 from src.analysis.mech import attribution as A
-from src.analysis.mech import common as MC
-
+from src.utils import fig, logger, dataloader
 WINDOWS = [1, 3, 5, 10, None]               # None = infinity
 CAPS = [8000, 32000, 64000, 128000, None]   # None = infinity
 
@@ -135,7 +134,7 @@ def compute():
             cells.append(cell)
             base = [r for r in cell["results"] if r["param"] == "inf"][0]
             print(method_disp, bench, "n", cell["n"], "/", cell["n_table1"], "rho_turns", round(cell["rho_turns"], 3), "rho(inf)", round(base["rho"], 3), "slope(inf)", round(base["slope"], 3))
-    MC.write_json("compaction", dict(model=A.MODEL, windows=[label(k) for k in WINDOWS], caps=[label(c) for c in CAPS], cells=cells))
+    dataloader.write_json("compaction", dict(model=A.MODEL, windows=[label(k) for k in WINDOWS], caps=[label(c) for c in CAPS], cells=cells))
     return cells
 
 
@@ -189,7 +188,7 @@ def draw(cells):
     fig.legend(handles, ["as recorded", "last turn only", "turn ratio"], loc="lower center", bbox_to_anchor=(0.6, -0.005), ncol=3, frameon=False,
                fontsize=7, handlelength=1.0, columnspacing=1.0, handletextpad=0.3)
     ax.annotate("input-token ratio to the seed", xy=(0.5, -0.1), xycoords="axes fraction", ha="center", va="top", fontsize=7)
-    MC.save_figure(fig, "compaction")
+    fig.save_figure(fig, "compaction")
 
 
 def fmt(x, nd=3):
@@ -207,16 +206,16 @@ def record(cells):
             rows_slope.append(head[:3] + [fmt(pick(c, policy, p)["slope"]) for p in params])
             rows_el.append(head[:3] + [fmt(pick(c, policy, p)["elasticity"], 2) for p in params])
         sections.append(f"### {title}\n\nrho (geometric mean over tasks of per-task 3-run means, skill vs seed)\n\n"
-                        + MC.md_table(["Skill", "Bench", "n", "rho_turns"] + [f"{policy} {p}" for p in params], rows_rho)
-                        + "\n\nwithin-task slope of log input on log turns\n\n" + MC.md_table(["Skill", "Bench", "n"] + [f"{policy} {p}" for p in params], rows_slope)
-                        + "\n\nlog rho / log rho_turns (1 = the whole token tax is the turn ratio)\n\n" + MC.md_table(["Skill", "Bench", "n"] + [f"{policy} {p}" for p in params], rows_el))
+                        + logger.md_table(["Skill", "Bench", "n", "rho_turns"] + [f"{policy} {p}" for p in params], rows_rho)
+                        + "\n\nwithin-task slope of log input on log turns\n\n" + logger.md_table(["Skill", "Bench", "n"] + [f"{policy} {p}" for p in params], rows_slope)
+                        + "\n\nlog rho / log rho_turns (1 = the whole token tax is the turn ratio)\n\n" + logger.md_table(["Skill", "Bench", "n"] + [f"{policy} {p}" for p in params], rows_el))
     # mean over cells, to read the trend at a glance
     summary = []
     for policy, params in (("window", [label(k) for k in WINDOWS]), ("cap", [label(c) for c in CAPS])):
         for p in params:
             gap = [abs(math.log(pick(c, policy, p)["rho"] / c["rho_turns"])) for c in cells]
             summary.append([policy, p, fmt(float(np.mean([pick(c, policy, p)["slope"] for c in cells]))), fmt(float(np.mean(gap)))])
-    sections.append("### Trend over the nine skills\n\n" + MC.md_table(["policy", "parameter", "mean slope", "mean |log(rho / rho_turns)|"], summary))
+    sections.append("### Trend over the nine skills\n\n" + logger.md_table(["policy", "parameter", "mean slope", "mean |log(rho / rho_turns)|"], summary))
     what = ("Reviewer X1, a counterfactual: how large would the token tax be if the harness compacted its history? Each test episode's input tokens are recomputed from its per-request records under a sliding window "
             "(keep only the history added by the last k turns) and under a token cap C on history per request, with the agent's turns held fixed. The expectation is that rho moves toward rho_turns and the "
             "within-task slope of log input on log turns falls toward 1 as compaction tightens. This is an accounting counterfactual on fixed trajectories: a compacting harness would also change what the agent does next, "
@@ -227,7 +226,7 @@ def record(cells):
            "rho = geometric mean over tasks of skill / seed with the same policy on both sides; rho_turns the same on turn counts R (graph requests); slope = within-task (task fixed effects) slope of log X' on log R pooled over the "
            "six episodes of each task. Window inf and cap inf are the recorded run (rho = Table 1 rho_trj on these tasks, up to the graph-episode input sum: SkillOpt TB2 1.423 vs 1.429, GEPA TB2 1.290 on 17 of 18 tasks vs 1.338). "
            "Caution on log rho / log rho_turns: it is unstable where rho_turns is near 1 (SkillOpt tau3); the robust reading is the gap rho - rho_turns and the slope.")
-    MC.write_record("compaction", what, runs, agg, "\n\n".join(sections), ".venv/bin/python -m src.analysis.mech.compaction compute\npython3 -m src.analysis.mech.compaction draw")
+    logger.write_record("compaction", what, runs, agg, "\n\n".join(sections), ".venv/bin/python -m src.analysis.mech.compaction compute\npython3 -m src.analysis.mech.compaction draw")
 
 
 def main():
@@ -237,7 +236,7 @@ def main():
     if step == "compute":
         compute()
         return
-    cells = json.loads((MC.CACHE / "compaction.json").read_text())["cells"]
+    cells = json.loads((dataloader.CACHE / "compaction.json").read_text())["cells"]
     draw(cells)
     record(cells)
 

@@ -14,8 +14,8 @@ import argparse, hashlib, json, os
 from pathlib import Path
 import numpy as np
 from scipy.stats import t as tdist, ttest_rel
-from src.analysis import common
-from src.analysis.common import BENCHES
+from src.utils import dataloader as common
+from src.utils.dataloader import BENCHES
 from src.analysis.mechanism.nullmodel import bb_fit, load_exec, seed_execs, tally
 
 SEED, NS, ALPHA, TARGET = 20261008, 4000, 0.05, 0.8

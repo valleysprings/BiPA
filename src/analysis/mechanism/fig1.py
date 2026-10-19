@@ -8,7 +8,7 @@ Outputs in assets/cache/analysis/fig1/ (--out DIR). GEPA, SkillOpt, SkillAdam (t
 import argparse, collections, json, math, sys
 from pathlib import Path
 import numpy as np
-from src.analysis.common import gmean
+from src.utils.dataloader import gmean
 
 BENCH = [("tau3-bench", r"$\tau^3$-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench", "AutoBench"), ("terminal-bench-2-1", "TB2", "TB2")]
 ROOT = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/assets/cache/analysis/fig1")
@@ -17,7 +17,7 @@ ROOT = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitiga
 def compute(models, out):
     """Per optimized skill the four terms against the seed (test tasks both completed), and the within-task regressions of log input tokens /
     log output tokens / log calls on log R per benchmark over seed and skill episodes."""
-    from src.analysis import common as C
+    from src.utils import dataloader as C
     from src.analysis.mechanism.slopes_checks import metrics, episodes
     q = lambda rows: (lambda kn: 100 * sum(r["success"] is True for r in kn) / len(kn) / 100)([r for r in rows.values() if r["success"] is not None])  # Table 1's Q (percent) over the known outcomes of the whole test panel, as a fraction
     skills, all_eps, all_out, raw = [], collections.defaultdict(dict), collections.defaultdict(dict), []

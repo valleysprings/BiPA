@@ -32,12 +32,11 @@ No BACH, no model calls, no benchmark execution. Command (from bipa):
 import json
 import re
 
-from src.analysis.common import SEED_TEXT, EX
-from src.analysis.mech import common as MC
-
-HB = MC.H.parent / "harness-bench"  # sibling of harness-mitigation; task materials (see module docstring)
+from src.utils.dataloader import SEED_TEXT, EX
+from src.utils import logger, dataloader
+HB = dataloader.H.parent / "harness-bench"  # sibling of harness-mitigation; task materials (see module docstring)
 if not HB.is_dir():
-    HB = MC.H / ".." / "harness-bench"
+    HB = dataloader.H / ".." / "harness-bench"
 BENCHES = ("tau3-bench", "automationbench", "terminal-bench-2-1")
 SHORT = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
 OPT = ("gepa", "skillopt", "skilladam")
@@ -196,7 +195,7 @@ def compute():
         s["audit"] = audit_text(s["text"], benches[s["bench"]])
     seed_audit = {b: audit_text(SEED_TEXT, benches[b]) for b in BENCHES}
     # rule level on the 337 hand-coded units (DeepSeek nine)
-    coded = json.loads((MC.CACHE / "skilltext.json").read_text())["coded_units"]
+    coded = json.loads((dataloader.CACHE / "skilltext.json").read_text())["coded_units"]
     rules = {}
     for key, units in coded.items():
         arm, bench = key.split("|")
@@ -210,7 +209,7 @@ def compute():
                       "by_category": {c: sum(1 for t in tagged if t["category"] == c and t["hits"]) for c in {u["category"] for u in tagged}}}
     res = {"skills": [{k: v for k, v in s.items() if k != "text"} for s in skills], "seed": seed_audit, "rules": rules,
            "dev_sizes": {b: len(benches[b]["per_task"]) for b in BENCHES}}
-    MC.write_json("cheatsheet", res)
+    dataloader.write_json("cheatsheet", res)
     return res
 
 
@@ -236,7 +235,7 @@ def record(res):
                      pct(a["ov5_prompt"]["share"]), pct(a["ov5_answer"]["share"]), pct(a["ov8_answer"]["share"]), pct(a["ov13_answer"]["share"]),
                      len(a["task_ids"]) or 0, f"{len(a['paths'])} ({len(a['paths_specific'])})", f"{len(a['values'])} ({len(a['values_specific'])})",
                      len(a["commands"]) or 0])
-    table_a = MC.md_table(["skill", "bench", "words", "5g overlap prompt", "5g overlap answer", "8g overlap answer", "13g overlap answer",
+    table_a = logger.md_table(["skill", "bench", "words", "5g overlap prompt", "5g overlap answer", "8g overlap answer", "13g overlap answer",
                            "dev task ids named", "path hits (specific)", "value hits (specific)", "verbatim command lines"], rows)
     # evidence quotes: every task-id hit, every specific path/value, every command line
     ev = []
@@ -258,7 +257,7 @@ def record(res):
         arm, bench = key.split("|")
         rrows.append([arm, SHORT[bench], r["n"], len(r["specific"]), len(r["generic"]),
                       "; ".join(f"{c}:{n}" for c, n in sorted(r["by_category"].items()) if n) or "-"])
-    table_c = MC.md_table(["arm", "bench", "coded units", "task-specific (heuristic)", "generic-convention hits", "task-specific by behaviour category"], rrows)
+    table_c = logger.md_table(["arm", "bench", "coded units", "task-specific (heuristic)", "generic-convention hits", "task-specific by behaviour category"], rrows)
     rex = []
     for key, r in sorted(res["rules"].items()):
         for t in r["specific"]:
@@ -290,12 +289,12 @@ def record(res):
              + "\n\n### L0-c3. Generic-convention hits (shared by > 3 dev tasks — environment conventions, NOT task-specific)\n\n" + table_cg
              + "\n\n### L2. Compilation of the existing evidence\n\n" + l2_section()
              + "\n\n### Verdict\n\n" + verdict(res))
-    MC.write_record("cheatsheet", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.cheatsheet")
+    logger.write_record("cheatsheet", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.cheatsheet")
 
 
 def l2_section():
     """The compilation: OOD rep0 and pass@k read from the caches; dev edges quoted from mech_edges.md."""
-    dyn = json.loads((MC.CACHE / "dynamics.json").read_text())["cells"]
+    dyn = json.loads((dataloader.CACHE / "dynamics.json").read_text())["cells"]
     rows = []
     for model, mshort in (("deepseek-flash", "DeepSeek"), ("gpt-6-luna", "Luna")):
         for bench in ("tau3-bench", "automationbench"):
@@ -303,10 +302,10 @@ def l2_section():
             for arm, label in (("native-noseed", "No skill"), ("native-seed", "Seed"), ("gepa", "GEPA"), ("skillopt", "SkillOpt"), ("skilladam", "SkillAdam")):
                 h = arms[arm]["h4"]
                 rows.append([mshort, SHORT[bench], label, h["n"], f"{h['pass1']:.1f}", f"{h['pass3']:.1f}", f"{h['pass3'] - h['pass1']:+.1f}"])
-    passk = MC.md_table(["model", "bench", "arm", "n", "pass@1", "pass@3", "gap"], rows)
-    ood = json.loads((MC.H / "assets/artifacts/results/ood-cross-bench.json").read_text())
+    passk = logger.md_table(["model", "bench", "arm", "n", "pass@1", "pass@3", "gap"], rows)
+    ood = json.loads((dataloader.H / "assets/artifacts/results/ood-cross-bench.json").read_text())
     orows = [[SHORT[o["train"]], "->", SHORT[o["bench"]], o["method"], f"{o['Q']:.1f} ({o['known']}/{o['total']})", f"{o['rho']:.2f}", f"{o['rho_inv']:.2f}"] for o in ood]
-    oodt = MC.md_table(["train bench", "eval bench", "method", "Q (rep0)", "rho", "rho^calls"], orows)
+    oodt = logger.md_table(["train bench", "eval bench", "method", "Q (rep0)", "rho", "rho^calls"], orows)
     return ("**OOD, cross-bench transfer, rep0** (mech_ood.md; assets/artifacts/results/ood-cross-bench.json; seed references: AutoB Q 45.0, "
             "TB2 Q 75.9, Table 1 avg@3):\n\n" + oodt
             + "\n\nReading (mech_ood.md): the token tax transfers (5 of 6 cells rho > 1.2) but there is no OOD collapse — transferred skills sit "

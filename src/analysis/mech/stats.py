@@ -29,8 +29,8 @@ import numpy as np
 from scipy import stats as sps
 
 from src.analysis import table1 as T
-from src.analysis import paperout as PO
-from src.analysis.common import BENCHES, H, SEED_TEXT, current_run, final_skill, gmean, vid
+from src.utils.logger import paperout as PO
+from src.utils.dataloader import BENCHES, H, SEED_TEXT, current_run, final_skill, gmean, vid
 
 MODEL = "deepseek-flash"
 METHODS = (("No skill", "native-noseed"), ("GEPA", "gepa"), ("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"))

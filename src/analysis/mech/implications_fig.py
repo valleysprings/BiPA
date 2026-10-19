@@ -18,7 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from src.analysis.mech import batching
-from src.analysis.mech import common as MC
+from src.utils import fig, dataloader
 from src.analysis.mech import designev
 from src.analysis.mech import selrules
 
@@ -37,9 +37,9 @@ def main():
     """Load the three caches and draw the 1x4 figure at full text width."""
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
                          "font.size": 7, "axes.linewidth": 0.6})
-    sel = json.loads((MC.CACHE / "selrules.json").read_text())
-    dev = json.loads((MC.CACHE / "designev.json").read_text())
-    bat = json.loads((MC.CACHE / "batching.json").read_text())
+    sel = json.loads((dataloader.CACHE / "selrules.json").read_text())
+    dev = json.loads((dataloader.CACHE / "designev.json").read_text())
+    bat = json.loads((dataloader.CACHE / "batching.json").read_text())
 
     fig, axes = plt.subplots(1, 4, figsize=(6.75, 1.72), gridspec_kw=dict(width_ratios=[1.35, 1, 0.9, 0.85]))
     fig.subplots_adjust(left=0.065, right=0.995, bottom=0.235, top=0.875, wspace=0.62)
@@ -56,7 +56,7 @@ def main():
 
     for ax, title in zip(axes, TITLES):
         ax.set_title(title, fontsize=7, loc="left", pad=3, fontweight="bold")
-    MC.save_figure(fig, "implications")
+    fig.save_figure(fig, "implications")
 
 
 if __name__ == "__main__":

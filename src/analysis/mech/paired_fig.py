@@ -6,8 +6,7 @@ Data: assets/cache/analysis/mech/stats.json (written by analysis.mech.stats).
   python3 -m src.analysis.mech.paired_fig"""
 import json
 import numpy as np
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 BENCH = [("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench"), ("terminal-bench-2-1", "TB2")]
 METHODS = ["GEPA", "SkillOpt", "SkillAdam"]
 OC = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}
@@ -16,7 +15,7 @@ MARK = {"SkillOpt": "o", "SkillAdam": "s", "GEPA": "^"}
 
 def collect():
     """One dict per (benchmark, method) with the plotted numbers."""
-    stats = json.loads((M.CACHE / "stats.json").read_text())
+    stats = json.loads((dataloader.CACHE / "stats.json").read_text())
     rows = []
     for bench, disp in BENCH:
         for name in METHODS:
@@ -87,11 +86,11 @@ def draw():
 
 def main():
     fig, rows = draw()
-    M.save_figure(fig, "paired")
+    fig.save_figure(fig, "paired")
     head = ["Bench", "Method", "n", "rho (geo)", "total tokens", "both solve (n)", "both fail (n)", "share > 1"]
-    table = M.md_table(head, [[r["bench"], r["method"], r["n"], f"{r['rho']:.3f}", f"{r['total']:.3f}", f"{r['solve']:.3f} ({r['n_solve']})",
+    table = logger.md_table(head, [[r["bench"], r["method"], r["n"], f"{r['rho']:.3f}", f"{r['total']:.3f}", f"{r['solve']:.3f} ({r['n_solve']})",
                                 f"{r['fail']:.3f} ({r['n_fail']})", f"{100 * r['share']:.0f}%"] for r in rows])
-    M.write_record("paired", "Input-token ratio to the seed skill of the nine learned skills under four aggregations (geometric mean of per-task ratios, ratio of totals, "
+    logger.write_record("paired", "Input-token ratio to the seed skill of the nine learned skills under four aggregations (geometric mean of per-task ratios, ratio of totals, "
                    "tasks both solve in every run, tasks both fail in every run) and the share of tasks above 1. Appendix figure, 4.5 x 3.3 in; both-fail values beyond 1.6 are drawn as arrows with their value.",
                    "Same runs and task sets as Table 1 (see mech_stats).", "As in mech_stats section 5a and 5c; the x marker is annotated with its task count when n < 5.",
                    table, "python3 -m src.analysis.mech.paired_fig")

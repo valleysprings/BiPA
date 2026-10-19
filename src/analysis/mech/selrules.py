@@ -24,7 +24,7 @@ import sys
 
 import numpy as np
 
-from src.analysis.mech import common as M
+from src.utils import fig, logger, dataloader
 from src.analysis.mech import edges
 from src.analysis.mech import selection as S
 
@@ -137,13 +137,13 @@ def record(result):
     bench_rows = [[bench, v["accepted"], v["refused"]] for bench, v in gate["per_bench"].items()]
     extra = "\n".join([
         "MDE80 of a single-run comparison (selection.mde80, fitted prior):", "",
-        M.md_table(["benchmark", "dev tasks", "MDE80 (tasks)", "MDE80 (points)", "MDE80 by comparison size (tasks)"], mde_rows), "",
+        logger.md_table(["benchmark", "dev tasks", "MDE80 (tasks)", "MDE80 (points)", "MDE80 by comparison size (tasks)"], mde_rows), "",
         f"Logged accepted edges refused by rule (b): {gate['refused']} of {gate['accepted']} (survive {gate['survive']}).", "",
-        M.md_table(["benchmark", "accepted edges", "refused by (b)"], bench_rows), "",
-        M.md_table(["group", "edges", "mean dlogX (x100)", "n_pair-weighted dlogX (x100)"],
+        logger.md_table(["benchmark", "accepted edges", "refused by (b)"], bench_rows), "",
+        logger.md_table(["group", "edges", "mean dlogX (x100)", "n_pair-weighted dlogX (x100)"],
                    [["refused", gate["refused"], f"{gate['refused_dlogX_mean']:.1f}", f"{gate['refused_dlogX_weighted']:.1f}"],
                     ["survive", gate["survive"], f"{gate['survive_dlogX_mean']:.1f}", f"{gate['survive_dlogX_weighted']:.1f}"]])])
-    M.write_record(
+    logger.write_record(
         "selrules",
         "How often four acceptance rules accept one candidate against its parent: a candidate identical to the parent (false acceptance) and "
         f"one that truly solves g more dev tasks in expectation (g = {', '.join(map(str, TRUE_GAINS))}; the figure shows g = {PLOT_GAIN}). "
@@ -153,7 +153,7 @@ def record(result):
         f"{S.DRAWS} draws of the task probabilities per benchmark; each rule compares one candidate with its parent on the same draw; rules: "
         + "; ".join(label for _, label in RULES) + ". Seeds fixed per benchmark. Edge gain in tasks = dQ x n_pair / 100 against MDE80 of an "
         "n_pair-task comparison.",
-        M.md_table(head, rows),
+        logger.md_table(head, rows),
         ".venv/bin/python -m src.analysis.mech.selrules compute\npython3 -m src.analysis.mech.selrules draw",
         extra)
 
@@ -163,7 +163,7 @@ def compute():
     result = {bench: analyse(bench) for bench, _ in S.BENCHES}
     result["edge_gate"] = edge_gate(result)
     result["plot_gain"] = PLOT_GAIN
-    M.write_json("selrules", result)
+    dataloader.write_json("selrules", result)
     record(result)
 
 
@@ -237,14 +237,14 @@ def style():
 def draw():
     """Standalone single-column version of the panel with its legend, saved as mech_selrules."""
     plt = style()
-    data = json.load(open(M.CACHE / "selrules.json"))
+    data = json.load(open(dataloader.CACHE / "selrules.json"))
     fig, ax = plt.subplots(figsize=(3.25, 2.9))
     fig.subplots_adjust(left=0.15, right=0.98, top=0.98, bottom=0.40)
     panel(ax, data)
     rules, benches = legend_handles()
     fig.legend(handles=rules + benches, loc="lower center", ncol=2, fontsize=7, frameon=False, handletextpad=0.3, columnspacing=1.0,
                bbox_to_anchor=(0.5, 0.0))
-    M.save_figure(fig, "selrules")
+    fig.save_figure(fig, "selrules")
 
 
 if __name__ == "__main__":

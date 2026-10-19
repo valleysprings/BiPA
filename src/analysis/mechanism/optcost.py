@@ -12,7 +12,7 @@ skills-diff-excerpts.txt, llm.json, cost.json, cost_table.tex, optcost.tex.
 import argparse, csv, difflib, json, math, re, statistics as st
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
-from src.analysis.common import *
+from src.utils.dataloader import *
 from src.graph.episode import classify
 
 MODEL = "deepseek-flash"

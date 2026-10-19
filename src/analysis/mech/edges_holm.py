@@ -13,7 +13,7 @@ import json
 
 import numpy as np
 
-from src.analysis.mech import common as M
+from src.utils import logger, dataloader
 from src.analysis.mech.edges import EXCLUDED_REASON, TABLE, is_excluded
 
 CATS = ["verify", "reread", "enumerate", "test", "format", "business", "scope_stop", "economize", "serialize", "other"]
@@ -71,12 +71,12 @@ def main():
         test["p_holm"] = adjusted
         test["survives"] = adjusted < ALPHA
         test["unadjusted_ci_excludes_zero"] = test["ci"][0] > 0 or test["ci"][1] < 0
-    M.write_json("edges_holm", {"edges": len(edges), "tests": tests})
+    dataloader.write_json("edges_holm", {"edges": len(edges), "tests": tests})
     rows = [[t["category"], t["term"], f"{t['with']}/{t['without']}", f"{100 * t['diff']:+.1f}",
              f"[{100 * t['ci'][0]:.1f}, {100 * t['ci'][1]:.1f}]", f"{t['p']:.4f}", f"{t['p_holm']:.4f}",
              "yes" if t["unadjusted_ci_excludes_zero"] else "no", "yes" if t["survives"] else "no"]
             for t in sorted(tests, key=lambda t: t["p"])]
-    M.write_record(
+    logger.write_record(
         "edges_holm",
         "Whether the rule-category contrasts on the per-edge four-term split (with-minus-without the category, on the actions and turn-splitting "
         "terms) survive Holm's adjustment for the 20 tests.",
@@ -84,7 +84,7 @@ def main():
         f"terminal-bench-2-1 ({EXCLUDED_REASON}); categories and the {MIN_CHARS}-character rule as in analysis/mech/skilltext.py emp_check.",
         f"Unweighted means over edges. Bootstrap: {RESAMPLES:,} resamples, each side resampled within itself, seed {SEED}; two-sided p = 2 x the "
         f"smaller tail mass at zero with the +1 correction; Holm step-down over the {len(tests)} tests, alpha {ALPHA}. Differences in log points x 100.",
-        M.md_table(["category", "term", "edges with/without", "difference", "95% bootstrap interval", "p", "p (Holm, 20 tests)",
+        logger.md_table(["category", "term", "edges with/without", "difference", "95% bootstrap interval", "p", "p (Holm, 20 tests)",
                     "unadjusted interval excludes 0", f"survives Holm at {ALPHA}"], rows),
         ".venv/bin/python -m src.analysis.mech.edges_holm")
 

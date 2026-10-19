@@ -18,8 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from src.analysis.mech import common as MC
-
+from src.utils import fig, dataloader
 SIZES = (9, 15, 30, 60, 120)
 BENCHES = (("terminal-bench-2-1", "TB2", "s"), ("tau3-bench", r"$\tau^3$-bench", "o"), ("automationbench", "AutoBench", "^"))
 RULES = (("SkillOpt", "SkillOpt's rule (best of 4)", "0.15"), ("GEPA", "GEPA's rule (best of 7)", "0.6"))
@@ -29,7 +28,7 @@ PRIORS = (("fitted", "-"), ("moderate", "--"))
 def main():
     """Two stacked axes against the number of dev tasks (log axis): (a) the gain announced for unchanged candidates, (b) the smallest detectable gain."""
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7, "axes.linewidth": 0.6})
-    result = json.loads((MC.CACHE / "selection.json").read_text())
+    result = json.loads((dataloader.CACHE / "selection.json").read_text())
     fig, axs = plt.subplots(2, 1, figsize=(3.25, 2.75), sharex=True)
     fig.subplots_adjust(left=0.19, right=0.97, bottom=0.13, top=0.985, hspace=0.12)
     for bench, _, marker in BENCHES:
@@ -56,7 +55,7 @@ def main():
     axs[0].legend(handles=rule_handles + prior_handles, loc="upper right", fontsize=6.5, frameon=False, handlelength=1.8, borderaxespad=0.1)
     bench_handles = [Line2D([], [], color="0.3", lw=0, marker=m, markersize=4, label=d) for _, d, m in BENCHES]
     axs[1].legend(handles=bench_handles, loc="upper right", fontsize=6.5, frameon=False, ncol=3, columnspacing=0.8, handletextpad=0.3, borderaxespad=0.1)
-    MC.save_figure(fig, "devsize")
+    fig.save_figure(fig, "devsize")
 
 
 if __name__ == "__main__":

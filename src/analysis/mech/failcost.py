@@ -30,8 +30,7 @@ import math
 import numpy as np
 
 from src.analysis.mech import attribution as A
-from src.analysis.mech import common as MC
-
+from src.utils import logger, dataloader
 SUBSETS = [("solve", "(a) both solve 3/3"), ("fail", "(b) both fail 3/3"), ("mixed", "(c) mixed")]
 N_BOOT = 10000
 SEED = 20261012
@@ -148,7 +147,7 @@ def compute():
             cells.append(cell)
             print(method_disp, short, {k: v["n"] for k, v in cell["subsets"].items()},
                   {k: round(v["total"], 3) for k, v in cell["subsets"].items() if v["n"]})
-    MC.write_json("failcost", dict(model=A.MODEL, cells=cells))
+    dataloader.write_json("failcost", dict(model=A.MODEL, cells=cells))
     return cells
 
 
@@ -240,7 +239,7 @@ def record(cells):
     both = [c for c in cells if c["subsets"]["solve"]["n"] and c["subsets"]["fail"]["n"]]
     n_total_gt = sum(c["subsets"]["fail"]["total"] > c["subsets"]["solve"]["total"] for c in both)
     n_act_gt = sum(c["subsets"]["fail"]["terms"]["more_actions"] > c["subsets"]["solve"]["terms"]["more_actions"] for c in both)
-    MC.write_json("failcost_contrast", dict(pooled=contrast_all, per_bench=contrast_bench, cells_total_fail_gt_solve=n_total_gt, cells_actions_fail_gt_solve=n_act_gt, n_cells=len(both)))
+    dataloader.write_json("failcost_contrast", dict(pooled=contrast_all, per_bench=contrast_bench, cells_total_fail_gt_solve=n_total_gt, cells_actions_fail_gt_solve=n_act_gt, n_cells=len(both)))
     what = ("Is the input-token tax larger on tasks that fail, and is it flailing? For each skill x benchmark, the usable tasks of attribution.py are split into (a) both skill and seed solve in all three runs, "
             "(b) both fail in all three runs, (c) mixed; each subset gets attribution.py's four-term split on 3-run means (actions, turn-splitting, content per turn, skill text; total = mean dlog X), "
             "the mean per-episode turns R, executed calls N and input tokens X of seed and skill, and, for the failed episodes, the recorded ending (task_failure = agent stopped without a limit, "
@@ -250,17 +249,17 @@ def record(cells):
            "Subsets use the per-run verified outcome of Table 1 on both sides. Contrast = mean over cells of (b) minus (a) task-mean term, interval from 10,000 bootstrap draws resampling tasks within each cell and subset "
            f"(numpy default_rng seed {SEED}); cells lacking either subset are skipped. Endings come from evaluation.json episodes[].backend_outcome.classification (success / task_failure / timeout) and whether the last recorded request still issued tool calls.")
     table = ("### 1. Four terms by subset (log units; ratio = exp(total))\n\n"
-             + MC.md_table(["Skill", "Bench", "Subset", "n", "actions", "turn-split", "content", "skill text", "total", "exp(total)"], rows_terms)
+             + logger.md_table(["Skill", "Bench", "Subset", "n", "actions", "turn-split", "content", "skill text", "total", "exp(total)"], rows_terms)
              + "\n\n### 2. Per-episode behaviour by subset (seed / skill; mean over tasks of 3-run means)\n\n"
-             + MC.md_table(["Skill", "Bench", "Subset", "n", "turns R", "calls N", "input tokens X", "calls per turn", "ratio of means R / N / X", "geo-mean ratio R / N / X"], rows_stats)
+             + logger.md_table(["Skill", "Bench", "Subset", "n", "turns R", "calls N", "input tokens X", "calls per turn", "ratio of means R / N / X", "geo-mean ratio R / N / X"], rows_stats)
              + "\n\n### 3. How failed episodes end (all runs of the subset's tasks)\n\n"
-             + MC.md_table(["Skill", "Bench", "Subset", "Side", "episodes", "failed", "task_failure", "timeout", "other", "last request had calls"], rows_end)
+             + logger.md_table(["Skill", "Bench", "Subset", "Side", "episodes", "failed", "task_failure", "timeout", "other", "last request had calls"], rows_end)
              + "\n\nBoth-fail subset (b) pooled over the nine cells:\n\n"
-             + MC.md_table(["Scope", "Side", "failed episodes", "task_failure", "timeout", "other", "last request had calls"], rows_pool)
+             + logger.md_table(["Scope", "Side", "failed episodes", "task_failure", "timeout", "other", "last request had calls"], rows_pool)
              + "\n\n### 4. Contrast (b) both fail minus (a) both solve, mean over cells, 95% bootstrap interval\n\n"
-             + MC.md_table(["Scope", "cells"] + ["actions", "turn-split", "content", "skill text", "total"], rows_con)
+             + logger.md_table(["Scope", "cells"] + ["actions", "turn-split", "content", "skill text", "total"], rows_con)
              + f"\n\nCells where the failing-subset total exceeds the solved-subset total: {n_total_gt} of {len(both)}; where the failing-subset actions term exceeds the solved one: {n_act_gt} of {len(both)}.")
-    MC.write_record("failcost", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.failcost compute\n.venv/bin/python -m src.analysis.mech.failcost record")
+    logger.write_record("failcost", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.failcost compute\n.venv/bin/python -m src.analysis.mech.failcost record")
 
 
 def main():
@@ -270,7 +269,7 @@ def main():
     if step == "compute":
         compute()
         return
-    record(json.loads((MC.CACHE / "failcost.json").read_text())["cells"])
+    record(json.loads((dataloader.CACHE / "failcost.json").read_text())["cells"])
 
 
 if __name__ == "__main__":

@@ -27,8 +27,7 @@ import numpy as np
 
 from src.analysis import table1 as T
 from src.analysis.mech import attribution as A
-from src.analysis.mech import common as MC
-
+from src.utils import fig, logger, dataloader
 BENCH_NAME = {"tau3-bench": r"$\tau^3$", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
 
 
@@ -146,7 +145,7 @@ def compute():
             key = "removed" if source == cell["bench"] else "removed_pooled_slope"
             cell[key] = removed
             cell["log_rho_cf" if source == cell["bench"] else "log_rho_cf_pooled_slope"] = cell["log_rho"] - removed
-    MC.write_json("batching", dict(model=A.MODEL, fits=fits, cells=cells))
+    dataloader.write_json("batching", dict(model=A.MODEL, fits=fits, cells=cells))
     for name, fit in fits.items():
         print(name, {k: [round(c, 3) for c in v["coef"]] for k, v in fit.items()}, "n", fit["NR"]["n"])
 
@@ -188,12 +187,12 @@ def draw(data):
     fig, ax = plt.subplots(figsize=(3.25, 1.7))
     fig.subplots_adjust(left=0.16, right=0.98, bottom=0.12, top=0.97)
     panel(ax, data)
-    MC.save_figure(fig, "batching")
+    fig.save_figure(fig, "batching")
     # the 1x4-width version, to check legibility at the size the paper uses
     fig_small, ax_small = plt.subplots(figsize=(1.65, 1.7))
     fig_small.subplots_adjust(left=0.27, right=0.98, bottom=0.12, top=0.97)
     panel(ax_small, data)
-    fig_small.savefig(MC.CACHE / "mech_batching_small.png", dpi=250)
+    fig_small.savefig(dataloader.CACHE / "mech_batching_small.png", dpi=250)
 
 
 def record(data):
@@ -207,21 +206,21 @@ def record(data):
         rows.append([name, f["NR"]["n"], f["NR"]["tasks"], "%.3f (%.3f)" % (f["NR"]["coef"][0], f["NR"]["se"][0]), "%.3f (%.3f)" % (f["NR"]["coef"][1], f["NR"]["se"][1]),
                      "%.3f (%.3f)" % (f["Nm"]["coef"][0], f["Nm"]["se"][0]), "%.3f (%.3f)" % (f["Nm"]["coef"][1], f["Nm"]["se"][1]),
                      "%.3f (%.3f)" % (f["NR_noskill"]["coef"][0], f["NR_noskill"]["se"][0]), "%.3f (%.3f)" % (f["NR_noskill"]["coef"][1], f["NR_noskill"]["se"][1])])
-    t1 = MC.md_table(["pool", "episodes", "tasks", "b_N", "b_R", "g_N (log N)", "g_m (log N/R)", "b_N no skill FE", "b_R no skill FE"], rows)
+    t1 = logger.md_table(["pool", "episodes", "tasks", "b_N", "b_R", "g_N (log N)", "g_m (log N/R)", "b_N no skill FE", "b_R no skill FE"], rows)
     cell_rows = []
     for c in data["cells"]:
         cell_rows.append([c["method"], BENCH_NAME[c["bench"]].replace("$", "").replace("\\", ""), c["n"], "%+.3f" % c["log_rho"], "%+.3f" % c["removed"], "%+.3f" % c["log_rho_cf"],
                           "%+.3f" % c["turn_splitting_term"], "%+.3f" % c["removed_pooled_slope"]])
-    t2 = MC.md_table(["Skill", "Bench", "tasks", "log rho", "removed by seed's m (b_R)", "log rho after", "turn-splitting term (mech_attribution3 rule)", "removed with pooled b_R"], cell_rows)
+    t2 = logger.md_table(["Skill", "Bench", "tasks", "log rho", "removed by seed's m (b_R)", "log rho after", "turn-splitting term (mech_attribution3 rule)", "removed with pooled b_R"], cell_rows)
     summary = []
     for b, _ in A.BENCH:
         cs = [c for c in data["cells"] if c["bench"] == b]
         summary.append([b, "%+.3f" % mean_over(cs, "log_rho"), "%+.3f" % mean_over(cs, "removed"), "%+.3f" % mean_over(cs, "turn_splitting_term")])
     summary.append(["all nine", "%+.3f" % mean_over(data["cells"], "log_rho"), "%+.3f" % mean_over(data["cells"], "removed"), "%+.3f" % mean_over(data["cells"], "turn_splitting_term")])
-    t3 = MC.md_table(["Bench", "mean log rho", "mean removed (b_R)", "mean turn-splitting term"], summary)
+    t3 = logger.md_table(["Bench", "mean log rho", "mean removed (b_R)", "mean turn-splitting term"], summary)
     table = ("### Within-task regression log X = a_task + c_skill + b_N log N + b_R log R (task-clustered SE in brackets)\n\n" + t1 +
              "\n\n### Counterfactual: each skill keeps the seed's calls per turn on every task\n\n" + t2 + "\n\n### Benchmark means against the turn-splitting term\n\n" + t3)
-    MC.write_record(
+    logger.write_record(
         "batching",
         "Design principle 'issue independent calls in one turn'. Within a task, how many more input tokens does an episode bill when it spreads the same calls over more turns (b_R), and how much "
         "of each learned skill's token tax would disappear if it kept the seed's calls per turn on every task.  The counterfactual is compared with the turn-splitting term of mech_attribution3.",
@@ -240,7 +239,7 @@ def main():
     if step == "compute":
         compute()
         return
-    data = json.loads((MC.CACHE / "batching.json").read_text())
+    data = json.loads((dataloader.CACHE / "batching.json").read_text())
     draw(data)
     record(data)
 

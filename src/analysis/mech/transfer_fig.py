@@ -9,8 +9,7 @@ paper/assets/data/mech/mech_transfer.md (avg@3); this script reads no run artifa
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from src.analysis.mech import common as M
-
+from src.utils import fig
 METHODS = ["GEPA", "SkillOpt", "SkillAdam"]
 OC = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}
 MARK = {"SkillOpt": "o", "SkillAdam": "s", "GEPA": "^"}
@@ -84,7 +83,7 @@ def draw():
 
 def main():
     fig = draw()
-    M.save_figure(fig, "transfer")
+    fig.save_figure(fig, "transfer")
     for target, seed, local, trans, src in OOD:
         for name in METHODS:
             print(f"{src}->{target} {name}: local {local[name]:.1f} | transferred {trans[name]:.1f} | seed {seed:.1f} (single-run)")

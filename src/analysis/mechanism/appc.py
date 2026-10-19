@@ -7,7 +7,7 @@ The baseline attribution rows are pinned to the https reruns (ATTR_RUNS), the sa
 import json, math, sys
 from pathlib import Path
 import numpy as np
-from src.analysis.common import gmean
+from src.utils.dataloader import gmean
 
 H = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation")
 F1 = H / "assets/cache/analysis/fig1/cache.json"
@@ -24,7 +24,7 @@ ATTR_RUNS = {(m, b): "native-20261008-https" for m in ("skillopt", "skilladam", 
 
 def compute_attr():
     """The four-term split of slopes_checks.skill_fit per optimized skill against the seed, on the pinned https reruns (fig1.py's math)."""
-    from src.analysis import common as C
+    from src.utils import dataloader as C
     from src.analysis.mechanism.slopes_checks import metrics, episodes
     skills, raw = [], set()
     for meth, disp in OPT:
@@ -76,7 +76,7 @@ def check(skills):
 
 
 def compute():
-    from src.analysis import common as C
+    from src.utils import dataloader as C
     from src.analysis.mechanism.episodes import build_rows, derive
     from src.analysis.mechanism.slopes_checks import METHODS3
     from src.graph import episode as W
@@ -131,7 +131,7 @@ def style():
 
 def save(fig, name):
     import matplotlib
-    from src.analysis import paperout as PO
+    from src.utils.logger import paperout as PO
     (PO.FIG / "mech").mkdir(parents=True, exist_ok=True)
     with matplotlib.rc_context({"svg.fonttype": "none"}): fig.savefig(PO.FIG / "mech" / f"{name}.svg")
     fig.savefig(PO.FIG / "mech" / f"{name}.pdf"); fig.savefig(OUT / f"{name}.png", dpi=200)
@@ -222,7 +222,7 @@ def draw_price(plt, p):
 
 
 def records(c, p, attr):
-    from src.analysis import paperout as PO
+    from src.utils.logger import paperout as PO
     mt = PO.mdtable
     nm = {"tau3-bench": "tau3-bench", "automationbench": "AutoBench", "terminal-bench-2-1": "TB2"}
     rows = [[nm[b], qn, f"{v['slope']:.2f}", f"{v['se']:.2f}", v["n"], v["n_tasks"], f"{v['r2']:.2f}"] for b, _ in BENCH for qn, _ in QUANT for v in [c["reg"][b][qn]]]

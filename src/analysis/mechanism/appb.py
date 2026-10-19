@@ -14,7 +14,7 @@ asserted against it. 200,000 draws per setting, fixed seed."""
 import json, math, sys
 from pathlib import Path
 import numpy as np
-from src.analysis.common import gmean
+from src.utils.dataloader import gmean
 
 H = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation")
 OLD = H / "assets/cache/analysis/nullmodel"   # the zero-effect run behind the B.3 prose (out.json = fitted, out_c4.json = concentration 4)
@@ -46,7 +46,7 @@ FROZEN = dict(
 
 
 def out_dir():
-    from src.analysis.common import out_dir as od
+    from src.utils.dataloader import out_dir as od
     d = od("appb"); d.mkdir(parents=True, exist_ok=True); return d
 
 
@@ -54,7 +54,7 @@ def out_dir():
 
 def compute_reruns():
     import itertools
-    from src.analysis.common import DS, SEED_TEXT, eval_file, final_skill, vid
+    from src.utils.dataloader import DS, SEED_TEXT, eval_file, final_skill, vid
     from src.analysis.table1 import rep_files
     from src.analysis.mechanism.reproducibility import load, gm
     from src.analysis.mechanism.pooled import gm_ratio
@@ -108,7 +108,7 @@ def compute_reruns():
 def dev_execs(bench, old):
     """the distinct seed dev executions of the frozen nullmodel run: one per (total, request-id signature), matched by the frozen totals."""
     import glob
-    from src.analysis.common import EX, SEED_TEXT, vid
+    from src.utils.dataloader import EX, SEED_TEXT, vid
     from src.analysis.mechanism.nullmodel import load_exec
     want = sorted(old["V_seed_counts"])
     groups = {}
@@ -187,7 +187,7 @@ def style():
 
 def save(fig, name):
     import matplotlib
-    from src.analysis import paperout as PO
+    from src.utils.logger import paperout as PO
     (PO.FIG / "mech").mkdir(parents=True, exist_ok=True)
     with matplotlib.rc_context({"svg.fonttype": "none"}): fig.savefig(PO.FIG / "mech" / f"{name}.svg")
     fig.savefig(PO.FIG / "mech" / f"{name}.pdf"); fig.savefig(out_dir() / f"{name}.png", dpi=200)
@@ -283,7 +283,7 @@ def draw_nullsim(plt, d):
 
 
 def records(reruns, nullsim):
-    from src.analysis import paperout as PO
+    from src.utils.logger import paperout as PO
     mt = PO.mdtable
     PO.SPECS.setdefault("appB_reruns", dict(pub="mech",
         paper=[("fig:appb-reruns (Appendix B.2)", "appendix/b-noise.tex", r"label\{fig:appb-reruns\}",

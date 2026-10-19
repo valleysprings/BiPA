@@ -18,8 +18,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from src.analysis.mech import common as MC
-
+from src.utils import fig, dataloader
 MODELS = [("deepseek-flash", "DeepSeek"), ("gpt-6-luna", "Luna")]
 BENCH = [("tau3-bench", r"$\tau^3$"), ("automationbench", "AutoB")]
 ARMS = [("gepa", "GEPA"), ("skillopt", "SkillOpt"), ("skilladam", "SkillAdam")]
@@ -31,7 +30,7 @@ MK = {"deepseek-flash": "o", "gpt-6-luna": "s"}
 
 
 def load():
-    return json.loads((MC.CACHE / "dynamics.json").read_text())["cells"]
+    return json.loads((dataloader.CACHE / "dynamics.json").read_text())["cells"]
 
 
 def draw_curve(ax, cells):
@@ -95,7 +94,7 @@ def main():
     draw_squeeze(ax_b, cells)
     fig.text(0.065, 0.985, "(a) The seed's own test-time curve", fontsize=7.5, fontweight="bold", va="top")
     fig.text(0.585, 0.985, "(b) Extra turns buy no success", fontsize=7.5, fontweight="bold", va="top")
-    MC.save_figure(fig, "dynamics")
+    fig.save_figure(fig, "dynamics")
 
 
 if __name__ == "__main__":

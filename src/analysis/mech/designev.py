@@ -22,7 +22,7 @@ import json
 import numpy as np
 from scipy import stats
 
-from src.analysis.mech import common as MC
+from src.utils import fig, logger, dataloader
 from src.analysis.mech import edges as E
 
 OPTS = E.OPTS
@@ -50,9 +50,9 @@ def part_a(edges):
         "actions": fit(dlogn, dlogx),
     }
     # test level: log rho of input tokens vs log word ratio of the skill and log rho_turns
-    attribution = json.loads((MC.CACHE / "attribution.json").read_text())["cells"]
-    compaction = json.loads((MC.CACHE / "compaction.json").read_text())["cells"]
-    sizes = json.loads((MC.CACHE / "skilltext.json").read_text())["sizes"]
+    attribution = json.loads((dataloader.CACHE / "attribution.json").read_text())["cells"]
+    compaction = json.loads((dataloader.CACHE / "compaction.json").read_text())["cells"]
+    sizes = json.loads((dataloader.CACHE / "skilltext.json").read_text())["sizes"]
     turns = {(c["method"], c["bench"]): c["rho_turns"] for c in compaction}
     cells = []
     for c in attribution:
@@ -124,7 +124,7 @@ def compute():
     """Parts A, B, C on the 59 canonical dev edges and the nine test-level skills."""
     edges = E.load_dev_edges()
     out = dict(n_edges=len(edges), A=part_a(edges), B=part_b(edges), C=part_c(edges))
-    MC.write_json("designev", out)
+    dataloader.write_json("designev", out)
     print("A edge", {k: round(v["r2"], 3) for k, v in out["A"]["edge_level"].items()}, "test", {k: round(v["r2"], 3) for k, v in out["A"]["test_level"].items()})
     print("B", out["B"]["share_above"], out["B"]["gate"]["n_pass"], out["B"]["gate"]["accepted_kept"], out["B"]["gate"]["rejected_taken"])
     print("C", out["C"]["n_removing"], out["C"]["n_shortening"], out["C"]["added"], out["C"]["removed"])
@@ -191,7 +191,7 @@ def draw(data):
     fig.subplots_adjust(left=0.2, right=0.99, bottom=0.2, top=0.97, wspace=0.8)
     panel_predict(a1, data)
     panel_gate(a2, data)
-    MC.save_figure(fig, "designev")
+    fig.save_figure(fig, "designev")
 
 
 def fmt(x, nd=2):
@@ -206,21 +206,21 @@ def record(data):
     for level, fits in (("dev edges (59), dlogX on", a["edge_level"]), ("nine skills, log rho on", a["test_level"])):
         for name, f in fits.items():
             rows_a.append([level, name, f["n"], fmt(f["r2"]), fmt(f["spearman"]), fmt(f["spearman_p"], 3), fmt(f["slope"])])
-    table_a = MC.md_table(["level", "predictor", "n", "R^2", "Spearman", "p", "slope"], rows_a)
+    table_a = logger.md_table(["level", "predictor", "n", "R^2", "Spearman", "p", "slope"], rows_a)
     rows_b = [[NAMES[o], v["n"], v["n_above"], fmt(v["share_above"])] for o, v in b["by_opt"].items()]
     rows_b.append(["all", b["n"], b["n_above"], fmt(b["share_above"])])
-    table_b = MC.md_table(["optimizer", "proposals", "dlogX > 0", "share"], rows_b)
+    table_b = logger.md_table(["optimizer", "proposals", "dlogX > 0", "share"], rows_b)
     rows_k = [[n, g["n"], fmt(100 * g["mean"], 1), fmt(100 * g["median"], 1), fmt(g["share_above"])] for n, g in (("accepted", b["accepted"]), ("rejected", b["rejected"]))]
-    table_k = MC.md_table(["status", "n", "mean dlogX x100", "median x100", "share > 0"], rows_k)
+    table_k = logger.md_table(["status", "n", "mean dlogX x100", "median x100", "share > 0"], rows_k)
     g = b["gate"]
     gate_lines = (f"Gate accept iff dQ >= 0 and dlogX <= 0: {g['n_pass']} of {b['n']} proposals pass (min dlogX over all proposals = {fmt(100 * b['dlogx_min'], 1)} x100). "
                   f"It keeps {g['accepted_kept']} of {g['accepted_total']} accepted edges and would accept {g['rejected_taken']} of {g['rejected_total']} rejected ones; "
                   f"mean dlogX of the kept set = {fmt(None if g['mean_dlogX_kept'] is None else 100 * g['mean_dlogX_kept'], 1)} x100. "
                   f"{b['n_dq_ok']} proposals have dQ >= 0. Mann-Whitney p (accepted vs rejected dlogX) = {fmt(b['mannwhitney_p'], 3)}.\n\n"
-                  + MC.md_table(["optimizer", "child", "accepted", "dlogX x100", "dQ"], [[NAMES[p["opt"]] + " " + p["bench"], p["child"], p["accepted"], fmt(100 * p["dlogX"], 1), fmt(p["dQ"], 1)] for p in g["passing"]]))
+                  + logger.md_table(["optimizer", "child", "accepted", "dlogX x100", "dQ"], [[NAMES[p["opt"]] + " " + p["bench"], p["child"], p["accepted"], fmt(100 * p["dlogX"], 1), fmt(p["dQ"], 1)] for p in g["passing"]]))
     rows_c = [[NAMES[o], v["n"], v["n_removing"], v["n_shortening"], v["added"], v["removed"]] for o, v in c["by_opt"].items()]
     rows_c.append(["all", c["n"], c["n_removing"], c["n_shortening"], c["added"], c["removed"]])
-    table_c = MC.md_table(["optimizer", "edges", "remove text", "shorten skill", "chars added", "chars removed"], rows_c)
+    table_c = logger.md_table(["optimizer", "edges", "remove text", "shorten skill", "chars added", "chars removed"], rows_c)
     c_lines = (f"Mean dlogX x100: edges that remove text ({c['n_removing']}) = {fmt(None if c['mean_dlogX_removing'] is None else 100 * c['mean_dlogX_removing'], 1)}; "
                f"edges that shorten the skill ({c['n_shortening']}) = {fmt(None if c['mean_dlogX_shortening'] is None else 100 * c['mean_dlogX_shortening'], 1)}; "
                f"pure additions ({c['n_additions']}) = {fmt(100 * c['mean_dlogX_additions'], 1)}.")
@@ -231,7 +231,7 @@ def record(data):
     runs = "The 59 canonical dev edges of native-20261008-https (edges_table.json, SkillAdam x terminal-bench-2-1 excluded); test level: the nine learned skills of mech_attribution3 / mech_compaction / mech_skilltext."
     agg = ("A: scipy linregress R^2 and spearmanr of dlogX on log(len_c/len_p), dlogR, dlogN over edges; test level: log rho of input tokens (attribution total, Table 1 log rho_trj) on log(words of skill / words of seed) and on log rho_turns "
            "(compaction rho_turns). B: counts over all 59 edges, gate accept iff dQ >= 0 and dlogX <= 0. C: rem_chars > 0, len_c < len_p, sums of add_chars and rem_chars. No intervals; the sample is 59 edges and 9 skills.")
-    MC.write_record("designev", what, runs, agg, table, SELF_CMD)
+    logger.write_record("designev", what, runs, agg, table, SELF_CMD)
 
 
 def main():
@@ -241,7 +241,7 @@ def main():
     if step == "compute":
         compute()
         return
-    data = json.loads((MC.CACHE / "designev.json").read_text())
+    data = json.loads((dataloader.CACHE / "designev.json").read_text())
     draw(data)
     record(data)
 

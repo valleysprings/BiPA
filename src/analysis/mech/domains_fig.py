@@ -6,8 +6,7 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 ROWS = ["No skill", "Seed skill", "GEPA", "SkillOpt", "SkillAdam"]
 LABEL = {"Seed skill": "Seed"}
 STYLE = {"No skill": dict(m="o", fc="white", ec="0.5"), "Seed skill": dict(m="o", fc="k", ec="k"),
@@ -19,7 +18,7 @@ PUBLISHED = 25.5
 
 
 def draw():
-    d = json.loads((M.CACHE / "domains.json").read_text())
+    d = json.loads((dataloader.CACHE / "domains.json").read_text())
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
                          "font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7})
     fig, axes = plt.subplots(1, 2, figsize=(5.0, 2.0), gridspec_kw=dict(width_ratios=[4, 6], wspace=0.08), sharey=True)
@@ -51,22 +50,22 @@ def draw():
     h.append(plt.Line2D([], [], color="0.3", lw=1.3))
     fig.legend(h, [LABEL.get(r, r) for r in ROWS] + [r"best published (25.5%)"], loc="upper center", bbox_to_anchor=(0.54, 1.0), ncol=6,
                frameon=False, fontsize=7, handlelength=1.0, columnspacing=0.8, handletextpad=0.3)
-    M.save_figure(fig, "domains")
+    fig.save_figure(fig, "domains")
     heads = ["bench", "domain"] + [LABEL.get(r, r) for r in ROWS]
     tab = []
     for bk, disp, keys, _ in PANELS:
         for k in keys:
             tab.append([bk, k] + [f"{d[bk][r][k]['q']:.1f}" for r in ROWS])
-    M.write_record("domains_fig", "Test avg@3 success (%) per domain for No skill (hollow grey), Seed (black), GEPA, SkillOpt, SkillAdam; grey tick = best published tau-Knowledge pass^1 (25.52) on the banking domain.",
+    logger.write_record("domains_fig", "Test avg@3 success (%) per domain for No skill (hollow grey), Seed (black), GEPA, SkillOpt, SkillAdam; grey tick = best published tau-Knowledge pass^1 (25.52) on the banking domain.",
                    "Same runs as Table 1 (see mech_domains.md tables from mech.domains); DeepSeek-V4.1-Flash, OpenCode.",
                    "domains.json q: success among verified tasks per run, averaged over runs, per domain.",
-                   M.md_table(heads, tab), "python3 -m src.analysis.mech.domains_fig")
+                   logger.md_table(heads, tab), "python3 -m src.analysis.mech.domains_fig")
     return numbers
 
 
 def draw_col():
     """Single-column variant (3.25 x 2.5 in): tau3-bench panel above AutoBench panel, shared legend on top in two rows."""
-    d = json.loads((M.CACHE / "domains.json").read_text())
+    d = json.loads((dataloader.CACHE / "domains.json").read_text())
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
                          "font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7})
     fig, axes = plt.subplots(2, 1, figsize=(3.25, 2.5), gridspec_kw=dict(height_ratios=[1, 1], hspace=0.3))
@@ -90,7 +89,7 @@ def draw_col():
     # the published tau-Banking score is a setup check, not part of this figure's comparison; it stays in Appendix A only
     fig.legend(h, [LABEL.get(r, r) for r in ROWS], loc="upper center", bbox_to_anchor=(0.56, 1.0), ncol=3,
                frameon=False, fontsize=7, handlelength=1.0, columnspacing=1.0, handletextpad=0.3, labelspacing=0.25)
-    M.save_figure(fig, "domains_col")
+    fig.save_figure(fig, "domains_col")
 
 
 if __name__ == "__main__":

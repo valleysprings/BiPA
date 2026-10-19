@@ -15,8 +15,8 @@ import json
 import numpy as np
 
 from src.analysis import table1 as T
-from src.analysis.common import BENCHES, SEED_TEXT, current_run, final_skill, gmean, vid
-from src.analysis.mech import common as MC
+from src.utils.dataloader import BENCHES, SEED_TEXT, current_run, final_skill, gmean, vid
+from src.utils import logger, dataloader
 from src.analysis.mech import stats as S
 
 MODEL = S.MODEL
@@ -126,14 +126,14 @@ def markdown(res):
             rows.append([SHORT[bench], name, b["n"], f"{100 * b['cached_share']:.1f}%", f"{100 * b['out_share']:.2f}%",
                          f"x{b['geo']:.2f}", f"[{b['geo_min']:.2f}, {b['geo_max']:.2f}]",
                          f"x{b['sum']:.2f}", f"[{b['sum_min']:.2f}, {b['sum_max']:.2f}]"])
-    return MC.md_table(head, rows)
+    return logger.md_table(head, rows)
 
 
 def main():
     res = compute()
-    MC.write_json("price3", dict(main=dict(c=MAIN[0], o=MAIN[1]), grid=GRID, results=res))
+    dataloader.write_json("price3", dict(main=dict(c=MAIN[0], o=MAIN[1]), grid=GRID, results=res))
     commands = ".venv/bin/python -m src.analysis.mech.price"
-    MC.write_record(
+    logger.write_record(
         "price3",
         "Price of each learned skill (and No skill) relative to the Seed skill when cached input is cheap: price = uncached input + c x cached input + o x output tokens.",
         "DeepSeek-V4.1-Flash in OpenCode, baseline runs only: GEPA, SkillOpt, SkillAdam (native-20261008-https + test-reps rep 1/2), No skill (native-noseed, same layout), "

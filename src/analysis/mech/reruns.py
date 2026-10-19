@@ -8,17 +8,15 @@ import json
 import sys
 import numpy as np
 from src.analysis.mechanism import appb
-from src.analysis.mech import common as M
-
-
+from src.utils import fig, logger, dataloader
 def patch_appb():
     """Point appb at the baseline-only pins and the mech cache directory."""
     pins = {}
     for bench, cells in appb.PINS.items():
         pins[bench] = {name: pin for name, pin in cells.items() if name != "BACH"}
     appb.PINS = pins
-    M.CACHE.mkdir(parents=True, exist_ok=True)
-    appb.out_dir = lambda: M.CACHE
+    dataloader.CACHE.mkdir(parents=True, exist_ok=True)
+    appb.out_dir = lambda: dataloader.CACHE
 
 
 def compute():
@@ -87,12 +85,12 @@ def draw_reruns(plt, d):
     labels = [labels[i] for i in order]
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.54, 1.0), frameon=False, fontsize=7, ncol=6,
                handlelength=1.0, columnspacing=0.8, handletextpad=0.3)
-    M.save_figure(fig, "reruns")
+    fig.save_figure(fig, "reruns")
 
 
 def check_against_record(d):
     """Compare the plotted per-run success and ratios with the BACH-paper record paper/assets/data/mech/appB_reruns.md (baseline and seed rows)."""
-    text = M.find_existing(M.OLD_DATA_DIRS, "appB_reruns.md").read_text()
+    text = logger.find_existing(logger.OLD_DATA_DIRS, "appB_reruns.md").read_text()
     names = {b: n for b, n in appb.BENCH}
     seen = {}
     for line in text.splitlines():
@@ -117,16 +115,16 @@ def draw():
     plt = appb.style()
     # Liberation Serif is TrueType; the CFF Nimbus Roman first in appb's list cannot be embedded as Type 42
     plt.rcParams["font.serif"] = ["Liberation Serif"]
-    d = json.loads((M.CACHE / "reruns.json").read_text())
+    d = json.loads((dataloader.CACHE / "reruns.json").read_text())
     draw_reruns(plt, d)
     rows, allok = check_against_record(d)
     B = d["benches"]
     spread = [[disp, f"{B[b]['seed']['span']:.1f}", f"x{B[b]['seed']['spread_X']:.2f}", f"{100 * B[b]['seed']['flip']:.0f}%", f"{100 * B[b]['seed']['anyflip']:.0f}%"]
               for b, disp in appb.BENCH]
-    table = M.md_table(["Benchmark", "skill", "success per run (%)", "input tokens / pooled seed per run", "pooled ratio", "vs appB_reruns.md"], rows)
-    table += "\n\nSeed spread\n\n" + M.md_table(["Benchmark", "success span (pts)", "pairwise max ratio", "flip", "any-flip"], spread)
+    table = logger.md_table(["Benchmark", "skill", "success per run (%)", "input tokens / pooled seed per run", "pooled ratio", "vs appB_reruns.md"], rows)
+    table += "\n\nSeed spread\n\n" + logger.md_table(["Benchmark", "success span (pts)", "pairwise max ratio", "flip", "any-flip"], spread)
     table += f"\n\nAll plotted baseline/seed numbers equal paper/assets/data/mech/appB_reruns.md: {allok}."
-    M.write_record(
+    logger.write_record(
         "reruns",
         "Every test run of the seed and of the three baseline optimizers (GEPA, SkillOpt, SkillAdam): success (top row) and the run's geometric-mean input-token ratio against the pooled seed (bottom row); gray band = the seed's three runs. Derived from appB_reruns with the BACH entries removed.",
         "DeepSeek-V4.1-Flash in OpenCode; seed = native-seed/<bench>/native-20261003-trace-final plus rep-1 and rep-2; optimizers = <method>/<bench>/native-20261008-https (its own test evaluation) plus test-reps/<bench>__<method>__native-20261008-https rep 1/2. Test split, three executions per skill.",

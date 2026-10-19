@@ -4,7 +4,8 @@ where optimized skills' extra turns come from (calls per turn), and the per-turn
 Output: assets/cache/analysis/slopes/slopes.txt. Run: <bach-harness venv python> -m src.analysis.mechanism.slopes   (from bipa/)"""
 import collections
 import numpy as np
-from src.analysis.common import BN, Report, gmean
+from src.utils.dataloader import BN, gmean
+from src.utils.logger import Report
 from src.analysis.mechanism.episodes import episode_rows, fe, samp
 from src.analysis.mechanism.pricing import price
 

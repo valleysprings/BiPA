@@ -7,8 +7,8 @@ Execution identity = sha256 of the sorted request_ids of an evaluation's episode
 The old BACH run (bach-v8) is kept only under `bach_v8_reference` (not for the table). Read-only on artifacts; run from bipa: /mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bach-harness/.venv/bin/python -m src.analysis.submission_protocol
 """
 import argparse, datetime, json
-from src.analysis import common
-from src.analysis.common import *
+from src.utils import dataloader as common
+from src.utils.dataloader import *
 
 MODEL = "deepseek-flash"
 BASELINE_TAG, BACH_TAG, REF_TAG = "native-20261008-https", "bach-v9", "bach-v8"

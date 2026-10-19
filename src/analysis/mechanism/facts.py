@@ -10,7 +10,7 @@ Outputs (assets/cache/analysis/facts/): f1.json, f4.json, f6.json, f6b.json, fac
 """
 import argparse, collections, json
 import numpy as np
-from src.analysis.common import *
+from src.utils.dataloader import *
 from src.graph import episode as W
 from src.analysis.mechanism.reruns import rerun_files, fixed_part, MODEL, DS_ROOT
 

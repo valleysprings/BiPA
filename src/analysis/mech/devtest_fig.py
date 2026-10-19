@@ -12,8 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-from src.analysis.mech import common as M
-
+from src.utils import fig, logger, dataloader
 BENCH = [("tau3-bench", r"$\tau^3$-bench", "tau3"), ("automationbench", "AutoBench", "AutoB"), ("terminal-bench-2-1", "TB2", "TB2")]
 OPTS = ["GEPA", "SkillOpt"]          # optimizers that score the returned skill on the whole dev set
 ROWS = ["GEPA", "SkillOpt", "SkillAdam"]
@@ -24,7 +23,7 @@ OM = {"SkillOpt": "o", "GEPA": "^", "SkillAdam": "s"}
 def null_gain_tasks():
     """E[gain] under no effect, fitted prior, observed baseline, from mech_selection.md (tasks)."""
     out = {}
-    for line in M.DATA.joinpath("mech_selection.md").read_text().splitlines():
+    for line in logger.DATA.joinpath("mech_selection.md").read_text().splitlines():
         c = [x.strip() for x in line.strip().strip("|").split("|")]
         if len(c) == 10 and c[1] == "fitted" and c[2] in OPTS:
             out[(c[0], c[2])] = float(c[7])
@@ -34,7 +33,7 @@ def null_gain_tasks():
 def mde_points():
     """MDE avg@3 vs avg@3 (pts) per benchmark from mech_stats.md section d."""
     out = {}
-    for line in M.DATA.joinpath("mech_stats.md").read_text().splitlines():
+    for line in logger.DATA.joinpath("mech_stats.md").read_text().splitlines():
         c = [x.strip() for x in line.strip().strip("|").split("|")]
         found = re.match(r"[\d.]+ \(n=", c[7]) if len(c) == 9 else None
         if found and c[0] in ("tau3", "AutoB", "TB2"):
@@ -43,11 +42,11 @@ def mde_points():
 
 
 def draw():
-    stats = json.loads((M.CACHE / "stats.json").read_text())
+    stats = json.loads((dataloader.CACHE / "stats.json").read_text())
     dev = {(r["bench"], r["method"]): r for r in stats["_dev"]}
     null = null_gain_tasks()
     mde = mde_points()
-    sel = json.loads((M.CACHE / "selection.json").read_text())
+    sel = json.loads((dataloader.CACHE / "selection.json").read_text())
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
                          "font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7})
     fig, ax = plt.subplots(figsize=(3.25, 2.6))
@@ -98,11 +97,11 @@ def draw():
     lab = ["reported dev gain", "test difference (3 runs)", "dev gain from selection alone", "detectable difference"]
     fig.legend(h, lab, loc="upper center", bbox_to_anchor=(0.58, 1.0), ncol=2, frameon=False, fontsize=7, handlelength=1.3,
                columnspacing=0.9, handletextpad=0.4, labelspacing=0.3)
-    M.save_figure(fig, "devtest")
-    table = M.md_table(["bench", "optimizer", "dev gain (pts)", "test difference (pts)", "selection-alone dev gain (pts)", "detectable difference (pts)"],
+    fig.save_figure(fig, "devtest")
+    table = logger.md_table(["bench", "optimizer", "dev gain (pts)", "test difference (pts)", "selection-alone dev gain (pts)", "detectable difference (pts)"],
                        [[a, b, f"{c:+.1f}", f"{d:+.1f}", "-" if e is None else f"{e:+.1f}", f"{f:.1f}"] for a, b, c, d, e, f in
                         [(r[0].replace("$\\tau^3$", "tau3"), *r[1:]) for r in rows]])
-    M.write_record("devtest", "Reported dev gain (hollow) against the test avg@3 difference vs the seed (filled) for the nine learned skills; SkillOpt and GEPA report the returned skill's gain on the whole dev set, SkillAdam the sum of its accepted patches' gains, each on that iteration's dev subset (10 tasks; all 9 on TB2). Grey tick = expected dev gain when selection alone acts (fitted prior, observed baseline, tasks / dev size; SkillOpt and GEPA only, SkillAdam's replay is in mech_selection.md); band = +/- detectable difference of a paired avg@3 comparison.",
+    logger.write_record("devtest", "Reported dev gain (hollow) against the test avg@3 difference vs the seed (filled) for the nine learned skills; SkillOpt and GEPA report the returned skill's gain on the whole dev set, SkillAdam the sum of its accepted patches' gains, each on that iteration's dev subset (10 tasks; all 9 on TB2). Grey tick = expected dev gain when selection alone acts (fitted prior, observed baseline, tasks / dev size; SkillOpt and GEPA only, SkillAdam's replay is in mech_selection.md); band = +/- detectable difference of a paired avg@3 comparison.",
                    "Table 1 runs (native-20261008-https) and test reps, DeepSeek-V4.1-Flash; dev sizes 30 / 30 / 9.",
                    "stats.json key _dev (dev_gain_pts, test_dQ_avg3); E[gain] column of mech_selection.md divided by dev size; selection.json observed.SkillAdam.reported_gain_points; MDE avg@3 vs avg@3 of mech_stats.md section d.",
                    table, "python3 -m src.analysis.mech.devtest_fig")

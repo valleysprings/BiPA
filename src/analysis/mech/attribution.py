@@ -24,9 +24,8 @@ import math
 import numpy as np
 
 from src.analysis import table1 as T
-from src.analysis.common import BENCHES, EX, SEED_TEXT, current_run, final_skill, vid
-from src.analysis.mech import common as MC
-
+from src.utils.dataloader import BENCHES, EX, SEED_TEXT, current_run, final_skill, vid
+from src.utils import fig, logger, dataloader
 MODEL = "deepseek-flash"
 OPT = [("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"), ("GEPA", "gepa")]
 BENCH = [("tau3-bench", "tau3"), ("automationbench", "AutoB"), ("terminal-bench-2-1", "TB2")]
@@ -175,7 +174,7 @@ def compute():
                               table1_log_rho_usable=log_rho_usable, table1_log_rho_full=t1_log_rho, table1_rho_full=math.exp(t1_log_rho),
                               total_gap_to_table1=A["total"] - log_rho_usable, C=C))
             print(method_disp, bench, "n", len(usable), "of", len(t1_tasks), {k: round(v, 3) for k, v in A.items() if k != "largest"}, A["largest"], "T1 usable", round(log_rho_usable, 4), "T1 full", round(t1_log_rho, 4))
-    MC.write_json("attribution", dict(model=MODEL, cells=cells))
+    dataloader.write_json("attribution", dict(model=MODEL, cells=cells))
     return cells
 
 
@@ -223,7 +222,7 @@ def draw_heatmap(cells):
     cb.outline.set_visible(False)
     cb.ax.tick_params(length=0)
     cb.set_label("change in log input tokens", fontsize=7)
-    MC.save_figure(fig, "attribution3")
+    fig.save_figure(fig, "attribution3")
 
 
 def f(x, nd=3):
@@ -252,14 +251,14 @@ def record(cells):
            "A) means over tasks of the per-task terms on 3-run means. B) the same terms on single run pairs (skill rep k vs seed rep k). C) mean over tasks of the per-request tokens of each fixed-prefix column, "
            "skill minus seed (per-task mean over the three runs).")
     table = ("### A. 3-run means (log units; n = tasks used / Table 1 common tasks)\n\n"
-             + MC.md_table(["Skill", "Bench", "n", "actions", "turn-split", "content", "skill text", "total", "Table 1 log rho (same tasks)", "resid mean", "resid max |.|", "largest"], rowsA)
+             + logger.md_table(["Skill", "Bench", "n", "actions", "turn-split", "content", "skill text", "total", "Table 1 log rho (same tasks)", "resid mean", "resid max |.|", "largest"], rowsA)
              + "\n\n### B. Per run pair (skill rep k vs seed rep k)\n\n"
-             + MC.md_table(["Skill", "Bench", "run", "actions", "turn-split", "content", "skill text", "total", "resid mean", "largest"], rowsB)
-             + "\n\nStability of the largest term (runs 0 / 1 / 2):\n\n" + MC.md_table(["Skill", "Bench", "largest per run", "same in all three (and in A)"], rowsS)
-             + "\n\n### C. Fixed-prefix columns, change per request in tokens (skill minus seed)\n\n" + MC.md_table(["Skill", "Bench", "system", "tool_schemas", "task", "skill"], rowsC)
-             + "\n\n### Table 1 consistency (rho_trj)\n\n" + MC.md_table(["Skill", "Bench", "Table 1 rho (full common set)", "rho on used tasks (Table 1 rows)", "exp(total) of A"], rowsT)
-             + "\n\n### Dropped tasks (Table 1 common set minus used)\n\n" + MC.md_table(["Skill", "Bench", "dropped", "reason"], rowsD))
-    MC.write_record("attribution3", what, runs, agg, table,
+             + logger.md_table(["Skill", "Bench", "run", "actions", "turn-split", "content", "skill text", "total", "resid mean", "largest"], rowsB)
+             + "\n\nStability of the largest term (runs 0 / 1 / 2):\n\n" + logger.md_table(["Skill", "Bench", "largest per run", "same in all three (and in A)"], rowsS)
+             + "\n\n### C. Fixed-prefix columns, change per request in tokens (skill minus seed)\n\n" + logger.md_table(["Skill", "Bench", "system", "tool_schemas", "task", "skill"], rowsC)
+             + "\n\n### Table 1 consistency (rho_trj)\n\n" + logger.md_table(["Skill", "Bench", "Table 1 rho (full common set)", "rho on used tasks (Table 1 rows)", "exp(total) of A"], rowsT)
+             + "\n\n### Dropped tasks (Table 1 common set minus used)\n\n" + logger.md_table(["Skill", "Bench", "dropped", "reason"], rowsD))
+    logger.write_record("attribution3", what, runs, agg, table,
                     ".venv/bin/python -m src.analysis.mech.attribution compute\npython3 -m src.analysis.mech.attribution draw")
 
 
@@ -270,7 +269,7 @@ def main():
     if step == "compute":
         compute()
         return
-    cells = json.loads((MC.CACHE / "attribution.json").read_text())["cells"]
+    cells = json.loads((dataloader.CACHE / "attribution.json").read_text())["cells"]
     draw_heatmap(cells)
     record(cells)
 

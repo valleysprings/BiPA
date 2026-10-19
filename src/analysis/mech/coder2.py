@@ -12,8 +12,7 @@ import json
 
 import numpy as np
 
-from src.analysis.mech import common as C
-
+from src.utils import logger, dataloader
 CATS = ["serialize", "parallelize", "limit_read", "ask_stop", "verify", "domain", "format", "other"]
 # Groups the paper relies on; each becomes a binary "in group / not in group" coding.
 GROUPS = {"verify": ["verify"], "serialize": ["serialize"],
@@ -37,7 +36,7 @@ def kappa(a, b):
 
 def final_labels():
     """Final label of every unit from skilltext.json, keyed by unit id."""
-    coded = json.loads((C.CACHE / "skilltext.json").read_text())["coded_units"]
+    coded = json.loads((dataloader.CACHE / "skilltext.json").read_text())["coded_units"]
     return {f"{cell}#{u['idx']}": u["category"] for cell, rows in coded.items() for u in rows}
 
 
@@ -58,7 +57,7 @@ def compare(ids, first, second):
 def compute():
     """All numbers: full set, set without the exposed cell, confusion matrix, counts."""
     final = final_labels()
-    second = json.loads((C.CACHE / "coder2_labels.json").read_text())
+    second = json.loads((dataloader.CACHE / "coder2_labels.json").read_text())
     assert set(final) == set(second)
     ids = sorted(final)
     blind = [i for i in ids if not i.startswith(EXPOSED)]
@@ -73,21 +72,21 @@ def compute():
 
 def record(r):
     """Write the JSON and the markdown audit record."""
-    C.write_json("coder2", r)
+    dataloader.write_json("coder2", r)
     n = r["all"]["n"]
     rows = []
     for tag, key in (("all 337 units", "all"), (f"{r['blind']['n']} blind units (without gepa tau3)", "blind")):
         d = r[key]
         rows.append([tag, f"{100 * d['agreement']:.1f}%", f"{d['kappa']:.3f}"]
                     + [f"{100 * d['groups'][g]['agreement']:.1f}% / {d['groups'][g]['kappa']:.3f}" for g in GROUPS])
-    agree = C.md_table(["Units", "agreement", "kappa (8 categories)"]
+    agree = logger.md_table(["Units", "agreement", "kappa (8 categories)"]
                        + [f"{g}: agreement / kappa (binary)" for g in GROUPS], rows)
-    cnt = C.md_table(["category", "final", "final %", "coder 2", "coder 2 %"],
+    cnt = logger.md_table(["category", "final", "final %", "coder 2", "coder 2 %"],
                      [[c, r["counts_final"][c], f"{100 * r['counts_final'][c] / n:.1f}",
                        r["counts_coder2"][c], f"{100 * r['counts_coder2'][c] / n:.1f}"] for c in CATS])
-    conf = C.md_table(["final \\ coder 2"] + CATS,
+    conf = logger.md_table(["final \\ coder 2"] + CATS,
                       [[f] + [r["confusion"][f][s] for s in CATS] for f in CATS])
-    grp = C.md_table(["group", "units in final", "units in coder 2"],
+    grp = logger.md_table(["group", "units in final", "units in coder 2"],
                      [[g, r["all"]["groups"][g]["final"], r["all"]["groups"][g]["coder2"]] for g in GROUPS])
     extra = "\n".join([
         "### Counts per category", "", cnt, "", "### Units per relied-on group", "", grp, "",
@@ -101,7 +100,7 @@ def record(r):
         "`assets/cache/analysis/mech/coder2_labels.json`. Coder 2 is a model, not a human, and "
         "shares no hand-labelling session with the final coding, but this is an LLM second coder.",
         f"Units with different labels: {r['n_disagree']} of {n}."])
-    C.write_record("coder2", "Inter-coder agreement for the eight-category coding of the 337 added rule units.",
+    logger.write_record("coder2", "Inter-coder agreement for the eight-category coding of the 337 added rule units.",
                    "Nine learned skills (GEPA, SkillOpt, SkillAdam on tau3-bench, AutoBench, TB2); units from skilltext.json.",
                    "Percent agreement and Cohen's kappa between coder 2 and the final labels; binary kappa for each relied-on group.",
                    agree, "python -m src.analysis.mech.coder2", extra)

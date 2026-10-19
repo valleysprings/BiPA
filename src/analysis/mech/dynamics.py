@@ -37,9 +37,8 @@ import math
 import numpy as np
 
 from src.analysis import table1 as T
-from src.analysis.common import SEED_TEXT, current_run, final_skill, vid, EX
-from src.analysis.mech import common as MC
-
+from src.utils.dataloader import SEED_TEXT, current_run, final_skill, vid, EX
+from src.utils import logger, dataloader
 MODELS = (("deepseek-flash", "DeepSeek"), ("gpt-6-luna", "Luna"))
 ARMS = [("native-noseed", "No skill"), ("native-seed", "Seed skill"),
         ("gepa", "GEPA"), ("skillopt", "SkillOpt"), ("skilladam", "SkillAdam")]
@@ -379,21 +378,21 @@ def record(res):
            "task's seed mean R / skill mean R, averaged over the tasks with dR > 0. TB2 has 18 tasks and one permanently unknown task "
            "(torch-pipeline-parallelism); the evidence is tau3 (75) and AutoBench (120).")
     table = ("### A. H1: run-to-run trajectory similarity, behavioural modes, per-turn content h = X/R\n\n"
-             + MC.md_table(["Model", "Bench", "Arm", "n tasks", "jacc", "editsim", "modes (of 3)", "1-mode %", "h = X/R", "R", "X"], h1_rows)
+             + logger.md_table(["Model", "Bench", "Arm", "n tasks", "jacc", "editsim", "modes (of 3)", "1-mode %", "h = X/R", "R", "X"], h1_rows)
              + "\n\n### A2. H1: learned skill minus Seed (same benchmark)\n\n"
-             + MC.md_table(["Model", "Bench", "Arm", "d jacc", "d editsim", "d modes", "d h (relative)"], h1_delta)
+             + logger.md_table(["Model", "Bench", "Arm", "d jacc", "d editsim", "d modes", "d h (relative)"], h1_delta)
              + "\n\n### B. H4: pass@1 vs pass@3 over the 3 runs\n\n"
-             + MC.md_table(["Model", "Bench", "Arm", "n tasks", "pass@1 %", "pass@3 %", "gap (pts)"], h4_rows)
+             + logger.md_table(["Model", "Bench", "Arm", "n tasks", "pass@1 %", "pass@3 %", "gap (pts)"], h4_rows)
              + "\n\n### C1. H2: the seed's own test-time curve (success % by quantile bin)\n\n"
-             + MC.md_table(["Model", "Bench", "x", "bin", "range", "n episodes", "success %"], c1_rows)
+             + logger.md_table(["Model", "Bench", "x", "bin", "range", "n episodes", "success %"], c1_rows)
              + "\n\n### C2. H2: learned skill vs seed, per task (dR in turns, dQ in points; wasted = dR > 0 and dQ <= 0)\n\n"
-             + MC.md_table(["Model", "Bench", "Arm", "n tasks", "mean dR", "dR>0 %", "mean dQ", "wasted of dR>0", "wasted of all",
+             + logger.md_table(["Model", "Bench", "Arm", "n tasks", "mean dR", "dR>0 %", "mean dQ", "wasted of dR>0", "wasted of all",
                             "seed curve % at origin bin", "seed curve % at dest bin"], c2_rows))
-    MC.write_json("dynamics", {"cells": {k: {"curve": v["curve"],
+    dataloader.write_json("dynamics", {"cells": {k: {"curve": v["curve"],
                                              "arms": {a: {"label": x["label"], "shared_seed": x.get("shared_seed", False),
                                                           "h1": x.get("h1"), "h4": x.get("h4"), "h2": x.get("h2")}
                                                       for a, x in v["arms"].items()}} for k, v in res.items()}})
-    MC.write_record("dynamics", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.dynamics")
+    logger.write_record("dynamics", what, runs, agg, table, ".venv/bin/python -m src.analysis.mech.dynamics")
 
 
 def main():
