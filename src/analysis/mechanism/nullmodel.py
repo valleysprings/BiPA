@@ -1,4 +1,4 @@
-"""Winner's-curse null model and seed-variability audit (appendix 'selection noise'), driven by the frozen submission manifest (analysis/submission_protocol.py).
+"""Winner's-curse null model and seed-variability audit (appendix 'selection noise'), driven by the frozen submission manifest (analysis/submission/protocol.py).
 
 Inputs only from the manifest's pinned runs (--manifest FILE or env BACH_SUBMISSION_MANIFEST); nothing falls back to an older run, a pending cell is reported as pending.
 Units are (task_id, repetition) of an execution; an execution = one evaluation.json, identified by the sha256 of its request ids (cached copies of one execution share it and are
@@ -29,7 +29,7 @@ from scipy.stats import t as tdist, ttest_rel
 from src.utils import dataloader as common
 from src.utils.dataloader import BENCHES, SEED_TEXT, eval_file, vid
 from src.utils.logger import Report
-from src.analysis.submission_protocol import execution, fsha
+from src.analysis.submission.protocol import execution, fsha
 
 NS, SEED = 200000, 20261008
 VARIANTS = (("fitted", None, "out.json"), ("conc4", 4, "out_c4.json"), ("homog", 1000000, "out_c1000000.json"))
@@ -275,7 +275,7 @@ def skilladam_s(o, b): return o[b]["SkillAdam_accept_batch"]
 
 # ---- power / minimum detectable effect (merged from power.py; the P_ constants keep this section's draws apart from the null model's NS, SEED) ----------------
 
-POWER_DOC = """Power / minimum detectable effect (MDE80) of the submission protocol, driven by the frozen manifest (analysis/submission_protocol.py); offline, read-only on artifacts.
+POWER_DOC = """Power / minimum detectable effect (MDE80) of the submission protocol, driven by the frozen manifest (analysis/submission/protocol.py); offline, read-only on artifacts.
 
 Question: can the Table 1 comparison (candidate avg@3 vs Seed avg@3, paired over the same test tasks) detect gains of the size the original papers report (lit_gains.json)?
 Inputs: the seed's three pinned test executions per bench (manifest_reps), loaded as in nullmodel.py (request-id dedup); lit gains are the verified extraction in lit_gains.md/.json, transcribed in GAINS below.
@@ -463,7 +463,7 @@ def power_render(res):
 def main():
     if sys.argv[1:2] == ["power"]: power_main(sys.argv[2:]); return
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--manifest", default=os.environ.get("BACH_SUBMISSION_MANIFEST"), help="protocol.json from submission_protocol.py"); ap.add_argument("--out", required=True, help="output directory (created)")
+    ap.add_argument("--manifest", default=os.environ.get("BACH_SUBMISSION_MANIFEST"), help="protocol.json from submission/protocol.py"); ap.add_argument("--out", required=True, help="output directory (created)")
     args = ap.parse_args(); os.environ["BACH_SUBMISSION_MANIFEST"] = args.manifest; out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     m = common.manifest(); log = []
     data = {b: {sp: seed_execs(m, b, sp, log) for sp in ("test", "dev")} for b in BENCHES}

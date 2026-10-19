@@ -18,7 +18,7 @@ import glob
 import json
 from types import SimpleNamespace
 
-from src.analysis import report
+from src.analysis.mech import report
 from src.utils import fig, logger, dataloader
 def episode(record: dict) -> SimpleNamespace:
     """One task's episode with the fields report.stats / report.ratios read: task, success (None when the outcome is not verified),

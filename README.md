@@ -26,22 +26,21 @@ Skill optimizers report success alone, and a success score on a small dev set ca
 
 ## How BiPA works
 
-A harness without compaction re-sends the prefix and the whole conversation at every turn. With prefix F and a history growing h tokens per turn, an episode of R turns reads
+A harness without compaction re-sends the prefix and the whole conversation at every turn. With prefix $F$ and a history growing $h$ tokens per turn, an episode of $R$ turns reads
 
-    X = R·F + R(R−1)/2 · h
+$$X = R\,F + \frac{R(R-1)}{2}\,h$$
 
-input tokens — each extra turn re-reads the whole history, so input tokens grow faster than turns: the turn elasticity `e_R = 1 + s_H·R/(R−1)` (s_H the history share of X) is always above 1 and approaches 2 in long episodes.
+input tokens — each extra turn re-reads the whole history, so input tokens grow faster than turns: the turn elasticity $e_R = 1 + s_H\,R/(R-1)$ ($s_H$ the history share of $X$) is always above 1 and approaches 2 in long episodes.
 
-BiPA records each episode as a bipartite graph between its turns and a fixed set of context components (skill text, rest of the prompt, each tool's returned content), with two streams: what the model reads (input tokens) and what the harness executes (tool calls). Cost is judged against the seed task by task, as the mean paired log-ratio of input tokens and its ratio ρ:
+BiPA records each episode as a bipartite graph between its turns and a fixed set of context components (skill text, rest of the prompt, each tool's returned content), with two streams: what the model reads (input tokens) and what the harness executes (tool calls). Cost is judged against the seed task by task, as the mean paired log-ratio of input tokens and its ratio $\rho$:
 
-    L(S) = (1/|I|) · Σ_i log( X̄_i(S) / X̄_i(S₀) ),    ρ = e^{L(S)}   (ρ > 1: a token tax)
+$$L(S)=\frac{1}{|\mathcal I|}\sum_{i\in\mathcal I}\log\frac{\bar X_i(S)}{\bar X_i(S_0)},\qquad \rho=e^{L(S)}\quad(\rho>1:\ \text{a token tax})$$
 
-and with m = N/R calls per turn, the change splits into four behaviors, one term each:
+and with $m=N/R$ calls per turn, the change splits into four behaviors, one term each:
 
-    Δlog X ≈ e_R·Δlog N  −  e_R·Δlog m  +  s_H·Δlog h  +  s_F·Δlog F
-             more actions    turn-splitting   content per turn   skill text
+$$\Delta\log X \approx \underbrace{e_R\,\Delta\log N}_{\text{more actions}}\;\underbrace{-\,e_R\,\Delta\log m}_{\text{turn-splitting}}+\underbrace{s_H\,\Delta\log h}_{\text{content per turn}}+\underbrace{s_F\,\Delta\log F}_{\text{skill text}}$$
 
-Success is judged separately: avg@k test repetitions against the seed, plus a seed-replay control — each dev task's success probability is drawn from its Beta posterior `p_v|seed ~ Beta(a + s_v, b + n_v − s_v)` fitted to the seed's executions, candidates identical to the seed go through the optimizer's own acceptance rule, and the gain G₀ this keeps is what selection alone reports.
+Success is judged separately: avg@k test repetitions against the seed, plus a seed-replay control — each dev task's success probability is drawn from its Beta posterior $p_v\,|\,\text{seed}\sim\mathrm{Beta}(a+s_v,\;b+n_v-s_v)$ fitted to the seed's executions, candidates identical to the seed go through the optimizer's own acceptance rule, and the gain $G_0$ this keeps is what selection alone reports.
 
 The rolling agentic sandbox environments that training and evaluation live in are managed by our internal infrastructure. This repository holds the scheduler, the per-optimizer adapters to the upstream optimizer interfaces (documented `DEVIATIONS`; upstream search, edit and acceptance rules unchanged), the repeated evaluation, and the offline analysis and audit.
 
@@ -53,7 +52,7 @@ bipa/
 │   ├── run.py        # one optimization cell (the external entry)
 │   ├── core/         # launch, repeat, panels, traces, layout, config
 │   ├── adapters/     # per-optimizer interfaces (skillopt, skilladam, gepa)
-│   ├── analysis/     # main.py (Table 1), mech/ and mechanism/ (RQ analyses)
+│   ├── analysis/     # main.py (Table 1); mech/ and mechanism/ (RQ analyses); submission/ (frozen manifest + audit)
 │   ├── dynamics/     # transfer drivers, execution-evidence audits, status/refresh
 │   ├── graph/        # per-episode bipartite-graph metrics
 │   ├── utils/        # executor, llm, fig/, dataloader/, logger/ (audit records)

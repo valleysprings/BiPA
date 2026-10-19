@@ -4,7 +4,7 @@ Per (bench, row) the manifest pins one source run (No skill: the run common.late
 its three test executions {rep: evaluation.json, panel hash, request-id signature, missing/invalid counts}, the dev/train panels, budget, model and cache identity. A cell is `complete` only with summary.json and three distinct
 test executions (repetitions 0-2), else `pending` with the reason; nothing falls back to another run. A skill equal to the seed text reuses the seed row's executions (`returned_seed`, `executions_from`).
 Execution identity = sha256 of the sorted request_ids of an evaluation's episodes: cached copies of one execution share it (logged in `dedup_log`), independent reruns with identical success vectors differ and stay distinct.
-The old BACH run (bach-v8) is kept only under `bach_v8_reference` (not for the table). Read-only on artifacts; run from bipa: /mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bach-harness/.venv/bin/python -m src.analysis.submission_protocol
+The old BACH run (bach-v8) is kept only under `bach_v8_reference` (not for the table). Read-only on artifacts; run from bipa: /mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bach-harness/.venv/bin/python -m src.analysis.submission.protocol
 """
 import argparse, datetime, json
 from src.utils import dataloader as common
@@ -111,7 +111,7 @@ def main():
     (out/"PROTOCOL.md").write_text(f"""# 提交协议冻结（{man['created_utc']} UTC）
 
 `protocol.json` 固定每个 (bench, row) 的来源 run、summary/history/final 的 sha256、test 的三次 execution（evaluation.json、面板哈希、request-id 签名、缺失/无效计数）、train/dev 面板哈希与预算、模型与 cache 身份。
-分析脚本用环境变量 `BACH_SUBMISSION_MANIFEST=<本文件所在目录>/protocol.json` 读取同一快照（`common.current_run` / `common.manifest_reps`）；`analysis/submission_audit.py --manifest FILE` 只读复核，全部完整且一致才返回 0。
+分析脚本用环境变量 `BACH_SUBMISSION_MANIFEST=<本文件所在目录>/protocol.json` 读取同一快照（`common.current_run` / `common.manifest_reps`）；`analysis/submission/audit.py --manifest FILE` 只读复核，全部完整且一致才返回 0。
 
 - 基线 run 固定为 `{BASELINE_TAG}`；BACH 固定为正式 `{BACH_TAG}`；缺失或未完成的 cell 写 `pending`，不回退到旧 run。旧 `{REF_TAG}` 仅在 `bach_v8_reference` 下，标记 not_for_table。
 - 完整 = 有 summary.json 且 test 有重复 0/1/2 三个不同 execution。execution 身份 = 该次评测全部 episode 的 request_id 集合的 sha256；缓存复制（签名相同）记入 `dedup_log`，真实独立重跑即使 success 向量相同也保留。

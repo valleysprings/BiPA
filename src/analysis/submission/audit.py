@@ -1,4 +1,4 @@
-"""Read-only audit of a submission manifest (analysis/submission_protocol.py): re-hash everything it names and list what is pending or inconsistent.
+"""Read-only audit of a submission manifest (analysis/submission/protocol.py): re-hash everything it names and list what is pending or inconsistent.
 
 Checks per complete cell: summary / protocol / history / final hashes unchanged and the final skill, history, summary belong to the pinned run (same dir, config_hash, bench, model); the manifest's run is the pinned tag;
 every avg@3 row has repetitions 0,1,2 with three distinct request-id signatures (recomputed from the evaluation files), the same panel per repetition as the Seed row, and no signature shared with another row;
@@ -7,7 +7,7 @@ a returned seed reuses the Seed row's executions explicitly; the BACH cell is no
 import argparse, sys
 from src.utils import dataloader as common
 from src.utils.dataloader import *
-from src.analysis.submission_protocol import execution, fsha, hlist, HISTORY
+from src.analysis.submission.protocol import execution, fsha, hlist, HISTORY
 
 def audit(man):
     bad, pend = [], []
@@ -53,7 +53,7 @@ def audit(man):
 REF = "bach-v8"
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0]); ap.add_argument("--manifest", required=True, help="protocol.json from submission_protocol.py")
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0]); ap.add_argument("--manifest", required=True, help="protocol.json from submission/protocol.py")
     man = json.loads(Path(ap.parse_args().manifest).read_text()); bad, pend = audit(man)
     for p in pend: print("PENDING", p)
     for b in bad: print("INCONSISTENT", b)

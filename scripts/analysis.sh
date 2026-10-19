@@ -25,7 +25,7 @@ usage() { sed -n '6,10p' "$0"; exit 1; }
 need_manifest() {  # rq1's nullmodel/power are driven by the frozen submission manifest
   if [ ! -f "$BACH_SUBMISSION_MANIFEST" ]; then
     echo "submission manifest not found: $BACH_SUBMISSION_MANIFEST" >&2
-    echo "freeze it first: $PY -m src.analysis.submission_protocol" >&2
+    echo "freeze it first: $PY -m src.analysis.submission.protocol" >&2
     exit 1
   fi
 }
