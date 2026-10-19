@@ -1,5 +1,5 @@
 """table1.tex: an incomplete avg@3 cell is withheld (tbd), never printed as a number."""
-from src.analysis import table1
+from src.analysis import main as table1
 
 
 def test_paper_avg3_table_withholds_incomplete_repetitions(monkeypatch):

@@ -14,7 +14,7 @@ import json
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.utils.dataloader import BENCHES, SEED_TEXT, current_run, final_skill, gmean, vid
 from src.utils import logger, dataloader
 from src.analysis.mech import stats as S

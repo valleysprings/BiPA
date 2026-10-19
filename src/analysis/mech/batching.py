@@ -25,7 +25,7 @@ import math
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.analysis.mech import attribution as A
 from src.utils import fig, logger, dataloader
 BENCH_NAME = {"tau3-bench": r"$\tau^3$", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}

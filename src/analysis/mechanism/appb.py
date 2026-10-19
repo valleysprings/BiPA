@@ -55,7 +55,7 @@ def out_dir():
 def compute_reruns():
     import itertools
     from src.utils.dataloader import DS, SEED_TEXT, eval_file, final_skill, vid
-    from src.analysis.table1 import rep_files
+    from src.analysis.main import rep_files
     from src.analysis.mechanism.reproducibility import load, gm
     from src.analysis.mechanism.pooled import gm_ratio
     out, raw = {}, []

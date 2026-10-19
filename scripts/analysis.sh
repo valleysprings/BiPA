@@ -31,7 +31,7 @@ need_manifest() {  # rq1's nullmodel/power are driven by the frozen submission m
 }
 
 table1() {  # Table 1 (both models) -> ../paper/assets/data/mech/mech_table1.md
-  "$PY" -m src.analysis.table1
+  "$PY" -m src.analysis.main
 }
 
 rq1() {  # the success gains do not hold

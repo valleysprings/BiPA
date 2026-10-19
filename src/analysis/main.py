@@ -201,7 +201,7 @@ def record(res, models=MODELS):
             else "No optimizer row equals the seed text; every row reports its own three runs.")
     txt = ("Table 1 (Q = avg@3 over three test runs per skill, ratios against the Seed skill row on a common task set). Bold / underline: best / second-best Q of a benchmark within a model.\n\n" + "\n\n".join(blocks)
            + "\n\nColumn mapping: paper Q = `Q`; paper rho (input tokens) = `rho_trj`; paper rho^calls (tool calls) = `rho_inv`; `rho` (cost c = N + X/1000) is not printed. " + sent)
-    PO.record("mech_table1", "table1", result=txt, source=["bipa/src/analysis/table1.py"], commands=["/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bach-harness/.venv/bin/python -m src.analysis.table1  # from bipa/"],
+    PO.record("mech_table1", "table1", result=txt, source=["bipa/src/analysis/main.py"], commands=["/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bach-harness/.venv/bin/python -m src.analysis.main  # from bipa/"],
               raw=[c["run_dir"] for c in cells] + [c["test_eval"] for c in cells],
               notes=["rho = geometric mean per task of (mean over the runs of the metric) / (the same mean over the seed's runs)."])
 

@@ -28,7 +28,7 @@ import math
 import numpy as np
 from scipy import stats as sps
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.utils.logger import paperout as PO
 from src.utils.dataloader import BENCHES, H, SEED_TEXT, current_run, final_skill, gmean, vid
 

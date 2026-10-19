@@ -36,7 +36,7 @@ import math
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.utils.dataloader import SEED_TEXT, current_run, final_skill, vid, EX
 from src.utils import logger, dataloader
 MODELS = (("deepseek-flash", "DeepSeek"), ("gpt-6-luna", "Luna"))

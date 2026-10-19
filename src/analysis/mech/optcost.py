@@ -24,7 +24,7 @@ from statistics import median
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.utils.dataloader import BENCHES, EX, SEED_TEXT, current_run, final_skill, task_row, vid
 from src.utils import logger, dataloader
 from src.analysis.mech import stats as S

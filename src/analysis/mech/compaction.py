@@ -27,7 +27,7 @@ import math
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.analysis.mech import attribution as A
 from src.utils import fig, logger, dataloader
 WINDOWS = [1, 3, 5, 10, None]               # None = infinity

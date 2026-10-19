@@ -14,7 +14,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.utils.dataloader import BENCHES, EX, SEED_TEXT, current_run, final_skill, vid
 from src.utils import logger, dataloader
 MODEL = "deepseek-flash"

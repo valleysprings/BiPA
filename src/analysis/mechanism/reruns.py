@@ -24,7 +24,7 @@ def fixed_part(we):
 def rerun_files(bench, names=OPTIMIZERS):
     """{skill: [(run label, test evaluation file)]}: the main run of the seed and of each returned optimizer skill, plus its reruns
     (seed: rep-1/rep-2 beside the main run; optimizer skills: the repetitions under test-reps/<bench>__<method>__<run>, as table1.rep_files)."""
-    from src.analysis.table1 import rep_files as t1_rep_files
+    from src.analysis.main import rep_files as t1_rep_files
     texts = {"seed": SEED_TEXT}; runs = {}
     main = {"seed": eval_file(current_run("native-seed", MODEL, bench), "test", vid(SEED_TEXT))}
     for disp, (run, t) in returned_skills(MODEL, bench, names).items():

@@ -34,7 +34,7 @@ import shlex
 
 import numpy as np
 
-from src.analysis import table1 as T
+from src.analysis import main as T
 from src.analysis.mech import attribution as A
 from src.utils import logger, dataloader
 from src.graph.episode import LOOKUP
