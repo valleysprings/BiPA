@@ -50,8 +50,8 @@ bipa/
 │   ├── run.py        # one optimization cell (the external entry)
 │   ├── core/         # launch, repeat, panels, traces, layout, config
 │   ├── adapters/     # per-optimizer interfaces (skillopt, skilladam, gepa)
-│   ├── analysis/     # main.py (Table 1); rq1-rq4/ (per-question analyses); mainfigs/ (main-text figures);
-│   │                 # appendix/ (appendix + Section-3 numbers); submission/ (frozen manifest + audit)
+│   ├── analysis/     # main/ (main text: Table 1, the RQ1-4 analyses, the main-text figures);
+│   │                 # aux/ (appendix + Section-3 numbers); submission/ (frozen manifest + audit)
 │   ├── dynamics/     # transfer drivers, execution-evidence audits, status/refresh
 │   ├── graph/        # per-episode bipartite-graph metrics
 │   ├── utils/        # executor, llm, fig/, dataloader/, logger/ (audit records)
@@ -101,10 +101,10 @@ bash scripts/analysis.sh audit native-run|trace|skill-history ...
 
 `analysis.sh all` runs `rq1 rq2 rq4 rq3 mainfigs` — the order the cross-RQ cache dependencies require (rq2's paired figure reuses rq1's statistics, rq3 reuses rq2's attribution cache, the cheatsheet audit reuses rq4's). Everything runs under the one `$BASELINE_PYTHON` interpreter. What each target runs (`src/analysis/`; figures are `draw`-family subcommands of the same module, drawing from the cache its compute step wrote):
 
-- **RQ1** — do the dev gains survive the test split: paired statistics, winner's-curse replay, per-domain success, per-repetition reproducibility. `rq1/{stats,selection,domains,reruns}.py` + `appendix/{nullmodel,stability,appb}.py`
-- **RQ2** — the token tax: the four-term attribution, within-task slopes, solved-vs-failed tasks, cached-input pricing, the compaction counterfactual, the optimizer's own training bill. `rq2/{attribution,slopes,failcost,price,compaction,optcost}.py` + `appendix/{appc,slopes,pricing,optcost,facts}.py`
-- **RQ3** — what the optimizers write into the skill: rule coding and its second-coder check, calls per turn, accepted vs rejected edits, the answer-leakage audit. `rq3/{skilltext,coder2,callsperturn,edges,cheatsheet}.py`
-- **RQ4** — generality: skills frozen and re-evaluated on another model / benchmark, and the trajectory-dynamics hypotheses. `rq4/{transfer,dynamics}.py` + the `analysis.sh transfer` drivers
-- **Main-text figures** (`mainfigs`) — Fig. 1, the Sec.-4.3 per-skill figure, the Sec.-5 design-principle evidence. `mainfigs/{teaser,design}.py` + `rq3/skilltext.py skills`
+- **RQ1** — do the dev gains survive the test split: paired statistics, winner's-curse replay, per-domain success, per-repetition reproducibility. `main/{stats,selection,domains,reruns}.py` + `aux/{nullmodel,stability,appb}.py`
+- **RQ2** — the token tax: the four-term attribution, within-task slopes, solved-vs-failed tasks, cached-input pricing, the compaction counterfactual, the optimizer's own training bill. `main/{attribution,slopes,failcost,price,compaction,optcost}.py` + `aux/{appc,slopes,pricing,optcost,facts}.py`
+- **RQ3** — what the optimizers write into the skill: rule coding and its second-coder check, calls per turn, accepted vs rejected edits, the answer-leakage audit. `main/{skilltext,coder2,callsperturn,edges,cheatsheet}.py`
+- **RQ4** — generality: skills frozen and re-evaluated on another model / benchmark, and the trajectory-dynamics hypotheses. `main/{transfer,dynamics}.py` + the `analysis.sh transfer` drivers
+- **Main-text figures** (`mainfigs`) — Fig. 1, the Sec.-4.3 per-skill figure, the Sec.-5 design-principle evidence. `main/{teaser,design}.py` + `main/skilltext.py skills`
 
 Figures are `draw`-family subcommands of the same module, drawing from the cache its compute step wrote; each module's docstring lists its subcommands. Each module writes its audit record to `../paper/assets/data/mech/`.
