@@ -10,7 +10,7 @@
 #   bash scripts/analysis.sh audit native-run|trace|skill-history [args...]
 #
 # Cross-target cache dependencies (assets/cache/analysis/): rq2's paired figure
-# needs rq1's stats.json; rq3 needs rq2's appc/attr.json and mech/attribution.json;
+# needs rq1's stats.json; rq3 needs rq2's appc/attr.json and rq/attribution.json;
 # cheatsheet (rq3) also needs rq4's dynamics.json and the executed transfer results;
 # mainfigs needs rq1-rq3. "all" runs rq1 rq2 rq4 rq3 mainfigs, satisfying every one.
 set -euo pipefail
