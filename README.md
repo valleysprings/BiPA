@@ -42,8 +42,6 @@ $$\Delta\log X \approx \underbrace{e_R\,\Delta\log N}_{\text{more actions}}\;\un
 
 Success is judged separately: avg@k test repetitions against the seed, plus a seed-replay control — each dev task's success probability is drawn from its Beta posterior $p_v\,|\,\text{seed}\sim\mathrm{Beta}(a+s_v,\;b+n_v-s_v)$ fitted to the seed's executions, candidates identical to the seed go through the optimizer's own acceptance rule, and the gain $G_0$ this keeps is what selection alone reports.
 
-The rolling agentic sandbox environments that training and evaluation live in are managed by our internal infrastructure. This repository holds the scheduler, the per-optimizer adapters to the upstream optimizer interfaces (documented `DEVIATIONS`; upstream search, edit and acceptance rules unchanged), the repeated evaluation, and the offline analysis and audit.
-
 ## Layout
 
 ```
