@@ -56,8 +56,8 @@ def compute_reruns():
     import itertools
     from src.utils.dataloader import DS, SEED_TEXT, eval_file, final_skill, vid
     from src.analysis.main import rep_files
-    from src.analysis.mechanism.reproducibility import load, gm
-    from src.analysis.mechanism.pooled import gm_ratio
+    from src.analysis.mechanism.stability import load, gm
+    from src.analysis.mechanism.stability import gm_ratio
     out, raw = {}, []
     for bench, _ in BENCH:
         F = {"seed": [("main", eval_file(DS / "native-seed" / bench / SEED_RUN, "test", vid(SEED_TEXT)))]}

@@ -18,7 +18,7 @@ the dR > 0 tasks and of all tasks. For tasks with dR > 0: the seed curve's succe
 (origin) and at the bin of its skill mean R (destination) — whether the extra turns buy curve segments that still pay.
 
 Runs: DeepSeek-V4.1-Flash = Table 1's own runs (seed native-seed + rep-1/rep-2; skills and no-skill native-* + test-reps rep 1/2,
-picked by analysis.table1.rep_files exactly as Table 1). GPT-6 Luna = the avg@3 repeat protocol of bipa/src/core/repeat.py re-implemented
+picked by analysis.main.rep_files exactly as Table 1). GPT-6 Luna = the avg@3 repeat protocol of bipa/src/core/repeat.py re-implemented
 here (rep 0 = the source run's first evaluation; rep 1/2 = assets/artifacts/execution/gpt-6-luna/test-reps/<bench>__<arm>__<tag>,
 unknown-only supplement evaluations merged per slot; TB2's three optimizer arms returned the seed text and report the seed row).
 Episode fields are read straight from evaluation.json as analysis.mech.transfer / analysis.mech.callsperturn do: requests deduplicated
@@ -29,7 +29,11 @@ TB2 has 18 tasks and one permanently unknown task (torch-pipeline-parallelism); 
 and AutoBench (120). No BACH, no model calls.
 
 Commands (from bipa):           .venv/bin/python -m src.analysis.mech.dynamics   -> assets/cache/analysis/mech/dynamics.json, data/mech/mech_dynamics.md
+                                .venv/bin/python -m src.analysis.mech.dynamics draw -> fig/mech/mech_dynamics.{pdf,svg}: appendix figure for
+                                app:dynamics (H2), (a) the seed's own test-time curve and (b) the white-squeeze rate of each learned skill,
+                                from assets/cache/analysis/mech/dynamics.json (merged from dynamics_fig.py)
 """
+import argparse
 import collections
 import json
 import math
@@ -38,7 +42,7 @@ import numpy as np
 
 from src.analysis import main as T
 from src.utils.dataloader import SEED_TEXT, current_run, final_skill, vid, EX
-from src.utils import logger, dataloader
+from src.utils import fig, logger, dataloader
 MODELS = (("deepseek-flash", "DeepSeek"), ("gpt-6-luna", "Luna"))
 ARMS = [("native-noseed", "No skill"), ("native-seed", "Seed skill"),
         ("gepa", "GEPA"), ("skillopt", "SkillOpt"), ("skilladam", "SkillAdam")]
@@ -396,7 +400,95 @@ def record(res):
 
 
 def main():
-    record(compute())
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("step", nargs="?", default="record", choices=["record", "draw"])
+    if ap.parse_args().step == "draw":
+        draw()
+    else:
+        record(compute())
+
+
+# ---------- figure (merged from dynamics_fig.py; reads the cache compute wrote) ----------
+
+FIG_BENCH = [("tau3-bench", r"$\tau^3$"), ("automationbench", "AutoB")]  # TB2's 18 tasks are too few for this statistic
+# bench color in (a); optimizer color in (b), as in mech_paired
+BC = {"tau3-bench": "#0072B2", "automationbench": "#E69F00"}
+OC = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}
+LS = {"deepseek-flash": "-", "gpt-6-luna": "--"}
+MK = {"deepseek-flash": "o", "gpt-6-luna": "s"}
+
+
+def load():
+    return json.loads((dataloader.CACHE / "dynamics.json").read_text())["cells"]
+
+
+def draw_curve(ax, cells):
+    """(a) Seed success per turns bin; color = benchmark, line style / marker = model; the legend carries the turn ranges."""
+    for model, mshort in MODELS:
+        for bench, bshort in FIG_BENCH:
+            bins = cells[f"{model}|{bench}"]["curve"]["R"]
+            xs = list(range(len(bins)))
+            ys = [b["success"] for b in bins]
+            label = f"{mshort} {bshort}, {bins[0]['lo']:.0f}–{bins[-1]['hi']:.0f} turns"
+            ax.plot(xs, ys, LS[model], marker=MK[model], ms=3, lw=1.0, color=BC[bench],
+                    markerfacecolor="white" if model == "gpt-6-luna" else BC[bench], markeredgewidth=0.8, label=label)
+    ax.set_xticks(range(6))
+    ax.set_xticklabels([str(i + 1) for i in range(6)])
+    ax.set_xlabel("turns bin of the seed's episodes (low $\u2192$ high)", fontsize=7, labelpad=1)
+    ax.set_ylabel("seed success (%)", fontsize=7, labelpad=1)
+    ax.set_ylim(0, 100)
+    ax.tick_params(labelsize=6.5, length=2, pad=1)
+    ax.legend(frameon=False, fontsize=6.3, loc="lower left", handlelength=1.8, handletextpad=0.4, labelspacing=0.25, borderaxespad=0.1)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+
+
+def draw_squeeze(ax, cells):
+    """(b) White-squeeze bars: groups = model x benchmark, bars = optimizer, task counts on top."""
+    import matplotlib.pyplot as plt
+    width = 0.26
+    for g, (model, mshort) in enumerate(MODELS):
+        for b, (bench, bshort) in enumerate(FIG_BENCH):
+            gx = 2 * g + b
+            cell = cells[f"{model}|{bench}"]
+            for j, (arm, label) in enumerate(ARMS[2:]):
+                h = cell["arms"][arm]["h2"]
+                v = 100 * h["wasted_of_up"]
+                x = gx + (j - 1) * width
+                ax.bar(x, v, width=width * 0.9, color=OC[label], edgecolor="white", linewidth=0.4)
+                ax.text(x, v + 1.5, f"{v:.0f}", ha="center", va="bottom", fontsize=6.3)
+                ax.text(x, v / 2, f"{h['n_wasted']}/{h['n_up']}", ha="center", va="center", fontsize=5.6, color="white", rotation=90)
+    ax.set_xticks(range(4))
+    ax.set_xticklabels([f"{mshort}\n{bshort}" for mshort in ("DeepSeek", "Luna") for bshort in (r"$\tau^3$", "AutoB")], fontsize=6.5)
+    ax.set_xlim(-0.55, 3.55)
+    ax.set_ylim(0, 112)
+    ax.set_yticks([0, 25, 50, 75, 100])
+    ax.set_ylabel("white-squeeze (%)", fontsize=7, labelpad=1)
+    ax.tick_params(axis="y", labelsize=6.5, length=2, pad=1)
+    ax.tick_params(axis="x", length=0, pad=2)
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=OC[label], label=label) for _, label in ARMS[2:]]
+    ax.legend(handles=handles, frameon=False, fontsize=6.3, loc="lower left", ncol=3, handlelength=0.9, handletextpad=0.3,
+              columnspacing=0.6, borderaxespad=0.1)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+
+
+def draw():
+    """The two-panel mech_dynamics figure from assets/cache/analysis/mech/dynamics.json (numbers as recorded in mech_dynamics.md, C1 and C2)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
+                         "font.size": 7, "axes.linewidth": 0.6})
+    cells = load()
+    figure = plt.figure(figsize=(6.75, 2.1))
+    ax_a = figure.add_axes([0.065, 0.15, 0.42, 0.70])
+    ax_b = figure.add_axes([0.585, 0.15, 0.40, 0.70])
+    draw_curve(ax_a, cells)
+    draw_squeeze(ax_b, cells)
+    figure.text(0.065, 0.985, "(a) The seed's own test-time curve", fontsize=7.5, fontweight="bold", va="top")
+    figure.text(0.585, 0.985, "(b) Extra turns buy no success", fontsize=7.5, fontweight="bold", va="top")
+    fig.save_figure(figure, "dynamics")
 
 
 if __name__ == "__main__":

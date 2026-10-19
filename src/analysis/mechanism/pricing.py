@@ -5,7 +5,6 @@ Run: <bach-harness venv python> -m src.analysis.mechanism.pricing   (from bipa/)
 import numpy as np
 from src.utils.dataloader import BN
 from src.utils.logger import Report
-from src.analysis.mechanism.episodes import episode_rows, fe, samp
 
 lR = lambda r: np.log(r["R"])
 
@@ -16,7 +15,8 @@ def price(r, c, w, cached="res"):
 
 
 def main():
-    rows = episode_rows(); say = Report()
+    from src.analysis.mechanism.slopes import ep_rows, fe, samp  # local: slopes.py imports price() from this module
+    rows = ep_rows(); say = Report()
     say("== Q2 price slope vs cache price c (output weight w=4 | w=1)")
     for kind in ("main", "all"):
         for w in (4, 1):

@@ -1,34 +1,38 @@
-"""Appendix C figures (paper/assets/fig/mech/appC_slopes, appC_attribution, appC_price + records). DeepSeek test episodes of the seed and the three baseline optimizers (attribution and price); the slopes come from fig1.py's rows.
+"""Appendix C figures (paper/assets/fig/mech/appC_slopes, appC_attribution, appC_price + records) and the fig1 data stage they rest on. DeepSeek test episodes of the seed and the three baseline optimizers (attribution and price).
+  <venv python> -m src.analysis.mechanism.appc fig1 [--models deepseek-flash] [--out DIR]   -> assets/cache/analysis/fig1/cache.json (merged from fig1.py's
+      compute stage: within-task regressions of log input/output/calls on log turns per benchmark, and each optimized skill's four-term split against the seed)
   <venv python> -m src.analysis.mechanism.appc compute   -> assets/cache/analysis/appc/price.json (raw input-token ratio vs cache-priced ratio per skill)   (run from bipa/)
                                                           and assets/cache/analysis/appc/attr.json (the four-term attribution rows, from the pinned https reruns below)
-  <system python3 + matplotlib> -m src.analysis.mechanism.appc draw               -> the three figures and records (appC_slopes needs fig1.py compute first)
+  <system python3 + matplotlib> -m src.analysis.mechanism.appc draw               -> the three figures and records (appC_slopes needs the fig1 subcommand first)
+  (fig1.py's draw stage is not carried over: it only wrote a preview fig1.png to the output dir, nothing to paper/.)
 Price = uncached input + 0.1 * cached input + 4 * output tokens (cached = tokens served from cache from request 2 on), per task, geometric mean of skill/seed over the Table 1 common task set.
 The baseline attribution rows are pinned to the https reruns (ATTR_RUNS), the same runs that feed the avg@3 Table 1. check() asserts the claims."""
-import json, math, sys
+import argparse, collections, json, math, sys
 from pathlib import Path
 import numpy as np
 from src.utils.dataloader import gmean
 
 H = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation")
-F1 = H / "assets/cache/analysis/fig1/cache.json"
+FIG1 = H / "assets/cache/analysis/fig1"
+F1 = FIG1 / "cache.json"
 OUT = H / "assets/cache/analysis/appc"
-BENCH = [("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench"), ("terminal-bench-2-1", "TB2")]
+BENCH = [("tau3-bench", r"$\tau^3$-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench", "AutoBench"), ("terminal-bench-2-1", "TB2", "TB2")]  # (key, display, short); shared with analysis/mech/
 OPT = [("skillopt", "SkillOpt"), ("skilladam", "SkillAdam"), ("gepa", "GEPA")]   # baselines only (BiPA reports no BACH rows)
 DISP = {"SkillOpt": "skillopt", "SkillAdam": "skilladam", "GEPA": "gepa"}
 
 # The attribution (Figure appC_attribution) is read on the https reruns, the same runs that feed the avg@3 Table 1;
 # all nine optimizer cells returned a new skill in these runs, so every (method, benchmark) pair has a row.
 SEED_RUN = "native-20261003-trace-final"
-ATTR_RUNS = {(m, b): "native-20261008-https" for m in ("skillopt", "skilladam", "gepa") for b, _ in BENCH}
+ATTR_RUNS = {(m, b): "native-20261008-https" for m in ("skillopt", "skilladam", "gepa") for b, *_ in BENCH}
 
 
 def compute_attr():
-    """The four-term split of slopes_checks.skill_fit per optimized skill against the seed, on the pinned https reruns (fig1.py's math)."""
+    """The four-term split of the slopes checks' skill_fit per optimized skill against the seed, on the pinned https reruns (the fig1 subcommand's math)."""
     from src.utils import dataloader as C
-    from src.analysis.mechanism.slopes_checks import metrics, episodes
+    from src.analysis.mechanism.slopes import metrics, episodes
     skills, raw = [], set()
     for meth, disp in OPT:
-        for bench, _ in BENCH:
+        for bench, *_ in BENCH:
             if (meth, bench) not in ATTR_RUNS: continue
             seedrun = C.EX / "deepseek-flash" / "native-seed" / bench / SEED_RUN
             sf = C.eval_file(seedrun, "test", C.vid(C.SEED_TEXT)); seed_rows = C.evaluation(seedrun, "test", C.vid(C.SEED_TEXT))[0]
@@ -77,11 +81,11 @@ def check(skills):
 
 def compute():
     from src.utils import dataloader as C
-    from src.analysis.mechanism.episodes import build_rows, derive
-    from src.analysis.mechanism.slopes_checks import METHODS3
+    from src.analysis.mechanism.slopes import build_rows, derive
+    from src.analysis.mechanism.slopes import METHODS3
     from src.graph import episode as W
     # The https reruns, the same runs that feed the avg@3 Table 1.
-    PRICE_RUNS = {(m, b): "native-20261008-https" for m in ("gepa", "skillopt", "skilladam") for b, _ in BENCH}
+    PRICE_RUNS = {(m, b): "native-20261008-https" for m in ("gepa", "skillopt", "skilladam") for b, *_ in BENCH}
     def load(f):
         d = json.load(open(f)); raw = {}
         for e in d["episodes"]: raw.setdefault((e["task_id"], e.get("repetition", 0)), e)
@@ -97,7 +101,7 @@ def compute():
         return out
     price = lambda r, c=0.1, w=4: (r["X"] - r["res"]) + c * r["res"] + w * r["out_tot"]
     res = []
-    for bench, _ in BENCH:
+    for bench, *_ in BENCH:
         seedrun = C.EX / "deepseek-flash" / "native-seed" / bench / SEED_RUN; sf = str(C.eval_file(seedrun, "test", C.vid(C.SEED_TEXT)))
         seed_rows = C.evaluation(seedrun, "test", C.vid(C.SEED_TEXT))[0]
         S = load(sf)
@@ -151,10 +155,10 @@ def draw_slopes(plt, c):
     rng = np.random.default_rng(0)
     xx = np.exp(np.array([-0.6, 0.6]))
     for row, (qn, qlab) in enumerate(QUANT):
-        ally = np.concatenate([pts[b][qn][1] for b, _ in BENCH] + [np.log(xx) * max(reg[b][qn]["slope"], 1.0) for b, _ in BENCH])
+        ally = np.concatenate([pts[b][qn][1] for b, *_ in BENCH] + [np.log(xx) * max(reg[b][qn]["slope"], 1.0) for b, *_ in BENCH])
         lo, hi = np.exp(ally.min()), np.exp(ally.max()); span = hi / lo; lo, hi = lo / span ** 0.06, hi * span ** 0.06
         ticks = [t for t in (0.25, 0.5, 1, 2, 4, 8) if lo <= t <= hi]
-        for ax, (b, disp) in zip(axs[row], BENCH):
+        for ax, (b, disp, *_) in zip(axs[row], BENCH):
             xs, ys = pts[b][qn]; r = reg[b][qn]
             sel = rng.choice(len(xs), min(len(xs), 250), replace=False)
             ax.scatter(np.exp(xs[sel]), np.exp(ys[sel]), s=3, color=BC[b], alpha=0.25, lw=0, rasterized=True)
@@ -212,7 +216,7 @@ def draw_price(plt, p):
     mk = {"SkillOpt": "o", "SkillAdam": "s", "GEPA": "^"}
     for r in p:
         ax.scatter(r["raw"], r["priced"], s=34, marker=mk[r["method"]], color=BC[r["bench"]], zorder=4, lw=0)
-    for b, d in BENCH: ax.scatter([], [], s=34, color=BC[b], label=d)
+    for b, d, *_ in BENCH: ax.scatter([], [], s=34, color=BC[b], label=d)
     for m, k in mk.items(): ax.scatter([], [], s=34, marker=k, color="0.35", label=m)
     ax.legend(loc="upper left", frameon=False, fontsize=7.5, handletextpad=0.1, labelspacing=0.25)
     ax.set_xlim(lo, hi); ax.set_ylim(lo, hi); ax.set_aspect("equal"); ax.spines[["top", "right"]].set_visible(False)
@@ -225,10 +229,10 @@ def records(c, p, attr):
     from src.utils.logger import paperout as PO
     mt = PO.mdtable
     nm = {"tau3-bench": "tau3-bench", "automationbench": "AutoBench", "terminal-bench-2-1": "TB2"}
-    rows = [[nm[b], qn, f"{v['slope']:.2f}", f"{v['se']:.2f}", v["n"], v["n_tasks"], f"{v['r2']:.2f}"] for b, _ in BENCH for qn, _ in QUANT for v in [c["reg"][b][qn]]]
+    rows = [[nm[b], qn, f"{v['slope']:.2f}", f"{v['se']:.2f}", v["n"], v["n_tasks"], f"{v['r2']:.2f}"] for b, *_ in BENCH for qn, _ in QUANT for v in [c["reg"][b][qn]]]
     PO.record("appC_slopes", "fig", result=mt(["Benchmark", "quantity", "slope k", "SE", "episodes", "tasks", "R^2 (within)"], rows)
               + "\n\nWithin-task slope of log y on log turns (per-task means removed), y = input tokens / output tokens / calls (executed tool calls), seed and GEPA/SkillOpt/SkillAdam episodes pooled; dashed line is slope 1. Axes show the ratio to the task's geometric mean. Episodes with zero or missing output tokens are dropped from the output row (n reports the actual count).", source=["bipa/src/analysis/mechanism/appc.py", "bipa/src/analysis/mechanism/fig1.py"],
-              commands=["<bach-harness venv python> -m src.analysis.mechanism.fig1 compute   # from bipa/", "<system python3 + matplotlib> -m src.analysis.mechanism.appc draw   # from bipa/"], raw=c.get("raw", []))
+              commands=[".venv/bin/python -m src.analysis.mechanism.appc fig1   # from bipa/", ".venv/bin/python -m src.analysis.mechanism.appc draw   # from bipa/"], raw=c.get("raw", []))
     rows = [[s["method"], nm[s["bench"]], s["n"], *[f"{s[k]:+.3f}" for k in TC], f"{s['dlogX']:+.3f}", f"x{s['ratio']:.2f}", max(TC, key=lambda k: s[k])] for s in attr["skills"]]
     PO.record("appC_attribution", "fig", result=mt(["Optimizer", "Benchmark", "n", "more actions", "turn-splitting", "more content per turn", "longer text", "total dlogX", "ratio", "largest term"], rows)
               + "\n\nChange in log input tokens against the seed on the same test tasks (Table 1 common task set); limit elasticity k = 1 + s_H. Drawn as an annotated heatmap: rows are the skills grouped by optimizer, columns the four terms and the measured total, cells the change in log units. check() in the script asserts the Section 5.2 claims against the baseline rows.", source=["bipa/src/analysis/mechanism/appc.py"],
@@ -239,7 +243,91 @@ def records(c, p, attr):
               commands=["<bach-harness venv python> -m src.analysis.mechanism.appc compute   # from bipa/", "<system python3 + matplotlib> -m src.analysis.mechanism.appc draw   # from bipa/"])
 
 
+# ---- fig1 data stage (merged from fig1.py's compute; draw stays with appc draw / the dropped preview) -----------------------------------
+
+
+def fig1_compute(models, out):
+    """Per optimized skill the four terms against the seed (test tasks both completed), and the within-task regressions of log input tokens /
+    log output tokens / log calls on log R per benchmark over seed and skill episodes."""
+    from src.utils import dataloader as C
+    from src.analysis.mechanism.slopes import metrics, episodes
+    q = lambda rows: (lambda kn: 100 * sum(r["success"] is True for r in kn) / len(kn) / 100)([r for r in rows.values() if r["success"] is not None])  # Table 1's Q (percent) over the known outcomes of the whole test panel, as a fraction
+    skills, all_eps, all_out, raw = [], collections.defaultdict(dict), collections.defaultdict(dict), []
+    for model in models:
+        for bench, _, _ in BENCH:
+            seedrun = C.current_run("native-seed", model, bench); sf = C.eval_file(seedrun, "test", C.vid(C.SEED_TEXT))
+            seed_rows = C.evaluation(seedrun, "test", C.vid(C.SEED_TEXT))[0]
+            for disp, (run, t) in C.returned_skills(model, bench).items():
+                f = C.eval_file(run, "test", C.vid(t)); own_rows = C.evaluation(run, "test", C.vid(t))[0]
+                common = {k[0] for k, r in own_rows.items() if (k[0], 0) in seed_rows and r["success"] is not None and seed_rows[(k[0], 0)]["success"] is not None
+                          and all(x and x > 0 for x in (r["N"], r["X"], seed_rows[(k[0], 0)]["N"], seed_rows[(k[0], 0)]["X"]))}  # Table 1's common task set
+                if f is None: continue
+                raw += [str(sf), str(f)]
+                S = episodes(sf); Cs = episodes(f); S_out, C_out = output_totals(sf), output_totals(f); rows = []
+                for task, ec in Cs.items():
+                    a = metrics(S[task]) if task in S else None; b = metrics(ec)
+                    if a and b and task in common: rows.append((task, a, b))
+                    if b: all_eps[(model, bench)].setdefault((disp, task), b); all_out[(model, bench)].setdefault((disp, task), C_out.get(task))
+                for task, es in S.items():
+                    m = metrics(es)
+                    if m: all_eps[(model, bench)].setdefault(("seed", task), m); all_out[(model, bench)].setdefault(("seed", task), S_out.get(task))
+                if not rows: continue
+                L = lambda k: np.array([math.log(b[k] / a[k]) for _, a, b in rows])
+                dR, dN, dh, dX, dF = L("R"), L("N"), L("h"), L("X"), L("F")
+                dm = dN - dR
+                sF = np.array([(a["sF"] + b["sF"]) / 2 for _, a, b in rows]); sH = 1 - sF; Rm = np.array([(a["R"] + b["R"]) / 2 for _, a, b in rows]); k = 1 + sH * Rm / (Rm - 1)  # exact e_R
+                seg = dict(more_actions=float(np.mean(k * dN)), more_requests=float(np.mean(-k * dm)), longer_content=float(np.mean(sH * dh)), longer_skill=float(np.mean(sF * dF)))
+                skills.append(dict(model=model, bench=bench, method=disp, n=len(rows), **seg, segments_sum=sum(seg.values()), dlogX=float(dX.mean()), ratio=gmean(np.exp(dX)),
+                                   succ_seed=q(seed_rows), succ=q(own_rows)))
+    reg, pts = {}, {}
+    for bkey, _, _ in BENCH:
+        recs = [(k[1], m, all_out[(mo, be)].get(k)) for (mo, be), d in all_eps.items() if be == bkey for k, m in d.items()]
+        if len(recs) < 5: continue
+        rb, pb = {}, {}
+        for qn, val in (("input", lambda m, o: m["X"]), ("output", lambda m, o: o), ("calls", lambda m, o: m["N"])):
+            items = [(t, m["R"], v) for t, m, o in recs for v in [val(m, o)] if v and v > 0]
+            rb[qn], pb[qn] = fe_reg(items)
+        reg[bkey], pts[bkey] = rb, pb
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "cache.json").write_text(json.dumps(dict(skills=skills, reg=reg, raw=sorted(set(raw)),
+                                                    pts={k: {qn: [v[0].tolist(), v[1].tolist()] for qn, v in d.items()} for k, d in pts.items()})))
+    for k, v in reg.items():
+        for qn, r in v.items(): print(k, qn, {a: round(b, 3) for a, b in r.items()})
+
+
+def output_totals(path):
+    """{task: output tokens summed over the distinct requests of the task's episode} (last episode of a task wins, as episodes())."""
+    out = {}
+    for e in json.loads(Path(path).read_text())["episodes"]:
+        seen, o = set(), 0
+        for r in e["requests"]:
+            if r["request_id"] in seen: continue
+            seen.add(r["request_id"]); o += r.get("output_tokens") or 0
+        out[e["task_id"]] = float(o)
+    return out
+
+
+def fe_reg(items):
+    """Within-task (fixed effects) slope of log y on log R over [(task, R, y)], with SE and the demeaned point cloud."""
+    x = np.log([r[1] for r in items]); y = np.log([r[2] for r in items])
+    g = collections.defaultdict(list)
+    for i, it in enumerate(items): g[it[0]].append(i)
+    xs, ys = x.copy(), y.copy()
+    for idx in g.values(): xs[idx] -= x[idx].mean(); ys[idx] -= y[idx].mean()
+    sl = float((xs * ys).sum() / (xs * xs).sum()); res = ys - sl * xs
+    dof = len(xs) - len(g) - 1; se = float(np.sqrt((res ** 2).sum() / dof / (xs * xs).sum()))
+    return dict(slope=sl, se=se, n=len(xs), n_tasks=len(g), r2=float(1 - (res ** 2).sum() / (ys ** 2).sum())), (xs, ys)
+
+
+def fig1_cli(argv):
+    ap = argparse.ArgumentParser(description="fig1 data stage: panel (a) within-task regressions and panel (b) four-term segments -> cache.json")
+    ap.add_argument("--models", nargs="+", default=["deepseek-flash"])
+    ap.add_argument("--out", default=str(FIG1))
+    a = ap.parse_args(argv); fig1_compute(a.models, Path(a.out))
+
+
 def main():
+    if sys.argv[1:2] == ["fig1"]: fig1_cli(sys.argv[2:]); return
     if sys.argv[1] == "compute": compute(); return
     plt = style(); c = json.loads(F1.read_text()); p = json.loads((OUT / "price.json").read_text()); attr = json.loads((OUT / "attr.json").read_text())
     draw_slopes(plt, c); draw_attr(plt, attr["skills"]); draw_price(plt, p); records(c, p, attr)

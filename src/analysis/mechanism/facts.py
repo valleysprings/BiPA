@@ -12,7 +12,7 @@ import argparse, collections, json
 import numpy as np
 from src.utils.dataloader import *
 from src.graph import episode as W
-from src.analysis.mechanism.reruns import rerun_files, fixed_part, MODEL, DS_ROOT
+from src.analysis.mechanism.slopes import rerun_files, fixed_part, MODEL, DS_ROOT
 
 # ---- f1: output tokens and price ------------------------------------------------------------------------------------------------------------------------
 

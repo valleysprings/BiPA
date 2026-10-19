@@ -10,12 +10,12 @@ appendix figure (analysis.mechanism.appc) used one run per side, so its total di
   B) per-run stability: the same terms for the run pairs k = 0, 1, 2 (skill rep k against seed rep k, single episodes per task).
   C) mean change per request of the fixed-prefix columns (system, tool_schemas, task, skill), skill minus seed, to show the prefix term is the skill text.
 
-Task set: Table 1's common task set (analysis.table1.mean_rows / geo), restricted to tasks with a usable graph episode (R >= 2, calls, positive history) and a
+Task set: Table 1's common task set (analysis.main.mean_rows / geo), restricted to tasks with a usable graph episode (R >= 2, calls, positive history) and a
 verified outcome with N, X known in all three runs of both sides. Dropped tasks are counted with their reason.
 No BACH, no model calls. Runs: native-20261008-https + test-reps rep 1/2 (skills), native-seed run + rep-1/rep-2 (seed), as Table 1.
 
 Commands (from bipa):           .venv/bin/python -m src.analysis.mech.attribution compute   -> assets/cache/analysis/mech/attribution.json
-                                python3 -m src.analysis.mech.attribution draw -> fig/mech/mech_attribution3.{pdf,svg}, data/mech/mech_attribution3.md
+                                .venv/bin/python -m src.analysis.mech.attribution draw -> fig/mech/mech_attribution3.{pdf,svg}, data/mech/mech_attribution3.md
 """
 import argparse
 import json
@@ -26,6 +26,7 @@ import numpy as np
 from src.analysis import main as T
 from src.utils.dataloader import BENCHES, EX, SEED_TEXT, current_run, final_skill, vid
 from src.utils import fig, logger, dataloader
+from src.utils.fig import save_figure
 MODEL = "deepseek-flash"
 OPT = [("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"), ("GEPA", "gepa")]
 BENCH = [("tau3-bench", "tau3"), ("automationbench", "AutoB"), ("terminal-bench-2-1", "TB2")]
@@ -46,7 +47,7 @@ def run_files(method, bench):
 
 def load_runs(files):
     """{rep: {task: (Episode, metrics dict or None)}} for the graph episodes of each run file; also the per-run Table 1 rows."""
-    from src.analysis.mechanism.slopes_checks import metrics
+    from src.analysis.mechanism.slopes import metrics
     from src.graph import episode as W
     episodes = {}
     rows = {}
@@ -222,7 +223,7 @@ def draw_heatmap(cells):
     cb.outline.set_visible(False)
     cb.ax.tick_params(length=0)
     cb.set_label("change in log input tokens", fontsize=7)
-    fig.save_figure(fig, "attribution3")
+    save_figure(fig, "attribution3")
 
 
 def f(x, nd=3):
@@ -259,7 +260,7 @@ def record(cells):
              + "\n\n### Table 1 consistency (rho_trj)\n\n" + logger.md_table(["Skill", "Bench", "Table 1 rho (full common set)", "rho on used tasks (Table 1 rows)", "exp(total) of A"], rowsT)
              + "\n\n### Dropped tasks (Table 1 common set minus used)\n\n" + logger.md_table(["Skill", "Bench", "dropped", "reason"], rowsD))
     logger.write_record("attribution3", what, runs, agg, table,
-                    ".venv/bin/python -m src.analysis.mech.attribution compute\npython3 -m src.analysis.mech.attribution draw")
+                    ".venv/bin/python -m src.analysis.mech.attribution compute\n.venv/bin/python -m src.analysis.mech.attribution draw")
 
 
 def main():

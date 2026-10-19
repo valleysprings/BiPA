@@ -25,7 +25,7 @@ argmax over 7: E[announced gain] in points with a random baseline and with the b
 the run's own seed draw; and the MDE80 of a single-run comparison in points.
 
   .venv/bin/python -m src.analysis.mech.selection compute      -> assets/cache/analysis/mech/selection.json, data/mech/mech_selection.md, data/mech/mech_devsize.md
-  python3 -m src.analysis.mech.selection draw   -> fig/mech/mech_selection.{pdf,svg} (full width), fig/mech/mech_devsize.{pdf,svg} (one column)
+  .venv/bin/python -m src.analysis.mech.selection draw   -> fig/mech/mech_selection.{pdf,svg} (full width), fig/mech/mech_devsize.{pdf,svg} (one column)
 """
 import glob
 import json
@@ -36,6 +36,7 @@ from collections import defaultdict
 import numpy as np
 
 from src.utils import fig, logger, dataloader
+from src.utils.fig import save_figure
 EXECUTION = dataloader.H / "assets/artifacts/execution/deepseek-flash"
 RUN = "native-20261008-https"
 BENCHES = [("terminal-bench-2-1", "TB2"), ("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench")]
@@ -418,7 +419,7 @@ def record_selection(result):
         "evaluations of the seed, one row per distinct set of verified episodes (sorted by success).",
         "### Seed task model\n\n" + priors + "\n\n### The seed's dev draws and its test success\n\n" + t3 +
         "\n\n### Selection rules under no effect\n\n" + t1 + "\n\n### Accept-if-better on the dev panel (two single runs)\n\n" + t2,
-        ".venv/bin/python -m src.analysis.mech.selection compute\npython3 -m src.analysis.mech.selection draw")
+        ".venv/bin/python -m src.analysis.mech.selection compute\n.venv/bin/python -m src.analysis.mech.selection draw")
 
 
 def record_devsize(result):
@@ -445,7 +446,7 @@ def record_devsize(result):
         "comparison of two single runs. Random seed [20261012, benchmark index, prior index, 100 + size index].",
         logger.md_table(["bench", "prior", "dev size", "seed-draw quantile -> baseline", "SkillOpt E[gain] random (pts)", "SkillOpt E[gain] at quantile (pts)",
                     "GEPA E[gain] random (pts)", "GEPA E[gain] at quantile (pts)", "MDE80 (pts)", "critical net difference (tasks)"], rows),
-        ".venv/bin/python -m src.analysis.mech.selection compute\npython3 -m src.analysis.mech.selection draw")
+        ".venv/bin/python -m src.analysis.mech.selection compute\n.venv/bin/python -m src.analysis.mech.selection draw")
 
 
 def compute():
@@ -514,47 +515,49 @@ def draw_selection(result):
                Line2D([], [], color="0.1", lw=1.8, ls="-", marker="v", markersize=4.5, label="SkillOpt run's gain"),
                Line2D([], [], color="0.1", lw=1.8, ls="--", marker="D", markersize=4, label="GEPA run's gain")]
     fig.legend(handles=handles, loc="upper center", ncol=4, fontsize=7.5, frameon=False, bbox_to_anchor=(0.53, 1.0))
-    fig.save_figure(fig, "selection")
+    save_figure(fig, "selection")
 
 
 def draw_devsize(result):
-    """mech_devsize, one column (3.25 in): two rows, (a) the announced dev gain under no effect (points, random baseline) and (b) the MDE80 of a
-    single-run comparison (points), against the dev size (log axis), per benchmark (marker) for the fitted prior (solid) and the moderate prior
-    (dashed); in (a) SkillOpt's best of 4 dark, GEPA's argmax over 7 light.  A missing MDE80 point: no effect up to the panel size is detected
-    with probability 0.8.  The dev size of the Table 1 runs (30) is marked.  Every text >= 7 pt."""
+    """mech_devsize, one column (3.25 in), the plain-labels rendering (the version the paper uses, formerly mech/devsize_fig.py): two stacked
+    axes against the number of dev tasks (log axis), (a) the dev gain SkillOpt's rule (best of 4) and GEPA's rule (best of 7) announce when
+    every candidate is identical to the seed, and (b) the smallest gain one dev comparison detects with 80% power (MDE80), per benchmark
+    (marker) for the fitted task model (solid) and the flatter one (dashed).  A missing MDE80 point: no effect up to the dev-set size is
+    detected with probability 0.8.  The dev size of the Table 1 runs (30) is marked."""
     plt = style()
     from matplotlib.lines import Line2D
-    benches = (("terminal-bench-2-1", "TB2", "s"), ("tau3-bench", r"$\tau^3$", "o"), ("automationbench", "AutoB", "^"))
-    shades = {"SkillOpt": "0.15", "GEPA": "0.6"}
-    fig, axs = plt.subplots(2, 1, figsize=(3.25, 3.7), sharex=True)
-    fig.subplots_adjust(left=0.17, right=0.97, bottom=0.12, top=0.98, hspace=0.12)
-    sizes = list(DEV_SIZES)
+    benches = (("terminal-bench-2-1", "TB2", "s"), ("tau3-bench", r"$\tau^3$-bench", "o"), ("automationbench", "AutoBench", "^"))
+    rules = (("SkillOpt", "SkillOpt's rule (best of 4)", "0.15"), ("GEPA", "GEPA's rule (best of 7)", "0.6"))
+    priors = (("fitted", "-"), ("moderate", "--"))
+    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7,
+                         "axes.linewidth": 0.6})
+    fig, axs = plt.subplots(2, 1, figsize=(3.25, 2.75), sharex=True)
+    fig.subplots_adjust(left=0.19, right=0.97, bottom=0.13, top=0.985, hspace=0.12)
     for bench, _, marker in benches:
-        for prior, ls in (("fitted", "-"), ("moderate", "--")):
-            rows = [result[bench]["devsize"][prior][str(s)] for s in sizes]
-            for rule, _ in DEVSIZE_RULES:
-                axs[0].plot(sizes, [r[rule]["E_gain_random_points"] for r in rows], color=shades[rule], ls=ls, lw=1.0, marker=marker, markersize=3.5)
-            axs[1].plot(sizes, [r["MDE80_points"] for r in rows], color="0.15", ls=ls, lw=1.0, marker=marker, markersize=3.5)
+        for prior, ls in priors:
+            rows = [result[bench]["devsize"][prior][str(s)] for s in DEV_SIZES]
+            for rule, _, shade in rules:
+                axs[0].plot(DEV_SIZES, [r[rule]["E_gain_random_points"] for r in rows], color=shade, ls=ls, lw=1.0, marker=marker, markersize=3.5)
+            # a missing point: no gain up to the dev-set size is detected with probability 0.8
+            axs[1].plot(DEV_SIZES, [r["MDE80_points"] for r in rows], color="0.15", ls=ls, lw=1.0, marker=marker, markersize=3.5)
     for ax in axs:
         ax.axvline(30, color="0.75", lw=0.8, zorder=0)
         ax.set_xscale("log")
-        ax.set_xticks(sizes)
-        ax.set_xticklabels([str(s) for s in sizes])
+        ax.set_xticks(DEV_SIZES)
+        ax.set_xticklabels([str(s) for s in DEV_SIZES])
         ax.minorticks_off()
-        ax.tick_params(labelsize=7)
+        ax.tick_params(labelsize=7, length=2)
         ax.spines[["top", "right"]].set_visible(False)
-    axs[0].set_ylabel("(a) null-announced\ngain (points)", fontsize=7.5)
-    axs[1].set_ylabel("(b) MDE80 (points)", fontsize=7.5)
-    axs[1].set_xlabel("dev panel size (tasks); 30 = Table 1 runs", fontsize=7.5)
-    rule_handles = [Line2D([], [], color=shades["SkillOpt"], lw=1.2, label="SkillOpt, best of 4"),
-                    Line2D([], [], color=shades["GEPA"], lw=1.2, label="GEPA, argmax over 7"),
-                    Line2D([], [], color="0.3", lw=1.0, ls="-", label="fitted prior"),
-                    Line2D([], [], color="0.3", lw=1.0, ls="--", label="moderate prior")]
-    axs[0].legend(handles=rule_handles, loc="upper right", fontsize=7, frameon=False, handlelength=1.8, borderaxespad=0.1)
+    axs[0].set_ylabel("(a) gain announced for\nunchanged candidates (pts)", fontsize=7)
+    axs[1].set_ylabel("(b) smallest gain one dev\ncomparison detects (pts)", fontsize=7)
+    axs[1].set_xlabel("dev tasks (30 in our runs)", fontsize=7)
+    rule_handles = [Line2D([], [], color=shade, lw=1.2, label=label) for _, label, shade in rules]
+    prior_handles = [Line2D([], [], color="0.3", lw=1.0, ls="-", label="fitted task model"),
+                     Line2D([], [], color="0.3", lw=1.0, ls="--", label="flatter task model")]
+    axs[0].legend(handles=rule_handles + prior_handles, loc="upper right", fontsize=6.5, frameon=False, handlelength=1.8, borderaxespad=0.1)
     bench_handles = [Line2D([], [], color="0.3", lw=0, marker=m, markersize=4, label=d) for _, d, m in benches]
-    axs[1].legend(handles=bench_handles, loc="upper right", fontsize=7, frameon=False, ncol=3, columnspacing=0.8, handletextpad=0.3,
-                  borderaxespad=0.1)
-    fig.save_figure(fig, "devsize")
+    axs[1].legend(handles=bench_handles, loc="upper right", fontsize=6.5, frameon=False, ncol=3, columnspacing=0.8, handletextpad=0.3, borderaxespad=0.1)
+    save_figure(fig, "devsize")
 
 
 def draw():

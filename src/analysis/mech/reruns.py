@@ -3,12 +3,13 @@ Data (needs .venv): the seed's three test runs and each baseline's three test ex
 input-token ratio against the pooled seed; appb's own frozen-value asserts run unchanged. PINS is copied without the BACH entries and appb's cache directory is
 redirected to assets/cache/analysis/mech/ (appb.py itself is not edited).
   .venv/bin/python -m src.analysis.mech.reruns compute
-  python3 -m src.analysis.mech.reruns draw"""
+  .venv/bin/python -m src.analysis.mech.reruns draw"""
 import json
 import sys
 import numpy as np
 from src.analysis.mechanism import appb
 from src.utils import fig, logger, dataloader
+from src.utils.fig import save_figure
 def patch_appb():
     """Point appb at the baseline-only pins and the mech cache directory."""
     pins = {}
@@ -85,7 +86,7 @@ def draw_reruns(plt, d):
     labels = [labels[i] for i in order]
     fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.54, 1.0), frameon=False, fontsize=7, ncol=6,
                handlelength=1.0, columnspacing=0.8, handletextpad=0.3)
-    fig.save_figure(fig, "reruns")
+    save_figure(fig, "reruns")
 
 
 def check_against_record(d):
@@ -130,7 +131,7 @@ def draw():
         "DeepSeek-V4.1-Flash in OpenCode; seed = native-seed/<bench>/native-20261003-trace-final plus rep-1 and rep-2; optimizers = <method>/<bench>/native-20261008-https (its own test evaluation) plus test-reps/<bench>__<method>__native-20261008-https rep 1/2. Test split, three executions per skill.",
         "Per-run success = mean over the common task set; rho = per-task geometric mean ratio of input tokens against the per-task geometric mean over the seed's three runs; pooled ratio pools the skill's own three runs the same way (mechanism/pooled.py). appb.py frozen-value asserts on the baseline cells ran unchanged.",
         table,
-        ".venv/bin/python -m src.analysis.mech.reruns compute\npython3 -m src.analysis.mech.reruns draw",
+        ".venv/bin/python -m src.analysis.mech.reruns compute\n.venv/bin/python -m src.analysis.mech.reruns draw",
         "Numbers: assets/cache/analysis/mech/reruns.json. Figure: paper/assets/fig/mech/mech_reruns.pdf/.svg. Drawing patch: appb.PINS copied without the BACH entries, appb.out_dir redirected to the mech cache, legend without BACH (ncol 3).")
     print("equal to appB_reruns.md:", allok)
     for r in rows:

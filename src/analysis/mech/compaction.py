@@ -19,7 +19,7 @@ each side; rho = geometric mean over tasks of Xbar'_skill / Xbar'_seed, the same
 (task fixed effects) slope of log X' on log R pooled over the six episodes of every task of the cell. At k = inf rho equals Table 1's rho_trj on these tasks.
 
 Commands (from bipa):           .venv/bin/python -m src.analysis.mech.compaction compute  -> assets/cache/analysis/mech/compaction.json
-                               python3 -m src.analysis.mech.compaction draw -> fig/mech/mech_compaction.{pdf,svg}, data/mech/mech_compaction.md
+                               .venv/bin/python -m src.analysis.mech.compaction draw -> fig/mech/mech_compaction.{pdf,svg}, data/mech/mech_compaction.md
 """
 import argparse
 import json
@@ -30,6 +30,7 @@ import numpy as np
 from src.analysis import main as T
 from src.analysis.mech import attribution as A
 from src.utils import fig, logger, dataloader
+from src.utils.fig import save_figure
 WINDOWS = [1, 3, 5, 10, None]               # None = infinity
 CAPS = [8000, 32000, 64000, 128000, None]   # None = infinity
 
@@ -188,7 +189,7 @@ def draw(cells):
     fig.legend(handles, ["as recorded", "last turn only", "turn ratio"], loc="lower center", bbox_to_anchor=(0.6, -0.005), ncol=3, frameon=False,
                fontsize=7, handlelength=1.0, columnspacing=1.0, handletextpad=0.3)
     ax.annotate("input-token ratio to the seed", xy=(0.5, -0.1), xycoords="axes fraction", ha="center", va="top", fontsize=7)
-    fig.save_figure(fig, "compaction")
+    save_figure(fig, "compaction")
 
 
 def fmt(x, nd=3):
@@ -226,7 +227,7 @@ def record(cells):
            "rho = geometric mean over tasks of skill / seed with the same policy on both sides; rho_turns the same on turn counts R (graph requests); slope = within-task (task fixed effects) slope of log X' on log R pooled over the "
            "six episodes of each task. Window inf and cap inf are the recorded run (rho = Table 1 rho_trj on these tasks, up to the graph-episode input sum: SkillOpt TB2 1.423 vs 1.429, GEPA TB2 1.290 on 17 of 18 tasks vs 1.338). "
            "Caution on log rho / log rho_turns: it is unstable where rho_turns is near 1 (SkillOpt tau3); the robust reading is the gap rho - rho_turns and the slope.")
-    logger.write_record("compaction", what, runs, agg, "\n\n".join(sections), ".venv/bin/python -m src.analysis.mech.compaction compute\npython3 -m src.analysis.mech.compaction draw")
+    logger.write_record("compaction", what, runs, agg, "\n\n".join(sections), ".venv/bin/python -m src.analysis.mech.compaction compute\n.venv/bin/python -m src.analysis.mech.compaction draw")
 
 
 def main():

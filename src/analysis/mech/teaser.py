@@ -3,12 +3,13 @@ One AutoBench test task (casestudy.teaser.PIN, finance-vendor-payment-approval) 
 episode (turns -> tool calls -> component boxes, exposure edges = input tokens of a component re-sent in later turns), plus panel (c): the four-term attribution of the change in log
 input tokens of this one task pair (more actions, turn-splitting, content per turn, skill text, measured total) with exactly the per-task computation of mechanism/appc.py compute_attr.
   .venv/bin/python -m src.analysis.mech.teaser compute      -> assets/cache/analysis/mech/teaser.json
-  python3 -m src.analysis.mech.teaser draw                -> paper/assets/fig/mech/mech_teaser.pdf/.svg and data/mech/mech_teaser.md"""
+  .venv/bin/python -m src.analysis.mech.teaser draw                -> paper/assets/fig/mech/mech_teaser.pdf/.svg and data/mech/mech_teaser.md"""
 import json
 import math
 import sys
 import numpy as np
 from src.utils import fig, logger, dataloader
+from src.utils.fig import save_figure
 # constants copied from bach-harness/src/analysis/casestudy/teaser.py (the casestudy package is not part of bipa)
 BENCH, MODEL = "automationbench", "deepseek-flash"
 GROUPS = ["skill", "bash", "read", "other"]
@@ -35,7 +36,7 @@ TERM_COLOR = {"more_actions": "#0072B2", "more_requests": "#E69F00", "longer_con
 def compute():
     """Load the seed and SkillOpt episodes of the pinned task, record per-panel numbers and the four-term attribution of the pair."""
     from src.utils import dataloader as C
-    from src.analysis.mechanism.slopes_checks import metrics
+    from src.analysis.mechanism.slopes import metrics
     from src.graph import episode as W
     seed_run = C.current_run("native-seed", MODEL, BENCH)
     so_run = C.DS / "skillopt" / BENCH / SKILLOPT_RUN
@@ -281,7 +282,7 @@ def draw():
     ratio = P["skillopt"]["X"] / P["seed"]["X"]
     ax.text(x_c + width_c / 2, FOOTER_Y, f"Same pass, \u00d7{ratio:.2f} tokens \u2014 paid in extra turns.", fontsize=8, fontweight="bold",
             ha="center", va="center", color=INK)
-    fig.save_figure(fig, "teaser")
+    save_figure(fig, "teaser")
     record(d)
 
 
@@ -313,7 +314,7 @@ def record(d):
         f"DeepSeek-V4.1-Flash in OpenCode, AutoBench test split. Seed: native-seed/automationbench/{d['runs']['seed']} (the run-0 test episode). SkillOpt: skillopt/automationbench/{d['runs']['skillopt']} (its own test evaluation). Task pinned to casestudy.teaser.PIN `{d['task']}`; both episodes pass. No BACH episode.",
         "Panel numbers are the single test episode of each skill (groups skill, bash, read / grep, other context as in casestudy/teaser.py; turn spacing shared by (a) and (b); context edge width 1/9000 pt per token, minimum 0.15 pt, drawn only where the turn reads tokens of the component; one call arrow per (turn, tool group) pair). Panel (c) is the per-task body of mechanism/appc.py compute_attr: terms = k*dlogN, -k*(dlogN-dlogR), s_H*dlog h, s_F*dlog F with k = 1 + s_H R/(R-1) and s_F, R averaged over the two episodes; the measured total is log(X_SkillOpt/X_seed).",
         table,
-        ".venv/bin/python -m src.analysis.mech.teaser compute\npython3 -m src.analysis.mech.teaser draw",
+        ".venv/bin/python -m src.analysis.mech.teaser compute\n.venv/bin/python -m src.analysis.mech.teaser draw",
         "Numbers: assets/cache/analysis/mech/teaser.json.")
 
 
