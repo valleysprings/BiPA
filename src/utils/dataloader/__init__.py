@@ -1,4 +1,4 @@
-"""Shared data loading for the analyses: run paths, evaluation files, per-task rows, the optimizer registry, and the mech cache (CACHE, write_json)."""
+"""Shared data loading for the analyses: run paths, evaluation files, per-task rows, the optimizer registry, and the analysis cache (CACHE, write_json)."""
 import json, math, hashlib, re, os
 from pathlib import Path
 import numpy as np
@@ -120,10 +120,10 @@ def returned_skills(model, bench, names=OPTIMIZERS):
 DS = EX/"deepseek-flash"
 BN = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
 
-# ---- mech cache ----
-CACHE = H / "assets/cache/analysis/rq"
+# ---- analysis cache ----
+CACHE = H / "assets/cache/analysis/main"
 def write_json(name, obj):
-    """Write <name>.json under the mech cache dir (CACHE)."""
+    """Write <name>.json under the analysis cache dir (CACHE)."""
     CACHE.mkdir(parents=True, exist_ok=True)
     path = CACHE / f"{name}.json"
     path.write_text(json.dumps(obj, indent=1))

@@ -10,7 +10,7 @@
 #   bash scripts/analysis.sh audit native-run|trace|skill-history [args...]
 #
 # Cross-target cache dependencies (assets/cache/analysis/): rq2's paired figure
-# needs rq1's stats.json; rq3 needs rq2's appc/attr.json and rq/attribution.json;
+# needs rq1's stats.json; rq3 needs rq2's appc/attr.json and main/attribution.json;
 # cheatsheet (rq3) also needs rq4's dynamics.json and the executed transfer results;
 # mainfigs needs rq1-rq3. "all" runs rq1 rq2 rq4 rq3 mainfigs, satisfying every one.
 set -euo pipefail
@@ -31,80 +31,80 @@ need_manifest() {  # rq1's nullmodel/power are driven by the frozen submission m
 }
 
 table1() {  # Table 1 (both models) -> ../paper/assets/data/mech/mech_table1.md
-  "$PY" -m src.analysis.main
+  "$PY" -m src.analysis.main.table1
 }
 
 rq1() {  # the success gains do not hold
   need_manifest
-  "$PY" -m src.analysis.appendix.nullmodel --out "$CACHE/nullmodel"
-  "$PY" -m src.analysis.appendix.nullmodel power --out "$CACHE/power"
-  "$PY" -m src.analysis.appendix.appb compute
-  "$PY" -m src.analysis.appendix.stability pooled
-  "$PY" -m src.analysis.appendix.stability reproducibility
-  "$PY" -m src.analysis.rq1.stats
-  "$PY" -m src.analysis.rq1.selection compute
-  "$PY" -m src.analysis.rq1.selection records
-  "$PY" -m src.analysis.rq1.domains
-  "$PY" -m src.analysis.rq1.reruns compute
-  "$PY" -m src.analysis.appendix.appb draw
-  "$PY" -m src.analysis.rq1.selection draw
-  "$PY" -m src.analysis.rq1.reruns draw
-  "$PY" -m src.analysis.rq1.stats devtest
-  "$PY" -m src.analysis.rq1.domains draw
+  "$PY" -m src.analysis.aux.nullmodel --out "$CACHE/nullmodel"
+  "$PY" -m src.analysis.aux.nullmodel power --out "$CACHE/power"
+  "$PY" -m src.analysis.aux.appb compute
+  "$PY" -m src.analysis.aux.stability pooled
+  "$PY" -m src.analysis.aux.stability reproducibility
+  "$PY" -m src.analysis.main.stats
+  "$PY" -m src.analysis.main.selection compute
+  "$PY" -m src.analysis.main.selection records
+  "$PY" -m src.analysis.main.domains
+  "$PY" -m src.analysis.main.reruns compute
+  "$PY" -m src.analysis.aux.appb draw
+  "$PY" -m src.analysis.main.selection draw
+  "$PY" -m src.analysis.main.reruns draw
+  "$PY" -m src.analysis.main.stats devtest
+  "$PY" -m src.analysis.main.domains draw
 }
 
 rq2() {  # every learned skill levies a token tax (the paired figure needs rq1's stats.json)
-  "$PY" -m src.analysis.appendix.appc compute
-  "$PY" -m src.analysis.appendix.slopes checks
-  "$PY" -m src.analysis.appendix.slopes
-  "$PY" -m src.analysis.appendix.pricing
-  "$PY" -m src.analysis.appendix.slopes reruns
-  "$PY" -m src.analysis.appendix.optcost
-  "$PY" -m src.analysis.appendix.facts
-  "$PY" -m src.analysis.rq2.attribution compute
-  "$PY" -m src.analysis.rq2.slopes compute
-  "$PY" -m src.analysis.rq2.failcost compute
-  "$PY" -m src.analysis.rq2.failcost record
-  "$PY" -m src.analysis.rq2.price
-  "$PY" -m src.analysis.rq2.compaction compute
-  "$PY" -m src.analysis.rq2.optcost
-  "$PY" -m src.analysis.rq2.attribution draw
-  "$PY" -m src.analysis.rq2.slopes draw
-  "$PY" -m src.analysis.rq2.slopes draw-input
-  "$PY" -m src.analysis.rq2.price draw
-  "$PY" -m src.analysis.rq2.compaction draw
-  "$PY" -m src.analysis.rq1.stats paired
+  "$PY" -m src.analysis.aux.appc compute
+  "$PY" -m src.analysis.aux.slopes checks
+  "$PY" -m src.analysis.aux.slopes
+  "$PY" -m src.analysis.aux.pricing
+  "$PY" -m src.analysis.aux.slopes reruns
+  "$PY" -m src.analysis.aux.optcost
+  "$PY" -m src.analysis.aux.facts
+  "$PY" -m src.analysis.main.attribution compute
+  "$PY" -m src.analysis.main.slopes compute
+  "$PY" -m src.analysis.main.failcost compute
+  "$PY" -m src.analysis.main.failcost record
+  "$PY" -m src.analysis.main.price
+  "$PY" -m src.analysis.main.compaction compute
+  "$PY" -m src.analysis.main.optcost
+  "$PY" -m src.analysis.main.attribution draw
+  "$PY" -m src.analysis.main.slopes draw
+  "$PY" -m src.analysis.main.slopes draw-input
+  "$PY" -m src.analysis.main.price draw
+  "$PY" -m src.analysis.main.compaction draw
+  "$PY" -m src.analysis.main.stats paired
 }
 
 rq4() {  # the findings generalize (offline analysis of the executed transfers)
-  "$PY" -m src.analysis.rq4.transfer
-  "$PY" -m src.analysis.rq4.dynamics
-  "$PY" -m src.analysis.rq4.transfer draw
-  "$PY" -m src.analysis.rq4.dynamics draw
+  "$PY" -m src.analysis.main.transfer
+  "$PY" -m src.analysis.main.dynamics
+  "$PY" -m src.analysis.main.transfer draw
+  "$PY" -m src.analysis.main.dynamics draw
 }
 
 rq3() {  # the optimizers accumulate procedure (needs rq2's caches; cheatsheet also rq4's)
-  "$PY" -m src.analysis.rq3.edges build
-  "$PY" -m src.analysis.rq3.edges
-  "$PY" -m src.analysis.rq3.edges holm
-  "$PY" -m src.analysis.rq3.skilltext compute
-  "$PY" -m src.analysis.rq3.skilltext record
-  "$PY" -m src.analysis.rq3.coder2
-  "$PY" -m src.analysis.rq3.callsperturn
-  "$PY" -m src.analysis.rq3.cheatsheet
-  "$PY" -m src.analysis.rq3.skilltext rules
-  "$PY" -m src.analysis.rq3.edges draw
-  "$PY" -m src.analysis.rq3.callsperturn draw
+  "$PY" -m src.analysis.main.edges build
+  "$PY" -m src.analysis.main.edges
+  "$PY" -m src.analysis.main.edges holm
+  "$PY" -m src.analysis.main.skilltext compute
+  "$PY" -m src.analysis.main.skilltext record
+  "$PY" -m src.analysis.main.coder2
+  "$PY" -m src.analysis.main.callsperturn
+  "$PY" -m src.analysis.main.cheatsheet
+  "$PY" -m src.analysis.main.skilltext rules
+  "$PY" -m src.analysis.main.edges draw
+  "$PY" -m src.analysis.main.callsperturn draw
 }
 
 mainfigs() {  # main-text figures: Fig. 1, Sec. 4.3, the Sec. 5 design evidence (needs rq1-rq3 caches)
-  "$PY" -m src.analysis.mainfigs.teaser compute
-  "$PY" -m src.analysis.mainfigs.design batching
-  "$PY" -m src.analysis.mainfigs.design designev
-  "$PY" -m src.analysis.mainfigs.design selrules
-  "$PY" -m src.analysis.mainfigs.teaser draw
-  "$PY" -m src.analysis.mainfigs.design draw
-  "$PY" -m src.analysis.rq3.skilltext skills
+  "$PY" -m src.analysis.main.teaser compute
+  "$PY" -m src.analysis.main.design batching
+  "$PY" -m src.analysis.main.design designev
+  "$PY" -m src.analysis.main.design selrules
+  "$PY" -m src.analysis.main.teaser draw
+  "$PY" -m src.analysis.main.design draw
+  "$PY" -m src.analysis.main.skilltext skills
 }
 
 refresh() {  # derived tables under assets/artifacts/results/ (skill export, main table, status)

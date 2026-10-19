@@ -1,4 +1,4 @@
-"""Figure output for the analyses: paper/assets/fig/mech target paths and save_figure (pdf + editable svg, png preview into the mech cache)."""
+"""Figure output for the analyses: paper/assets/fig/mech target paths and save_figure (pdf + editable svg, png preview into the analysis cache)."""
 from pathlib import Path
 
 from src.utils.dataloader import H, CACHE
@@ -9,7 +9,7 @@ OLD_FIG_DIRS = [FIG, FIG.parent]
 
 
 def save_figure(fig, name):
-    """Write paper/assets/fig/mech/mech_<name>.pdf and .svg (svg.fonttype none, text stays editable) and a png preview into the mech cache."""
+    """Write paper/assets/fig/mech/mech_<name>.pdf and .svg (svg.fonttype none, text stays editable) and a png preview into the analysis cache."""
     import matplotlib
     FIG.mkdir(parents=True, exist_ok=True)
     CACHE.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,674 @@
+"""Paired statistics behind paper 1's claims (kept in the repro package, not printed).
+
+Role: recompute from the raw evaluation.json files, for each benchmark and each of GEPA, SkillOpt, SkillAdam and No skill, the paired comparison against the Seed skill row.
+Data and task sets are IDENTICAL to Table 1: the loaders `rep_files`, `rows_of`, `mean_rows` and `geo` of analysis.main are reused, the runs are those of table1.compute
+(seed = native-seed run + rep-1/2; optimizers = native-20261008-https + test-reps), and the common task set is the one of table1.geo (verified outcome, N and X > 0 on both sides).
+
+Bare run computes; figure subcommands draw from the caches (absorbed from devtest_fig.py / paired_fig.py):
+  .venv/bin/python -m src.analysis.main.stats devtest   -> mech_devtest (reported dev gain against the test difference)
+  .venv/bin/python -m src.analysis.main.stats paired    -> mech_paired (the token tax under other aggregations)
+
+f) per-run sign agreement of the nine optimizer skills (run-k difference vs seed run k / seed mean, against the avg@3 sign).
+ g) dev-to-test shrinkage: dev gain announced by the SkillOpt / GEPA runs (tasks and points of the dev set) next to the test avg@3 difference.
+
+Outputs: assets/cache/analysis/main/stats.json and paper/assets/data/mech/mech_stats.md. Table 1 itself is never written (table1.record is not called).
+
+Sections of the result (per benchmark x method):
+ a) cost ratios for input tokens X, tool calls N and turns R: rho_geo (geometric mean of per-task ratios), rho_sum (ratio of sums of per-task means), 95% paired bootstrap
+    intervals over tasks (10,000 resamples, seed 20261012), share of tasks with ratio > 1, Wilcoxon signed-rank p on the per-task log ratios.
+ b) success: Q difference vs seed (avg@3, paired bootstrap over tasks), help / harm in rep units (d = method successes - seed successes over the runs of a task).
+    Success uses every run with a verified outcome (per_task_outcomes), so the task-mean dQ equals Table 1's dQ whenever each run covers the same tasks.
+ c) survivor-bias control: rho_geo on tasks both sides solve in every run, and on tasks both fail in every run.
+ d) per benchmark: seed headroom, seed run-to-run noise, and the minimum detectable effect (MDE) at 80% power, two-sided alpha 0.05.
+    MDE = (z_{0.975} + z_{0.80}) * sqrt(v / n), with v the variance of the per-task difference of the two success estimates and n the number of tasks.
+    Single run vs single run: v1 = mean over the three seed run pairs of mean_i (y_ia - y_ib)^2 (the per-task difference between two seed runs, centred at zero because both are the same skill).
+    avg@3 vs avg@3: v3 = v1 / 3 (each side averages three independent runs, so the run-noise variance of the difference drops by three).
+    The dev panel uses v1 with n = 30 / 30 / 9 (tau3 / AutoBench / TB2). Task-by-skill interaction is not in v, so these MDEs are lower bounds.
+"""
+import argparse
+import json
+import math
+import re
+
+import numpy as np
+from scipy import stats as sps
+
+from src.analysis.main import table1 as T
+from src.utils import fig, logger, dataloader
+from src.utils.logger import paperout as PO
+from src.utils.fig import save_figure
+from src.utils.dataloader import BENCHES, H, SEED_TEXT, current_run, final_skill, gmean, vid
+
+MODEL = "deepseek-flash"
+METHODS = (("No skill", "native-noseed"), ("GEPA", "gepa"), ("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"))
+METRICS = (("X", "input tokens"), ("N", "tool calls"), ("R", "turns"))
+DEV_SIZE = {"tau3-bench": 30, "automationbench": 30, "terminal-bench-2-1": 9}
+N_BOOT = 10000
+SEED = 20261012
+OUT = H / "assets/cache/analysis/main"
+RECORD = H / "paper/assets/data/mech/mech_stats.md"
+Z = sps.norm.ppf(0.975) + sps.norm.ppf(0.80)
+
+
+def per_task_runs(reps):
+    """{task: [run rows]} over the runs {rep: file} of one skill, exactly the rows Table 1 averages (verified outcome and N, X known); R = number of distinct requests."""
+    per = {}
+    for _, f in sorted(reps.items()):
+        for (task, _), row in T.rows_of(f).items():
+            if row["success"] is None or row["N"] is None or row["X"] is None:
+                continue
+            per.setdefault(task, []).append(dict(row, R=row["nreq"]))
+    return per
+
+
+def per_task_outcomes(reps):
+    """{task: [bool per run]} over every run with a verified outcome, whether or not its N and X are known.
+    The success statistics (b) use these outcomes: per_task_runs also drops a run whose N or X is missing (needed for the cost ratios only),
+    which silently removed successes/failures from the per-task success mean and made dQ (task mean) disagree with Table 1's Q."""
+    per = {}
+    for _, f in sorted(reps.items()):
+        for (task, _), row in T.rows_of(f).items():
+            if row["success"] is None:
+                continue
+            per.setdefault(task, []).append(row["success"] is True)
+    return per
+
+
+def task_means(per):
+    """{task: {S: success rate, N, X, R: mean over runs}}."""
+    out = {}
+    for task, runs in per.items():
+        out[task] = {k: float(np.mean([r[k] if k != "S" else float(r["success"] is True) for r in runs])) for k in ("S", "N", "X", "R")}
+    return out
+
+
+def common_tasks(ref, own):
+    """Table 1's common task set: both sides present and N, X > 0 on the per-task means."""
+    keep = []
+    for task in sorted(ref):
+        if task not in own:
+            continue
+        values = (ref[task]["N"], ref[task]["X"], own[task]["N"], own[task]["X"])
+        if all(v > 0 for v in values):
+            keep.append(task)
+    return keep
+
+
+def boot_idx(n, rng):
+    """(N_BOOT, n) resample indices."""
+    return rng.integers(0, n, size=(N_BOOT, n))
+
+
+def ratio_block(ref, own, tasks, key, rng):
+    """rho_geo, rho_sum with 95% paired bootstrap intervals, share of tasks above 1, Wilcoxon p on log ratios."""
+    a = np.array([own[t][key] for t in tasks])
+    b = np.array([ref[t][key] for t in tasks])
+    logs = np.log(a / b)
+    idx = boot_idx(len(tasks), rng)
+    geo_boot = np.exp(logs[idx].mean(axis=1))
+    sum_boot = a[idx].sum(axis=1) / b[idx].sum(axis=1)
+    if np.all(logs == 0):
+        p = 1.0
+    else:
+        p = float(sps.wilcoxon(logs).pvalue)
+    return {
+        "n": len(tasks),
+        "rho_geo": float(np.exp(logs.mean())),
+        "rho_geo_ci": [float(x) for x in np.percentile(geo_boot, [2.5, 97.5])],
+        "rho_sum": float(a.sum() / b.sum()),
+        "rho_sum_ci": [float(x) for x in np.percentile(sum_boot, [2.5, 97.5])],
+        "share_gt1": float(np.mean(a / b > 1)),
+        "wilcoxon_p": p,
+    }
+
+
+def geo_ci(ref, own, tasks, key, rng):
+    """rho_geo and its bootstrap interval on a task subset (survivor control)."""
+    if len(tasks) == 0:
+        return {"n": 0, "rho_geo": None, "rho_geo_ci": None}
+    logs = np.log(np.array([own[t][key] / ref[t][key] for t in tasks]))
+    boot = np.exp(logs[boot_idx(len(tasks), rng)].mean(axis=1))
+    return {"n": len(tasks), "rho_geo": float(np.exp(logs.mean())), "rho_geo_ci": [float(x) for x in np.percentile(boot, [2.5, 97.5])]}
+
+
+def wins(runs):
+    """Number of successful runs of a task."""
+    return sum(r["success"] is True for r in runs)
+
+
+def success_block(out_ref, out_own, q_ref, q_own, rng):
+    """Q difference (Table 1 Q), paired bootstrap over tasks on per-task success rates, help / harm in rep units, survivor-style counts.
+    out_ref / out_own = per_task_outcomes (all runs with a verified outcome)."""
+    tasks = sorted(set(out_ref) & set(out_own))
+    s_ref = np.array([np.mean(out_ref[t]) for t in tasks])
+    s_own = np.array([np.mean(out_own[t]) for t in tasks])
+    diff = s_own - s_ref
+    boot = 100 * diff[boot_idx(len(tasks), rng)].mean(axis=1)
+    d = np.array([sum(out_own[t]) - sum(out_ref[t]) for t in tasks])
+    full_ref = np.array([sum(out_ref[t]) == len(out_ref[t]) == 3 for t in tasks])
+    zero_ref = np.array([sum(out_ref[t]) == 0 and len(out_ref[t]) == 3 for t in tasks])
+    wins_own = np.array([sum(out_own[t]) for t in tasks])
+    return {
+        "n_tasks": len(tasks),
+        "Q_own": q_own,
+        "Q_seed": q_ref,
+        "dQ_table1": q_own - q_ref,
+        "dQ_task_mean": float(100 * diff.mean()),
+        "dQ_ci": [float(x) for x in np.percentile(boot, [2.5, 97.5])],
+        "help_reps": int(d[d > 0].sum()),
+        "harm_reps": int(d[d < 0].sum()),
+        "net_reps": int(d.sum()),
+        "tasks_helped": int((d > 0).sum()),
+        "tasks_harmed": int((d < 0).sum()),
+        "seed_3of3_tasks": int(full_ref.sum()),
+        "harm_reps_on_seed_3of3": int(d[full_ref & (d < 0)].sum()),
+        "tasks_harmed_on_seed_3of3": int((full_ref & (d < 0)).sum()),
+        "seed_0of3_tasks": int(zero_ref.sum()),
+        "seed_0of3_solved_ge1": int((zero_ref & (wins_own >= 1)).sum()),
+        "seed_0of3_reps_won": int(wins_own[zero_ref].sum()),
+    }
+
+
+def sign(x, tol=1e-9):
+    """-1, 0, +1 with a tolerance for float noise."""
+    return 0 if abs(x) < tol else (1 if x > 0 else -1)
+
+
+def sign_agreement(res):
+    """Per-run sign agreement for the nine optimizer skills (GEPA, SkillOpt, SkillAdam x 3 benchmarks): the sign of (skill run-k Q - seed run-k Q),
+    and of (skill run-k Q - seed 3-run mean Q), against the sign of the avg@3 difference (Table 1 dQ). Disagreement = opposite non-zero sign; tie = per-run difference exactly 0 while avg@3 is not."""
+    rows = []
+    for b in BENCHES:
+        seed_runs = res[b]["seed_run_Q"]
+        seed_mean = float(np.mean(seed_runs))
+        for name, _ in METHODS[1:]:
+            m = res[b]["methods"][name]
+            avg_sign = sign(m["success"]["dQ_table1"])
+            for k, q in enumerate(m["run_Q"]):
+                d_run = q - seed_runs[k]
+                d_mean = q - seed_mean
+                rows.append({"bench": b, "method": name, "k": k, "avg3_dQ": m["success"]["dQ_table1"], "d_vs_seed_run_k": d_run, "d_vs_seed_mean": d_mean,
+                             "sign_avg3": avg_sign, "sign_run_k": sign(d_run), "sign_mean": sign(d_mean)})
+    summary = {}
+    for k in range(3):
+        sel = [r for r in rows if r["k"] == k]
+        summary[str(k)] = {
+            "n": len(sel),
+            "disagree_vs_seed_run_k": sum(r["sign_run_k"] * r["sign_avg3"] == -1 for r in sel),
+            "tie_vs_seed_run_k": sum(r["sign_run_k"] == 0 and r["sign_avg3"] != 0 for r in sel),
+            "disagree_vs_seed_mean": sum(r["sign_mean"] * r["sign_avg3"] == -1 for r in sel),
+            "tie_vs_seed_mean": sum(r["sign_mean"] == 0 and r["sign_avg3"] != 0 for r in sel),
+        }
+    return rows, summary
+
+
+def dev_to_test(res):
+    """Dev gain announced by the run (SkillOpt: best_selection_hard - baseline_selection_hard; GEPA: val_scores[best_idx] - val_scores[0]) in tasks and points of the dev set,
+    next to the test avg@3 difference (Table 1 dQ) and the run's own announced test number."""
+    rows = []
+    for b in BENCHES:
+        size = DEV_SIZE[b]
+        for name, m in METHODS[1:3]:
+            run = current_run(m, MODEL, b)
+            extra = json.loads((run / "summary.json").read_text())["extra"]
+            if m == "skillopt":
+                base, best = extra["baseline_selection_hard"], extra["best_selection_hard"]
+            else:
+                base, best = extra["val_scores"][0], extra["val_scores"][extra["best_idx"]]
+            gain = best - base
+            rows.append({"bench": b, "method": name, "dev_size": size, "dev_seed": base, "dev_selected": best, "dev_gain_tasks": gain * size, "dev_gain_pts": 100 * gain,
+                         "test_dQ_avg3": res[b]["methods"][name]["success"]["dQ_table1"]})
+    return rows
+
+
+def survivor_block(ref, own, per_ref, per_own, tasks, rng):
+    """rho_geo restricted to tasks both sides solve in every run, and tasks both fail in every run."""
+    both_win, both_fail = [], []
+    for t in tasks:
+        wr, wo = wins(per_ref[t]), wins(per_own[t])
+        if wr == len(per_ref[t]) == 3 and wo == len(per_own[t]) == 3:
+            both_win.append(t)
+        if wr == 0 and wo == 0 and len(per_ref[t]) == 3 and len(per_own[t]) == 3:
+            both_fail.append(t)
+    out = {}
+    for label, subset in (("both_solve_all", both_win), ("both_fail_all", both_fail)):
+        out[label] = {key: geo_ci(ref, own, subset, key, rng) for key, _ in METRICS}
+    return out
+
+
+def seed_block(per_ref, ref, tasks):
+    """Seed headroom, seed run-to-run noise, MDE."""
+    runs3 = [t for t in sorted(per_ref) if len(per_ref[t]) == 3]
+    counts = [wins(per_ref[t]) for t in runs3]
+    head = {"n_tasks": len(runs3), "zero": counts.count(0), "one_two": counts.count(1) + counts.count(2), "three": counts.count(3)}
+    # per-task SD of log X over the 3 runs
+    sd = np.array([np.std(np.log([r["X"] for r in per_ref[t]]), ddof=1) for t in runs3])
+    sd_calls = np.array([np.std(np.log([r["N"] for r in per_ref[t]]), ddof=1) for t in runs3 if all(r["N"] > 0 for r in per_ref[t])])
+    # run-level geometric means over tasks with all three runs, pairwise max ratio
+    gm = []
+    for i in range(3):
+        gm.append(float(np.exp(np.mean([math.log(per_ref[t][i]["X"]) for t in runs3]))))
+    pair_ratios = [max(gm[i], gm[j]) / min(gm[i], gm[j]) for i in range(3) for j in range(i + 1, 3)]
+    # success noise between seed runs
+    y = np.array([[float(r["success"] is True) for r in per_ref[t]] for t in runs3])
+    v1 = float(np.mean([np.mean((y[:, i] - y[:, j]) ** 2) for i in range(3) for j in range(i + 1, 3)]))
+    v3 = v1 / 3
+    n = len(runs3)
+    return {
+        "headroom": head,
+        "sd_logX_mean": float(sd.mean()),
+        "sd_logX_median": float(np.median(sd)),
+        "sd_logN_mean": float(sd_calls.mean()),
+        "run_geomean_X": gm,
+        "pairwise_max_ratio_X": float(max(pair_ratios)),
+        "run_success_pct": [float(100 * y[:, i].mean()) for i in range(3)],
+        "var_diff_single_run": v1,
+        "var_diff_avg3": v3,
+        "n_test_tasks": n,
+        "mde_avg3_pts": float(100 * Z * math.sqrt(v3 / n)),
+        "dev_size": None,
+        "mde_dev_single_pts": None,
+    }
+
+
+def compute():
+    """All numbers, {bench: {...}}."""
+    rng = np.random.default_rng(SEED)
+    res = {}
+    for bench in BENCHES:
+        seed_run = current_run("native-seed", MODEL, bench)
+        seed_dirs = [seed_run, seed_run.parent / "rep-1", seed_run.parent / "rep-2"]
+        seed_reps = T.rep_files(seed_dirs, vid(SEED_TEXT))
+        per_ref = per_task_runs(seed_reps)
+        out_ref = per_task_outcomes(seed_reps)
+        ref = task_means(per_ref)
+        cell = {"methods": {}, "runs": {"seed": {str(k): str(v) for k, v in seed_reps.items()}}}
+        # Table 1 Q of the seed row, same formula as table1.compute
+        seed_q = table1_q(seed_reps)
+        for name, m in METHODS:
+            run = current_run(m, MODEL, bench)
+            text = final_skill(m, run)
+            reps = T.rep_files([run, T.EX / MODEL / "test-reps" / f"{bench}__{m}__{run.name}"], vid(text))
+            per_own = per_task_runs(reps)
+            own = task_means(per_own)
+            tasks = common_tasks(ref, own)
+            q_own = table1_q(reps)
+            block = {
+                "run": run.name,
+                "files": {str(k): str(v) for k, v in sorted(reps.items())},
+                "n_common": len(tasks),
+                "run_Q": run_q(reps),
+                "ratios": {key: ratio_block(ref, own, tasks, key, rng) for key, _ in METRICS},
+                "success": success_block(out_ref, per_task_outcomes(reps), seed_q, q_own, rng),
+                "survivor": survivor_block(ref, own, per_ref, per_own, tasks, rng),
+            }
+            cell["methods"][name] = block
+            cell["runs"][name] = {str(k): str(v) for k, v in sorted(reps.items())}
+        sb = seed_block(per_ref, ref, None)
+        sb["dev_size"] = DEV_SIZE[bench]
+        sb["mde_dev_single_pts"] = float(100 * Z * math.sqrt(sb["var_diff_single_run"] / DEV_SIZE[bench]))
+        cell["seed"] = sb
+        cell["seed_Q"] = seed_q
+        cell["seed_run_Q"] = run_q(seed_reps)
+        res[bench] = cell
+    return res
+
+
+def run_q(reps):
+    """Q (percent) of every run separately, in repetition order."""
+    out = []
+    for _, f in sorted(reps.items()):
+        known = [r for r in T.rows_of(f).values() if r["success"] is not None]
+        out.append(100 * sum(r["success"] is True for r in known) / len(known))
+    return out
+
+
+def table1_q(reps):
+    """Q exactly as table1.compute: 100 * mean over runs of the success rate among tasks with a verified outcome."""
+    rates = []
+    for _, f in sorted(reps.items()):
+        known = [r for r in T.rows_of(f).values() if r["success"] is not None]
+        rates.append(sum(r["success"] is True for r in known) / len(known))
+    return 100 * sum(rates) / len(rates)
+
+
+def fmt_ci(v, d=2):
+    return f"[{v[0]:.{d}f}, {v[1]:.{d}f}]"
+
+
+def pfmt(p):
+    return f"{p:.1e}" if p < 0.001 else f"{p:.3f}"
+
+
+def markdown(res):
+    """Readable result tables."""
+    short = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
+    L = []
+    for key, label in METRICS:
+        L += [f"### a) {label} ({key}) vs the Seed skill row", "",
+              "rho_geo = geometric mean of per-task ratios (Table 1 for X and N); rho_sum = sum of per-task means / seed sum; intervals = paired bootstrap over tasks; >1 = share of tasks with ratio above 1; p = Wilcoxon signed-rank on per-task log ratios.", ""]
+        rows = []
+        for b in BENCHES:
+            for name, _ in METHODS:
+                r = res[b]["methods"][name]["ratios"][key]
+                rows.append([short[b], name, r["n"], f"{r['rho_geo']:.3f}", fmt_ci(r["rho_geo_ci"], 3), f"{r['rho_sum']:.3f}", fmt_ci(r["rho_sum_ci"], 3), f"{100 * r['share_gt1']:.0f}%", pfmt(r["wilcoxon_p"])])
+        L += [PO.mdtable(["Bench", "Method", "n", "rho_geo", "95% CI", "rho_sum", "95% CI", ">1", "p"], rows), ""]
+    L += ["### b) success vs the Seed skill row", "",
+          "Q = Table 1 avg@3; dQ CI = paired bootstrap over tasks of the per-task mean success difference; help / harm = sum of positive / negative per-task d (method wins - seed wins over the 3 runs, rep units); harm@3/3 = harm reps (tasks) on tasks the seed solves 3/3; 0/3 solved = tasks the seed solves 0/3 that the method solves at least once (of all seed 0/3 tasks).", ""]
+    rows = []
+    for b in BENCHES:
+        for name, _ in METHODS:
+            s = res[b]["methods"][name]["success"]
+            rows.append([short[b], name, s["n_tasks"], f"{s['Q_own']:.1f}", f"{s['Q_seed']:.1f}", f"{s['dQ_table1']:+.1f}", f"{s['dQ_task_mean']:+.1f}", fmt_ci(s["dQ_ci"], 1),
+                         f"+{s['help_reps']} / {s['harm_reps']}", f"{s['harm_reps_on_seed_3of3']} ({s['tasks_harmed_on_seed_3of3']} of {s['seed_3of3_tasks']})", f"{s['seed_0of3_solved_ge1']} of {s['seed_0of3_tasks']}"])
+    L += [PO.mdtable(["Bench", "Method", "n", "Q", "Q seed", "dQ (T1)", "dQ (task mean)", "95% CI", "help / harm reps", "harm@seed 3/3", "seed 0/3 solved >=1"], rows), ""]
+    L += ["### c) survivor-bias control: rho_geo on tasks both sides solve in all 3 runs / both fail in all 3 runs", "",
+          "Cells: rho_geo [95% CI] (n tasks).", ""]
+    rows = []
+    for b in BENCHES:
+        for name, _ in METHODS:
+            sv = res[b]["methods"][name]["survivor"]
+            row = [short[b], name]
+            for grp in ("both_solve_all", "both_fail_all"):
+                for key in ("X", "N", "R"):
+                    g = sv[grp][key]
+                    row.append("-" if g["rho_geo"] is None else f"{g['rho_geo']:.2f} {fmt_ci(g['rho_geo_ci'])} (n={g['n']})")
+            rows.append(row)
+    L += [PO.mdtable(["Bench", "Method", "solve: X", "solve: N", "solve: R", "fail: X", "fail: N", "fail: R"], rows), ""]
+    L += ["### d) Seed headroom, run-to-run noise and MDE", "",
+          "headroom = tasks with 3 runs by seed successes. SD = per-task SD of log input tokens over the 3 seed runs (mean / median). max ratio = largest pairwise ratio of the seed runs' task-geometric-mean input tokens. v1, v3 = variance of the per-task success difference between two seed runs (single run) and for avg@3 vs avg@3 (v1/3). MDE (pts) = (1.96 + 0.84) sqrt(v / n) * 100, 80% power, two-sided alpha 0.05.", ""]
+    rows = []
+    for b in BENCHES:
+        s = res[b]["seed"]
+        h = s["headroom"]
+        rows.append([short[b], f"{h['zero']} / {h['one_two']} / {h['three']} (of {h['n_tasks']})", f"{s['sd_logX_mean']:.3f} / {s['sd_logX_median']:.3f}", f"{s['pairwise_max_ratio_X']:.3f}",
+                     " / ".join(f"{x:.1f}" for x in s["run_success_pct"]), f"{s['var_diff_single_run']:.3f}", f"{s['var_diff_avg3']:.3f}", f"{s['mde_avg3_pts']:.1f} (n={s['n_test_tasks']})", f"{s['mde_dev_single_pts']:.1f} (n={s['dev_size']})"])
+    L += [PO.mdtable(["Bench", "seed 0/3 / 1-2/3 / 3/3", "SD log X mean / median", "max pairwise ratio", "seed run success %", "v1", "v3", "MDE avg@3 vs avg@3 (pts)", "MDE single-run dev (pts)"], rows), ""]
+    L += ["### e) Per-run Q (rep 0 / 1 / 2; rep 0 = the optimizer run's own first evaluation) and first-run gain vs the seed's rep 0", "",
+          "Q per run among tasks with a verified outcome; first-run dQ = rep-0 Q of the method - rep-0 Q of the seed; avg@3 dQ = Table 1.", ""]
+    rows = []
+    for b in BENCHES:
+        seed_runs = res[b]["seed_run_Q"]
+        rows.append([short[b], "Seed skill", " / ".join(f"{x:.1f}" for x in seed_runs), "-", "-"])
+        for name, _ in METHODS:
+            m = res[b]["methods"][name]
+            rq = m["run_Q"]
+            rows.append([short[b], name, " / ".join(f"{x:.1f}" for x in rq), f"{rq[0] - seed_runs[0]:+.1f}", f"{m['success']['dQ_table1']:+.1f}"])
+    L += [PO.mdtable(["Bench", "Method", "Q per run", "first-run dQ", "avg@3 dQ"], rows), ""]
+    sign_rows, sign_sum = res["_sign"]["rows"], res["_sign"]["summary"]
+    L += ["### f) Per-run sign agreement: does one run's difference to the seed have the sign of the avg@3 difference?", "",
+          "Nine skills (GEPA, SkillOpt, SkillAdam x 3 benchmarks). For run k: sign(skill run-k Q - seed run-k Q) and sign(skill run-k Q - seed 3-run mean Q) against sign(avg@3 dQ, Table 1). disagree = opposite sign; tie = per-run difference exactly 0 while avg@3 is not.", ""]
+    L += [PO.mdtable(["run k", "disagree vs seed run k", "tie vs seed run k", "disagree vs seed mean", "tie vs seed mean"],
+                     [[k, v["disagree_vs_seed_run_k"], v["tie_vs_seed_run_k"], v["disagree_vs_seed_mean"], v["tie_vs_seed_mean"]] for k, v in sign_sum.items()]), ""]
+    L += [PO.mdtable(["Bench", "Method", "avg@3 dQ", "run0 - seed run0", "run1 - seed run1", "run2 - seed run2", "run0 - seed mean", "run1 - seed mean", "run2 - seed mean"],
+                     [[short[b], name] + [f"{[r for r in sign_rows if r['bench'] == b and r['method'] == name][0]['avg3_dQ']:+.1f}"]
+                      + [f"{[r for r in sign_rows if r['bench'] == b and r['method'] == name and r['k'] == k][0]['d_vs_seed_run_k']:+.1f}" for k in range(3)]
+                      + [f"{[r for r in sign_rows if r['bench'] == b and r['method'] == name and r['k'] == k][0]['d_vs_seed_mean']:+.1f}" for k in range(3)]
+                      for b in BENCHES for name, _ in METHODS[1:]]), ""]
+    L += ["### g) Dev-to-test shrinkage (SkillOpt, GEPA)", "",
+          "Dev gain announced by the run: SkillOpt best_selection_hard - baseline_selection_hard; GEPA val_scores[best_idx] - val_scores[0] (seed). Tasks = gain x dev size (30 / 30 / 9); points = 100 x gain. Test dQ = avg@3 difference vs the seed row (Table 1).", ""]
+    L += [PO.mdtable(["Bench", "Method", "dev size", "dev seed", "dev selected", "dev gain (tasks)", "dev gain (pts)", "test dQ avg@3 (pts)"],
+                     [[short[r["bench"]], r["method"], r["dev_size"], f"{100 * r['dev_seed']:.1f}", f"{100 * r['dev_selected']:.1f}", f"{r['dev_gain_tasks']:+.1f}", f"{r['dev_gain_pts']:+.1f}", f"{r['test_dQ_avg3']:+.1f}"] for r in res["_dev"]]), ""]
+    return "\n".join(L)
+
+
+def check_table1(res):
+    """Compare Q, rho_trj, rho_inv of every method with the live table1.compute (same run selection) and return rows and the number of mismatches at print precision."""
+    t1 = T.compute()
+    rows = []
+    bad = 0
+    for b in BENCHES:
+        for name, _ in METHODS:
+            ref = t1[f"{MODEL}|{b}"][name]
+            mine = res[b]["methods"][name]
+            q_ok = f"{ref['Q']:.1f}" == f"{mine['success']['Q_own']:.1f}"
+            x_ok = f"{ref['rho_trj']:.2f}" == f"{mine['ratios']['X']['rho_geo']:.2f}" and abs(ref["rho_trj"] - mine["ratios"]["X"]["rho_geo"]) < 1e-9
+            n_ok = f"{ref['rho_inv']:.2f}" == f"{mine['ratios']['N']['rho_geo']:.2f}" and abs(ref["rho_inv"] - mine["ratios"]["N"]["rho_geo"]) < 1e-9
+            n_same = ref["n"] == mine["n_common"]
+            bad += (not q_ok) + (not x_ok) + (not n_ok) + (not n_same)
+            rows.append([b, name, f"{ref['Q']:.3f}", f"{mine['success']['Q_own']:.3f}", f"{ref['rho_trj']:.4f}", f"{mine['ratios']['X']['rho_geo']:.4f}", f"{ref['rho_inv']:.4f}", f"{mine['ratios']['N']['rho_geo']:.4f}", f"{ref['n']} / {mine['n_common']}", "ok" if (q_ok and x_ok and n_ok and n_same) else "MISMATCH"])
+    return rows, bad
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("figure", nargs="?", choices=["devtest", "paired"], help="draw mech_<figure> from the caches instead of computing")
+    args = ap.parse_args()
+    if args.figure == "devtest":
+        for r in devtest():
+            print(r)
+        return
+    if args.figure == "paired":
+        for r in paired():
+            print(r)
+        return
+    res = compute()
+    rows, bad = check_table1(res)
+    res["_table1_check"] = {"mismatches": bad}
+    sign_rows, sign_sum = sign_agreement(res)
+    res["_sign"] = {"rows": sign_rows, "summary": sign_sum}
+    res["_dev"] = dev_to_test(res)
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "stats.json").write_text(json.dumps(res, indent=1))
+    check = PO.mdtable(["Bench", "Method", "Q T1", "Q here", "rho_trj T1", "rho_trj here", "rho_inv T1", "rho_inv here", "n common T1 / here", "status"], rows)
+    raw = []
+    for b in BENCHES:
+        raw += list(res[b]["runs"]["seed"].values())
+        for name, _ in METHODS:
+            raw += list(res[b]["runs"][name].values())
+    when, _ = PO._when(sorted(set(raw)))
+    text = ["# mech_stats", "",
+            "Audit record, written by `bipa/src/analysis/main/stats.py`; rerunning it refreshes this file. Do not edit by hand.", "",
+            "## 1. What it shows", "",
+            "Paired statistics of the four comparison rows (No skill, GEPA, SkillOpt, SkillAdam) against the Seed skill row on DeepSeek-V4.1-Flash, per benchmark: cost ratios for input tokens, tool calls and turns (geometric mean and ratio of sums, bootstrap intervals, share above 1, Wilcoxon), success differences with help / harm counts, survivor-bias controls, seed headroom and noise, and minimum detectable effects. Kept in the repro package, not printed. Task sets and runs are those of Table 1 (`sec05_table1`).", "",
+            "## 2. Runs and aggregation", "",
+            "Per task the mean over the 3 runs of each side (seed: native-seed run + rep-1 + rep-2; methods: native-20261008-https + test-reps; No skill: its latest native-noseed run). Common task set = Table 1's (verified outcome, N and X > 0 on both sides). Bootstrap: 10,000 task resamples, numpy default_rng seed 20261012, percentile 95% intervals. Turns R = number of distinct requests of the episode.", "",
+            "## 3. Regenerate (from `/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bipa`)", "", "```", ".venv/bin/python -m src.analysis.main.stats", "```", "",
+            "## 4. Table 1 reproduction check", "", check, "", f"Mismatches: {bad}.", "",
+            "## 5. Numbers", "", markdown(res), "",
+            "## 6. When (underlying evaluation files)", "", when, ""]
+    RECORD.write_text("\n".join(text))
+    print("table1 mismatches:", bad)
+    print(RECORD)
+
+
+# ---- figures (absorbed from devtest_fig.py and paired_fig.py) ---------------------------------------------------------------------
+
+FIG_OC = {"SkillOpt": "#0072B2", "GEPA": "#009E73", "SkillAdam": "#D55E00"}
+FIG_MARK = {"SkillOpt": "o", "GEPA": "^", "SkillAdam": "s"}
+DEVTEST_BENCH = [("tau3-bench", r"$\tau^3$-bench", "tau3"), ("automationbench", "AutoBench", "AutoB"), ("terminal-bench-2-1", "TB2", "TB2")]
+DEVTEST_OPTS = ["GEPA", "SkillOpt"]          # optimizers that score the returned skill on the whole dev set
+DEVTEST_ROWS = ["GEPA", "SkillOpt", "SkillAdam"]
+PAIRED_BENCH = [("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench"), ("terminal-bench-2-1", "TB2")]
+PAIRED_METHODS = ["GEPA", "SkillOpt", "SkillAdam"]
+
+
+def null_gain_tasks():
+    """E[gain] under no effect, fitted prior, observed baseline, from mech_selection.md (tasks)."""
+    out = {}
+    for line in logger.DATA.joinpath("mech_selection.md").read_text().splitlines():
+        c = [x.strip() for x in line.strip().strip("|").split("|")]
+        if len(c) == 10 and c[1] == "fitted" and c[2] in DEVTEST_OPTS:
+            out[(c[0], c[2])] = float(c[7])
+    return out
+
+
+def mde_points():
+    """MDE avg@3 vs avg@3 (pts) per benchmark from mech_stats.md section d."""
+    out = {}
+    for line in logger.DATA.joinpath("mech_stats.md").read_text().splitlines():
+        c = [x.strip() for x in line.strip().strip("|").split("|")]
+        found = re.match(r"[\d.]+ \(n=", c[7]) if len(c) == 9 else None
+        if found and c[0] in ("tau3", "AutoB", "TB2"):
+            out[c[0]] = float(re.match(r"[\d.]+", c[7]).group())
+    return out
+
+
+def devtest():
+    """mech_devtest: the dev gain each optimizer reported against the test difference over three runs (nine learned skills, three
+    benchmarks).  Dumbbell chart: hollow marker = reported dev gain, filled marker = test avg@3 difference vs the seed, arrow dev -> test,
+    grey tick = gain that the selection rule alone reports under no effect (fitted prior), grey band = +/- detectable difference of a
+    paired avg@3 comparison.  SkillOpt and GEPA report the returned skill's gain on the whole dev set (observed baseline for the tick);
+    SkillAdam reports the sum of its accepted patches' gains, each on that iteration's dev subset (10 tasks, all 9 on TB2); its rows have
+    no tick, since its patches lose to their parent more often than identical patches would (its selection-alone replay is in
+    mech_selection.md).  Reads stats.json (_dev), selection.json and the two audit records."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
+    stats = json.loads((dataloader.CACHE / "stats.json").read_text())
+    dev = {(r["bench"], r["method"]): r for r in stats["_dev"]}
+    null = null_gain_tasks()
+    mde = mde_points()
+    sel = json.loads((dataloader.CACHE / "selection.json").read_text())
+    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
+                         "font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7})
+    fig, ax = plt.subplots(figsize=(3.25, 2.6))
+    fig.subplots_adjust(left=0.18, right=0.985, bottom=0.155, top=0.82)
+    step, gap = 0.68, 1.1
+    ylabels, yticks, rows = [], [], []
+    y = 0.0
+    xlo, xhi = -14, 44
+    for bkey, disp, short in DEVTEST_BENCH:
+        y0 = y
+        ax.add_patch(Rectangle((-mde[short], y0 - 0.42), 2 * mde[short], 2.35, fc="0.5", alpha=0.15, lw=0, zorder=0))
+        ax.text(xhi - 0.3, y0 - 0.38, disp, ha="right", va="center", fontweight="bold", fontsize=7)
+        y = y0 + 0.2
+        for o in DEVTEST_ROWS:
+            if o == "SkillAdam":
+                # SkillAdam reports the summed gains of its accepted patches, each on that iteration's dev subset; its patches lose to
+                # their parent more often than identical ones would, so its selection-alone replay (mech_selection.md) gets no tick here
+                d = sel[bkey]["observed"]["SkillAdam"]["reported_gain_points"]
+                t = stats[bkey]["methods"]["SkillAdam"]["success"]["dQ_table1"]
+                nl = None
+            else:
+                r = dev[(bkey, o)]
+                d, t = r["dev_gain_pts"], r["test_dQ_avg3"]
+                nl = null[(bkey, o)] / r["dev_size"] * 100
+            col, mk = FIG_OC[o], FIG_MARK[o]
+            if nl is not None:
+                ax.plot([nl, nl], [y - 0.22, y + 0.22], color="0.35", lw=1.6, zorder=2, solid_capstyle="butt")
+            ax.annotate("", xy=(t, y), xytext=(d, y), arrowprops=dict(arrowstyle="-|>", color=col, lw=0.9, shrinkA=3.5, shrinkB=3.5, mutation_scale=6), zorder=3)
+            ax.scatter([d], [y], s=26, marker=mk, facecolor="white", edgecolor=col, lw=1.0, zorder=4)
+            ax.scatter([t], [y], s=26, marker=mk, color=col, lw=0, zorder=5)
+            rows.append((disp, o, d, t, nl, mde[short]))
+            yticks.append(y)
+            ylabels.append(o)
+            y += step
+        y = y0 + 3 * step + gap - 0.6
+    ax.axvline(0, color="k", lw=0.6, zorder=1)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels)
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlim(xlo, xhi)
+    ax.set_ylim(y - gap + 0.35, -0.65)
+    ax.set_xlabel("success difference to the seed (points)")
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    h = [plt.Line2D([], [], marker="o", ls="", mfc="white", mec="0.25", ms=4.5),
+         plt.Line2D([], [], marker="o", ls="", color="0.25", ms=4.5),
+         plt.Line2D([], [], color="0.35", lw=1.6),
+         Rectangle((0, 0), 1, 1, fc="0.5", alpha=0.15, lw=0)]
+    lab = ["reported dev gain", "test difference (3 runs)", "dev gain from selection alone", "detectable difference"]
+    fig.legend(h, lab, loc="upper center", bbox_to_anchor=(0.58, 1.0), ncol=2, frameon=False, fontsize=7, handlelength=1.3,
+               columnspacing=0.9, handletextpad=0.4, labelspacing=0.3)
+    save_figure(fig, "devtest")
+    table = logger.md_table(["bench", "optimizer", "dev gain (pts)", "test difference (pts)", "selection-alone dev gain (pts)", "detectable difference (pts)"],
+                       [[a, b, f"{c:+.1f}", f"{d:+.1f}", "-" if e is None else f"{e:+.1f}", f"{f:.1f}"] for a, b, c, d, e, f in
+                        [(r[0].replace("$\\tau^3$", "tau3"), *r[1:]) for r in rows]])
+    logger.write_record("devtest", "Reported dev gain (hollow) against the test avg@3 difference vs the seed (filled) for the nine learned skills; SkillOpt and GEPA report the returned skill's gain on the whole dev set, SkillAdam the sum of its accepted patches' gains, each on that iteration's dev subset (10 tasks; all 9 on TB2). Grey tick = expected dev gain when selection alone acts (fitted prior, observed baseline, tasks / dev size; SkillOpt and GEPA only, SkillAdam's replay is in mech_selection.md); band = +/- detectable difference of a paired avg@3 comparison.",
+                   "Table 1 runs (native-20261008-https) and test reps, DeepSeek-V4.1-Flash; dev sizes 30 / 30 / 9.",
+                   "stats.json key _dev (dev_gain_pts, test_dQ_avg3); E[gain] column of mech_selection.md divided by dev size; selection.json observed.SkillAdam.reported_gain_points; MDE avg@3 vs avg@3 of mech_stats.md section d.",
+                   table, ".venv/bin/python -m src.analysis.main.stats devtest")
+    return rows
+
+
+def paired_collect():
+    """One dict per (benchmark, method) with the plotted numbers."""
+    stats = json.loads((dataloader.CACHE / "stats.json").read_text())
+    rows = []
+    for bench, disp in PAIRED_BENCH:
+        for name in PAIRED_METHODS:
+            m = stats[bench]["methods"][name]
+            x = m["ratios"]["X"]
+            sv = m["survivor"]
+            rows.append({"bench": disp, "method": name, "n": x["n"], "rho": x["rho_geo"], "total": x["rho_sum"], "share": x["share_gt1"],
+                         "solve": sv["both_solve_all"]["X"]["rho_geo"], "n_solve": sv["both_solve_all"]["X"]["n"],
+                         "fail": sv["both_fail_all"]["X"]["rho_geo"], "n_fail": sv["both_fail_all"]["X"]["n"]})
+    return rows
+
+
+def paired_draw():
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif", "STIXGeneral"], "mathtext.fontset": "stix",
+                         "font.size": 7, "axes.labelsize": 7, "xtick.labelsize": 7, "ytick.labelsize": 7})
+    rows = paired_collect()
+    fig, ax = plt.subplots(figsize=(4.5, 3.3))
+    fig.subplots_adjust(left=0.17, right=0.87, bottom=0.12, top=0.88)
+    XMAX = 1.62
+    ys, y = [], 0.0
+    for g in range(3):
+        y += 1.0
+        for _ in PAIRED_METHODS:
+            ys.append(y)
+            y += 1.0
+    header_y = [ys[3 * g] - 1.0 for g in range(3)]
+    ax.set_xlim(0.97, XMAX)
+    ax.set_ylim(y - 0.4, -0.2)
+    ax.axvline(1.0, color="0.15", lw=1.4, zorder=1)
+    ax.text(1.0, -0.35, "seed = 1", ha="center", va="bottom", fontsize=7, fontweight="bold", color="0.15")
+    for yy in header_y:
+        ax.axhspan(yy - 0.45, yy + 0.45, color="0.93", zorder=0, lw=0)
+    for r, yy in zip(rows, ys):
+        c, mk = FIG_OC[r["method"]], FIG_MARK[r["method"]]
+        ax.plot([1.0, r["rho"]], [yy, yy], color=c, lw=0.9, alpha=0.35, zorder=2)
+        ax.scatter(r["rho"], yy - 0.1, s=34, marker=mk, color=c, lw=0, zorder=5)
+        ax.scatter(r["total"], yy - 0.1, s=34, marker=mk, facecolor="white", edgecolor=c, lw=1.0, zorder=6)
+        ax.scatter(r["solve"], yy + 0.25, s=12, marker="D", color="0.35", lw=0, zorder=4)
+        if r["fail"] <= XMAX - 0.02:
+            ax.scatter(r["fail"], yy + 0.25, s=18, marker="x", color="0.35", lw=0.9, zorder=4)
+            if r["n_fail"] < 5:
+                ax.text(r["fail"] + 0.012, yy + 0.25, f"n={r['n_fail']}", fontsize=7, color="0.35", va="center", ha="left")
+        else:
+            ax.annotate("", xy=(XMAX - 0.005, yy + 0.25), xytext=(XMAX - 0.07, yy + 0.25),
+                        arrowprops=dict(arrowstyle="-|>", color="0.35", lw=0.9, mutation_scale=7), zorder=4)
+            ax.text(XMAX - 0.075, yy + 0.25, f"{r['fail']:.2f} (n={r['n_fail']})", fontsize=7, color="0.35", va="center", ha="right")
+        ax.text(1.02, yy, f"{100 * r['share']:.0f}%", transform=ax.get_yaxis_transform(), fontsize=7, va="center", ha="left")
+    for g, (_, disp) in enumerate(PAIRED_BENCH):
+        ax.text(-0.02, header_y[g], disp, transform=ax.get_yaxis_transform(), fontsize=7, fontweight="bold", ha="right", va="center")
+    ax.set_yticks(ys)
+    ax.set_yticklabels([r["method"] for r in rows])
+    ax.tick_params(axis="y", length=0, pad=3)
+    ax.set_xticks([1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6])
+    ax.set_xlabel("input-token ratio to the seed skill")
+    ax.text(1.02, 1.005, "share $>1$", transform=ax.transAxes, fontsize=7, va="bottom", ha="left")
+    for s in ("top", "right", "left"):
+        ax.spines[s].set_visible(False)
+    handles = [plt.Line2D([], [], marker="o", ls="", color="0.3", ms=4, label=r"$\rho$ (per-task geometric mean)"),
+               plt.Line2D([], [], marker="o", ls="", mfc="white", mec="0.3", ms=4, label="total tokens"),
+               plt.Line2D([], [], marker="D", ls="", color="0.25", ms=3.5, label="both solve (lower)"),
+               plt.Line2D([], [], marker="x", ls="", color="0.25", ms=4, label="both fail (lower)")]
+    fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.01, 1.0), frameon=False, ncol=4, fontsize=7, handletextpad=0.1, columnspacing=0.8)
+    return fig, rows
+
+
+def paired():
+    """mech_paired: appendix figure replacing the table "The token tax under other aggregations".  For each of the nine learned skills
+    (GEPA, SkillOpt, SkillAdam x three benchmarks) one row on a log axis of input-token ratio to the seed skill (line at 1): rho (per-task
+    geometric mean, filled marker), ratio of total input tokens (hollow), rho on tasks both sides solve in all runs (diamond), rho on tasks
+    both fail in all runs (x, with its task count when n < 5).  The share of tasks above 1 is a text column in the right margin."""
+    fig, rows = paired_draw()
+    save_figure(fig, "paired")
+    head = ["Bench", "Method", "n", "rho (geo)", "total tokens", "both solve (n)", "both fail (n)", "share > 1"]
+    table = logger.md_table(head, [[r["bench"], r["method"], r["n"], f"{r['rho']:.3f}", f"{r['total']:.3f}", f"{r['solve']:.3f} ({r['n_solve']})",
+                                f"{r['fail']:.3f} ({r['n_fail']})", f"{100 * r['share']:.0f}%"] for r in rows])
+    logger.write_record("paired", "Input-token ratio to the seed skill of the nine learned skills under four aggregations (geometric mean of per-task ratios, ratio of totals, "
+                   "tasks both solve in every run, tasks both fail in every run) and the share of tasks above 1. Appendix figure, 4.5 x 3.3 in; both-fail values beyond 1.6 are drawn as arrows with their value.",
+                   "Same runs and task sets as Table 1 (see mech_stats).", "As in mech_stats section 5a and 5c; the x marker is annotated with its task count when n < 5.",
+                   table, ".venv/bin/python -m src.analysis.main.stats paired")
+    return rows
+
+
+if __name__ == "__main__":
+    main()
