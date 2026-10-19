@@ -17,11 +17,31 @@ Skill optimizers report success alone, and a success score on a small dev set ca
 - **The optimizers accumulate procedure (RQ3).** 58 of 59 traceable edits lengthen the skill (654–2,447 words against the seed's 580); of 337 added rules, 52% verify and none asks the agent to read less; kept and rejected edits cost alike — the cost arrives with the proposals (Fig. 6b, 7d).
 - **The findings generalize (RQ4).** On GPT-6-Luna the pattern repeats (on TB2 all three optimizers return the seed unchanged); frozen skills carry their tax to an unseen benchmark (five of six transfers read 1.23–1.47× the seed's tokens) and to the second model (Table 1 lower panel, Tables 2–3, Fig. 16).
 
+## Implications for skill optimizer design
+
+- **Keep an edit only when its gain exceeds selection noise.** Keeping whatever wins one dev comparison keeps a candidate identical to its parent 24–42% of the time; confirming the win on a fresh draw cuts this to 6–17% while keeping 55–94% of edits that truly gain.
+- **Charge each edit for the extra turns it causes.** Skill length explains 10% of the variance in an edit's token change against 93% for turns, so compressing text saves at most the skill-text term of the split; objectives that charge the extra turns save more.
+- **Let the editor remove rules and write cheaper ones.** 58 of 59 traced edits only append; re-billing recorded episodes at the seed's calls per turn halves the tax — issue independent calls in one turn, and return from each call only what the next turn needs.
+- **Show the editor what its earlier rules cost.** 44 of 59 edits raise input tokens whether kept or rejected, and only 5 keep dev success at no extra tokens — the cost arrives with the proposals, so it has to reach the editor that writes them.
+
 ## How BiPA works
 
-A harness without compaction re-sends the prefix and the whole conversation at every turn, so an episode of R turns reads `X = R·F + R(R−1)/2·h` input tokens — each extra turn re-reads the whole history, and input tokens grow faster than turns.
+A harness without compaction re-sends the prefix and the whole conversation at every turn. With prefix F and a history growing h tokens per turn, an episode of R turns reads
 
-BiPA records each episode as a bipartite graph between its turns and a fixed set of context components (skill text, rest of the prompt, each tool's returned content), with two streams: what the model reads (input tokens) and what the harness executes (tool calls). The change in log input tokens between a skill and its seed splits into four behaviors: **more actions**, **turn-splitting**, **more content per turn**, **longer skill text**. Success is judged separately: avg@k test repetitions against the seed, plus a seed-replay control that applies the optimizer's own acceptance rule to candidates identical to the seed, isolating the dev gain selection alone reports.
+    X = R·F + R(R−1)/2 · h
+
+input tokens — each extra turn re-reads the whole history, so input tokens grow faster than turns: the turn elasticity `e_R = 1 + s_H·R/(R−1)` (s_H the history share of X) is always above 1 and approaches 2 in long episodes.
+
+BiPA records each episode as a bipartite graph between its turns and a fixed set of context components (skill text, rest of the prompt, each tool's returned content), with two streams: what the model reads (input tokens) and what the harness executes (tool calls). Cost is judged against the seed task by task, as the mean paired log-ratio of input tokens and its ratio ρ:
+
+    L(S) = (1/|I|) · Σ_i log( X̄_i(S) / X̄_i(S₀) ),    ρ = e^{L(S)}   (ρ > 1: a token tax)
+
+and with m = N/R calls per turn, the change splits into four behaviors, one term each:
+
+    Δlog X ≈ e_R·Δlog N  −  e_R·Δlog m  +  s_H·Δlog h  +  s_F·Δlog F
+             more actions    turn-splitting   content per turn   skill text
+
+Success is judged separately: avg@k test repetitions against the seed, plus a seed-replay control — each dev task's success probability is drawn from its Beta posterior `p_v|seed ~ Beta(a + s_v, b + n_v − s_v)` fitted to the seed's executions, candidates identical to the seed go through the optimizer's own acceptance rule, and the gain G₀ this keeps is what selection alone reports.
 
 The rolling agentic sandbox environments that training and evaluation live in are managed by our internal infrastructure. This repository holds the scheduler, the per-optimizer adapters to the upstream optimizer interfaces (documented `DEVIATIONS`; upstream search, edit and acceptance rules unchanged), the repeated evaluation, and the offline analysis and audit.
 
@@ -33,7 +53,7 @@ bipa/
 │   ├── run.py        # one optimization cell (the external entry)
 │   ├── core/         # launch, repeat, panels, traces, layout, config
 │   ├── adapters/     # per-optimizer interfaces (skillopt, skilladam, gepa)
-│   ├── analysis/     # table1.py (Table 1), mech/ and mechanism/ (RQ analyses)
+│   ├── analysis/     # main.py (Table 1), mech/ and mechanism/ (RQ analyses)
 │   ├── dynamics/     # transfer drivers, execution-evidence audits, status/refresh
 │   ├── graph/        # per-episode bipartite-graph metrics
 │   ├── utils/        # executor, llm, fig/, dataloader/, logger/ (audit records)
@@ -60,11 +80,11 @@ Run from the repo root; `python -m` resolves `src.*`. The scripts are thin shell
 ```bash
 # 1. train the three optimizers and the two controls, three benchmarks x two models
 bash scripts/baselines.sh suite deepseek-flash --execute
-#    one cell instead of the suite: baselines.sh run tau3 gpt-6-luna --arm skillopt
+#    one cell instead of the suite: baselines.sh run tau3 gpt-6-luna --method skillopt
 # 2. avg@3 repeated test evaluation of each condition's frozen final skill
-bash scripts/baselines.sh repeat tau3 deepseek-flash --arm skillopt --execute
+bash scripts/baselines.sh repeat tau3 deepseek-flash --method skillopt --execute
 # 3. Table 1 (both models) -> ../paper/assets/data/mech/mech_table1.md
-"$BASELINE_PYTHON" -m src.analysis.main
+bash scripts/analysis.sh table1
 ```
 
 A test slot that ran in all three repetitions but never got a verifier verdict scores 0 (`adjudicated_failures`, never retried); a slot with no episode evidence blocks the average (`src/core/repeat.py`).

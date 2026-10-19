@@ -26,7 +26,7 @@ def job(model, bench, arm, *, repeat=False, tag=None, slots=None, test_runs=None
         out = config.repetition_dir(run)
     else:
         argv = [str(BASELINE_ROOT / "run.py"), "--protocol", "native-v1", "--feedback-mode", "full",
-                "--arm", arm, "--benchmark", bench, "--model", model, "--harness", config.HARNESS,
+                "--method", arm, "--benchmark", bench, "--model", model, "--harness", config.HARNESS,
                 "--scale", scale, "--slots", str(slots), "--out", str(run),
                 "--cache-root", str(config.baseline_cache(model)), *base["args"]]
         if (run / "native_protocol.json").is_file():
@@ -73,9 +73,9 @@ def main(argv=None):
         command.add_argument("model", choices=tuple(config.CFG["models"]))
         if action == "suite":
             command.add_argument("--benches", nargs="+", default=list(config.BENCHMARKS))
-            command.add_argument("--arms", nargs="+", choices=ARMS, default=list(ARMS))
+            command.add_argument("--methods", dest="arms", nargs="+", choices=ARMS, default=list(ARMS))
         else:
-            command.add_argument("--arm", choices=ARMS, required=True)
+            command.add_argument("--method", dest="arm", choices=ARMS, required=True)
         command.add_argument("--tag")
         command.add_argument("--scale", default=config.CFG["scale"],
                              help="panel scale from configs/tasks.yaml (main, smoke, lodo-*)")

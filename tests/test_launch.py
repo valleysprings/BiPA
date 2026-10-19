@@ -10,7 +10,7 @@ def test_suite_schedules_repetitions_for_all_five_methods(tmp_path, monkeypatch)
     assert len(jobs) == 10
     for index, arm in enumerate(launch.ARMS):
         native, repeat = jobs[index * 2:index * 2 + 2]
-        assert native["command"][native["command"].index("--arm") + 1] == arm
+        assert native["command"][native["command"].index("--method") + 1] == arm
         assert native["out"] == Path(repeat["command"][repeat["command"].index("--run") + 1])
         assert repeat["command"][-3:] == ["--test-runs", "3", "--execute"]
         assert "bach-harness" not in " ".join(native["command"][2:])
@@ -19,7 +19,7 @@ def test_suite_schedules_repetitions_for_all_five_methods(tmp_path, monkeypatch)
 def test_default_preview_does_not_execute_or_create_outputs(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(launch.config, "EXECUTION", tmp_path)
     monkeypatch.setattr(launch.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("execution")))
-    launch.main(["run", "tau3", "gpt-6-luna", "--arm", "skillopt"])
+    launch.main(["run", "tau3", "gpt-6-luna", "--method", "skillopt"])
     assert "--protocol native-v1" in capsys.readouterr().out
     assert not list(tmp_path.iterdir())
 

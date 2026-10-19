@@ -1,10 +1,10 @@
-"""Run one arm on one cell and test its final skill.
+"""Run one method on one cell and test its final skill.
 
-    python run.py --arm {skillopt,skilladam,gepa} --benchmark B --model M --harness H [--scale main|smoke]
+    python run.py --method {skillopt,skilladam,gepa} --benchmark B --model M --harness H [--scale main|smoke]
                   [--slots N] [--out DIR]
 
-Every arm gets the same sample (seed skill, train panel, B_1..B_T, D_sel, test panel), executor and optimizer LLM;
-``adapters/<arm>.py`` ``run(cell, panels, batches, llm, out)`` runs the optimizer's own loop and returns
+Every method gets the same sample (seed skill, train panel, B_1..B_T, D_sel, test panel), executor and optimizer LLM;
+``adapters/<method>.py`` ``run(cell, panels, batches, llm, out)`` runs the optimizer's own loop and returns
 {final_skill, episodes, llm, extra}. This script then evaluates the seed and the final skill on the test panel and writes ``<out>/summary.json``."""
 
 import argparse, importlib, json, os, sys
@@ -41,7 +41,7 @@ def score(rows: list[dict]) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--arm", required=True, choices=("none", "seed", "skillopt", "skilladam", "gepa"))
+    parser.add_argument("--method", dest="arm", required=True, choices=("none", "seed", "skillopt", "skilladam", "gepa"))
     parser.add_argument("--benchmark", required=True, choices=sorted(CONFIG["benchmarks"]))
     parser.add_argument("--model", required=True)
     parser.add_argument("--harness", required=True)
