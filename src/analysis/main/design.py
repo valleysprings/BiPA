@@ -21,8 +21,9 @@
   selrules   design principle "select against the noise of selection": how often four acceptance rules accept ONE candidate against its
              parent when the candidate is identical to the parent (false acceptance) and when it truly solves g more dev tasks in expectation
              (power), on selection.py's beta-binomial task model of the seed's dev tasks; then the detectability gate applied to the logged
-             accepted edges of the Table 1 runs (edge dev gain in tasks = dQ x n_pair / 100 against MDE80 of an n_pair-task comparison), with
-             refused vs surviving edges compared on dlogX.  Rules: (a) better on one run, (b) gain >= MDE80, (c) better then better again on
+             accepted edges of the Table 1 runs (edge dev gain in tasks = dQ x n_pair / 100 against the one-sided 0.05 critical value of an
+             n_pair-task comparison), with refused vs surviving edges compared on dlogX.  Rules: (a) better on one run, (b) gain >= the
+             one-sided 0.05 critical value of a single-run comparison under no effect, (c) better then better again on
              a fresh draw, (d) mean of 3 runs.
              -> assets/cache/analysis/main/selrules.json, data/mech/mech_selrules.md
   draw       the Section 5 evidence figure: one panel per principle, laid out from the three caches —
@@ -437,7 +438,7 @@ def record_designev(data):
 
 # ---------- selrules (from selrules.py) ----------
 
-RULES = [("better", "(a) better on one run"), ("detectable", "(b) gain >= MDE80"), ("confirm", "(c) better, then better again"),
+RULES = [("better", "(a) better on one run"), ("critical", "(b) gain >= one-sided 0.05 critical value"), ("confirm", "(c) better, then better again"),
          ("mean3", "(d) mean of 3 runs")]
 TRUE_GAINS = (1, 2, 4)       # tasks; the panel shows PLOT_GAIN
 PLOT_GAIN = 2
@@ -455,7 +456,7 @@ def runs_total(p, repeats):
     return total
 
 
-def acceptance(p, q, mde) -> dict:
+def acceptance(p, q, critical) -> dict:
     """{rule: acceptance rate} of one candidate with task probabilities q against a parent with p, on the same draws of the task model."""
     parent, child = S.outcomes(p), S.outcomes(q)
     net = child - parent
@@ -464,36 +465,38 @@ def acceptance(p, q, mde) -> dict:
     # (d) three runs each, summed
     net_mean3 = runs_total(q, 3) - runs_total(p, 3)
     return {"better": float((net > 0).mean()),
-            "detectable": float((net >= mde).mean()),
+            "critical": float((net >= critical).mean()),
             "confirm": float(((net > 0) & (net_again > 0)).mean()),
             "mean3": float((net_mean3 > 0).mean())}
 
 
-def panel_threshold(dev, prior, size, index) -> float:
-    """MDE80 (tasks) of a single-run comparison on `size` dev tasks (the panel, or a random subset of it)."""
+def panel_threshold(dev, prior, size, index) -> int:
+    """One-sided 0.05 critical net difference (tasks) of a single-run comparison on `size` dev tasks (the panel, or a random subset of it)
+    when the candidate is identical to its parent."""
     S.reseed(index, 31, size)
     p = S.task_probabilities(dev, prior, size, S.DRAWS)
-    return S.mde80(p)[1]
+    return S.critical_value(p)
 
 
 def analyse(bench) -> dict:
-    """Null acceptance and power per rule for one benchmark, plus the MDE80 thresholds of the panel sizes used by the logged edges."""
+    """Null acceptance and power per rule for one benchmark, plus the critical values of the panel sizes used by the logged edges."""
     dev_files, test_files = S.seed_files(bench)
     dev, test = S.executions(dev_files), S.executions(test_files)
+    S.check_inputs(bench, dev, test)
     n_dev = len(dev)
     pooled = [(sum(v), len(v)) for v in list(dev.values()) + list(test.values())]
     prior = S.fit_prior(pooled)
     index = [x for x, _ in S.BENCHES].index(bench)
     S.reseed(index, 30)
     p = S.task_probabilities(dev, prior, n_dev, DRAWS)
-    mde = panel_threshold(dev, prior, n_dev, index)
+    critical = panel_threshold(dev, prior, n_dev, index)
     S.reseed(index, 32)
-    out = {"dev_tasks": n_dev, "mde80_tasks": mde, "null": acceptance(p, p, mde), "power": {}}
+    out = {"dev_tasks": n_dev, "critical_tasks": critical, "null": acceptance(p, p, critical), "power": {}}
     for gain in TRUE_GAINS:
-        out["power"][str(gain)] = acceptance(p, S.raised(p, gain), mde)
+        out["power"][str(gain)] = acceptance(p, S.raised(p, gain), critical)
     # thresholds of the smaller comparisons logged (SkillAdam's validation minibatches)
     sizes = sorted({r["n_pair"] for r in logged_edges() if r["bench"] == bench})
-    out["mde80_by_size"] = {str(s): (mde if s == n_dev else panel_threshold(dev, prior, s, index)) for s in sizes}
+    out["critical_by_size"] = {str(s): (critical if s == n_dev else panel_threshold(dev, prior, s, index)) for s in sizes}
     return out
 
 
@@ -510,11 +513,11 @@ def weighted_mean(values, weights) -> float:
 
 
 def edge_gate(result) -> dict:
-    """Of the accepted dev edges, those a rule-(b) gate refuses (dev gain in tasks below MDE80 of the edge's comparison size) and their mean
+    """Of the accepted dev edges, those a rule-(b) gate refuses (dev gain in tasks below the critical value of the edge's comparison size) and their mean
     dlogX (x100 log points), unweighted and weighted by n_pair, against the surviving edges."""
     accepted = [r for r in logged_edges() if r["accepted"]]
     gain_tasks = np.array([r["dQ"] * r["n_pair"] / 100 for r in accepted])
-    threshold = np.array([result[r["bench"]]["mde80_by_size"][str(r["n_pair"])] for r in accepted])
+    threshold = np.array([result[r["bench"]]["critical_by_size"][str(r["n_pair"])] for r in accepted])
     refused = gain_tasks < threshold
     dlogx = 100 * np.array([r["dlogX"] for r in accepted])
     weight = np.array([r["n_pair"] for r in accepted], float)
@@ -540,12 +543,12 @@ def record_selrules(result):
             rows.append([bench, label, f"{100 * r['null'][key]:.1f}"] + [f"{100 * r['power'][str(g)][key]:.1f}" for g in TRUE_GAINS])
     head = ["benchmark", "rule", "false acceptance %"] + [f"accepted at true gain {g} tasks %" for g in TRUE_GAINS]
     gate = result["edge_gate"]
-    mde_rows = [[bench, result[bench]["dev_tasks"], f"{result[bench]['mde80_tasks']:.2f}", f"{100 * result[bench]['mde80_tasks'] / result[bench]['dev_tasks']:.1f}",
-                 json.dumps(result[bench]["mde80_by_size"])] for bench, _ in S.BENCHES]
+    crit_rows = [[bench, result[bench]["dev_tasks"], result[bench]["critical_tasks"], json.dumps(result[bench]["critical_by_size"])]
+                 for bench, _ in S.BENCHES]
     bench_rows = [[bench, v["accepted"], v["refused"]] for bench, v in gate["per_bench"].items()]
     extra = "\n".join([
-        "MDE80 of a single-run comparison (selection.mde80, fitted prior):", "",
-        logger.md_table(["benchmark", "dev tasks", "MDE80 (tasks)", "MDE80 (points)", "MDE80 by comparison size (tasks)"], mde_rows), "",
+        "One-sided 0.05 critical net difference of a single-run comparison under no effect (selection.critical_value, fitted prior):", "",
+        logger.md_table(["benchmark", "dev tasks", "critical value (tasks)", "critical value by comparison size (tasks)"], crit_rows), "",
         f"Logged accepted edges refused by rule (b): {gate['refused']} of {gate['accepted']} (survive {gate['survive']}).", "",
         logger.md_table(["benchmark", "accepted edges", "refused by (b)"], bench_rows), "",
         logger.md_table(["group", "edges", "mean dlogX (x100)", "n_pair-weighted dlogX (x100)"],
@@ -555,11 +558,12 @@ def record_selrules(result):
         "selrules",
         "How often four acceptance rules accept one candidate against its parent: a candidate identical to the parent (false acceptance) and "
         f"one that truly solves g more dev tasks in expectation (g = {', '.join(map(str, TRUE_GAINS))}; the figure shows g = {PLOT_GAIN}). "
-        "Also, how many of the 30 accepted logged dev edges a detectability gate (rule b) would have refused, and the token cost they carried.",
+        "Also, how many of the 30 accepted logged dev edges a critical-value gate (rule b: single-run gain at least the one-sided 0.05 critical "
+        "value under no effect) would have refused, and the token cost they carried.",
         "Seed skill dev and test executions of Table 1 (native-20261008-https), the beta-binomial task model of mech_selection; logged edges: the 59 "
         "canonical dev edges (edges_table.json, SkillAdam x terminal-bench-2-1 excluded), 30 accepted.",
         f"{S.DRAWS} draws of the task probabilities per benchmark; each rule compares one candidate with its parent on the same draw; rules: "
-        + "; ".join(label for _, label in RULES) + ". Seeds fixed per benchmark. Edge gain in tasks = dQ x n_pair / 100 against MDE80 of an "
+        + "; ".join(label for _, label in RULES) + ". Seeds fixed per benchmark. Edge gain in tasks = dQ x n_pair / 100 against the critical value of an "
         "n_pair-task comparison.",
         logger.md_table(head, rows),
         ".venv/bin/python -m src.analysis.main.design selrules",
@@ -580,7 +584,7 @@ def panel_bars(ax, data):
     one that truly solves PLOT_GAIN more dev tasks (dark bar); bar = mean over the three benchmarks, whisker = their range."""
     gain = str(data["plot_gain"])
     benches = list(COLORS)
-    labels = ["one win\n(today)", "one large\nwin", "two wins\nin a row", "3-run\ntotal"]
+    labels = ["one win\n(today)", "one win at\n5% level", "two wins\nin a row", "3-run\ntotal"]
     width = 0.38
     for i, (key, _) in enumerate(RULES):
         null = [100 * data[b]["null"][key] for b in benches]

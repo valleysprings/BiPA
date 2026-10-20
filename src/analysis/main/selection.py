@@ -30,6 +30,7 @@ the run's own seed draw; and the MDE80 of a single-run comparison in points.
 import glob
 import json
 import math
+import re
 import sys
 from collections import defaultdict
 
@@ -49,8 +50,14 @@ DEV_SIZES = (9, 15, 30, 60, 120)
 DEVSIZE_RULES = (("SkillOpt", 4), ("GEPA", 7))
 MODERATE = 4.0           # concentration of the sensitivity prior
 GAINS = (1, 2, 3)        # true gains (tasks) for P(accept | gain)
+POWER_GAINS = (1, 2, 3)  # true gains (tasks) of one candidate for the replay's power
 PRIORS = ("fitted", "moderate")
 RNG = np.random.default_rng(20261012)   # re-seeded per benchmark, prior and dev size, so one cell's numbers never depend on another's
+# The paper's seed executions predate the leave-one-domain-out runs (10-15) and the deepseek-flash upgrade (10-17; different model).
+LAST_RUN_DATE = "20261015"
+EXCLUDED_RUN_TAGS = ("lodo", "-1017")
+# (dev tasks, distinct dev executions, distinct test executions) of the paper's inputs; a new run that matches the globs fails loudly
+PAPER_INPUTS = {"terminal-bench-2-1": (9, 18, 54), "tau3-bench": (30, 90, 225), "automationbench": (30, 89, 360)}
 
 
 def reseed(*key):
@@ -81,13 +88,32 @@ def executions(files) -> dict:
     return {task: list(runs.values()) for task, runs in seen.items()}
 
 
+def paper_input(path) -> bool:
+    """Whether a seed dev evaluation belongs to the paper's inputs: not a run on the upgraded model (on or after 2026-10-17, e.g.
+    native-seed/tau3-bench/native-20261020-1017) and not a leave-one-domain-out run (10-15, a different dev panel).  Runs named with a date
+    are kept only before LAST_RUN_DATE; every undated run predates it."""
+    run = path.split("deepseek-flash/")[1].split("/results")[0].split("/")[-1]
+    if any(tag in run for tag in EXCLUDED_RUN_TAGS):
+        return False
+    dated = re.search(r"(2026\d{4})", run)
+    return dated is None or dated.group(1) < LAST_RUN_DATE
+
+
 def seed_files(bench) -> tuple[list, list]:
-    """(dev evaluation files, test evaluation files) of the seed skill on one benchmark."""
-    dev_files = glob.glob(str(EXECUTION / f"*/{bench}/*/results/evaluations/dev/{SEED_VERSION}-*/evaluation.json"))
+    """(dev evaluation files, test evaluation files) of the seed skill on one benchmark, restricted to the paper's inputs (paper_input);
+    check_inputs verifies that they reproduce the paper's execution counts."""
+    dev_files = sorted(f for f in glob.glob(str(EXECUTION / f"*/{bench}/*/results/evaluations/dev/{SEED_VERSION}-*/evaluation.json"))
+                       if paper_input(f))
     test_files = []
     for run in SEED_TEST_RUNS:
         test_files += glob.glob(str(EXECUTION / f"native-seed/{bench}/{run}/results/evaluations/test/*/evaluation.json"))
     return dev_files, test_files
+
+
+def check_inputs(bench, dev, test):
+    """Fail if the seed executions differ from the paper's inputs (PAPER_INPUTS): a run added later must not change the replay silently."""
+    found = (len(dev), sum(map(len, dev.values())), sum(map(len, test.values())))
+    assert found == PAPER_INPUTS[bench], f"{bench}: seed executions {found} differ from the paper's {PAPER_INPUTS[bench]}; check seed_files"
 
 
 def dev_draws(dev_files, n_dev) -> list[dict]:
@@ -190,11 +216,17 @@ def paired(p, q):
     return outcomes(q) - outcomes(p)
 
 
+def critical_value(p, level=0.05) -> int:
+    """The one-sided critical net difference (tasks) of two single runs under no effect: the smallest t with P(net >= t) <= level."""
+    null = paired(p, p)
+    return next(t for t in range(0, p.shape[1] + 2) if (null >= t).mean() <= level)
+
+
 def mde80(p, step=0.25) -> tuple[int, float]:
     """(critical net difference, MDE80 in tasks): the one-sided 0.05 critical value under no effect, and the smallest true gain (in `step`
-    tasks) detected at it with probability 0.8 (nan when no gain up to the panel size is)."""
-    null = paired(p, p)
-    critical = next(t for t in range(0, p.shape[1] + 1) if (null >= t).mean() <= 0.05)
+    tasks) detected at it with probability 0.8 (nan when no gain up to the panel size is).  Kept for the audit records; the paper does
+    not use the MDE80 (it depends on the task model), only the critical value."""
+    critical = critical_value(p)
     for gain in np.arange(step, p.shape[1] + step, step):
         if (paired(p, raised(p, gain)) >= critical).mean() >= 0.8:
             return critical, float(gain)
@@ -259,6 +291,21 @@ def skilladam_null(p_dev, sa, rng) -> dict:
             "E_accepts_cached": float(accepts.mean())}
 
 
+def replay_power(p, k, baseline, null_gain, rng, gains=POWER_GAINS) -> dict:
+    """Power of the replay as a test of "no candidate differs from the seed", from the run's starting draw: the one-sided 0.05 critical
+    gain c of the null distribution `null_gain`, and P(G >= c) when one of the k candidates truly solves g more dev tasks in expectation
+    (raised on the least-solved tasks) and the others are identical to the seed.  Uses its own generator so that every other number stays
+    as it was."""
+    critical = next(t for t in range(0, p.shape[1] + 2) if (null_gain >= t).mean() <= 0.05)
+    out = {"critical_gain_tasks": critical}
+    for g in gains:
+        q = raised(p, float(g))
+        scores = (rng.random((p.shape[0], k, p.shape[1])) < p[:, None, :]).sum(axis=2)
+        scores[:, 0] = (rng.random(p.shape) < q).sum(axis=1)
+        out[str(g)] = float((np.maximum(scores.max(axis=1) - baseline, 0) >= critical).mean())
+    return out
+
+
 def batch_gain_tail(p_dev, batch, gain):
     """P(candidate - current >= gain) for one null comparison on a random subset of `batch` dev tasks."""
     pick = np.argsort(RNG.random(p_dev.shape), axis=1)[:, :batch]
@@ -292,6 +339,7 @@ def analyse(bench) -> dict:
     accept-if-better comparison, and the dev-size sensitivity."""
     dev_files, test_files = seed_files(bench)
     dev, test = executions(dev_files), executions(test_files)
+    check_inputs(bench, dev, test)
     n_dev = len(dev)
     pooled = [(sum(v), len(v)) for v in list(dev.values()) + list(test.values())]
     a, b = fit_prior(pooled)
@@ -315,7 +363,9 @@ def analyse(bench) -> dict:
                            "P_ge_observed_random_baseline": float((gain_random >= obs[rule]["gain"]).mean()),
                            "P_ge_observed_observed_baseline": float((gain_fixed >= obs[rule]["gain"]).mean()),
                            "hist_random_baseline": np.bincount(gain_random, minlength=n_dev + 1).tolist(),
-                           "hist_observed_baseline": np.bincount(gain_fixed, minlength=n_dev + 1).tolist()}
+                           "hist_observed_baseline": np.bincount(gain_fixed, minlength=n_dev + 1).tolist(),
+                           "power_observed_baseline": replay_power(p, k, obs[rule]["baseline"], gain_fixed,
+                                                                   np.random.default_rng([20261012, index, j, 11, k]))}
         sa = obs["SkillAdam"]
         accepts = skilladam_accepts(p, sa["batch"], sa["budgets"])
         rules["SkillAdam"] = {"E_accepts": float(accepts.mean()), "P_accepts_ge_observed": float((accepts >= sa["accepted"]).mean()),
@@ -400,6 +450,12 @@ def record_selection(result):
     t2 = logger.md_table(["bench", "prior", "dev tasks", "P(accept | no effect)", "SD of net difference (tasks)",
                      "P(accept | true gain 1 / 2 / 3 tasks)", "critical net difference (one-sided 0.05)", "MDE80"], rows2)
     t3 = logger.md_table(["bench", "seed dev draw (solved/verified)", "success %", "runs using it", "runs (first three)"], draws)
+    power_rows = [[bench, prior, rule, f"{result[bench]['observed'][rule]['baseline']}/{result[bench]['dev_tasks']}",
+                   f"+{result[bench]['observed'][rule]['gain']}", x["critical_gain_tasks"]] + [f"{x[str(g)]:.2f}" for g in POWER_GAINS]
+                  for bench, _ in BENCHES for prior in PRIORS for rule in ("SkillOpt", "GEPA")
+                  for x in [result[bench]["priors"][prior]["rules"][rule].get("power_observed_baseline")] if x]
+    t4 = logger.md_table(["bench", "prior", "rule", "starting draw", "observed gain", "critical gain (one-sided 0.05, tasks)"]
+                         + [f"power, one candidate +{g} task{'s' if g > 1 else ''}" for g in POWER_GAINS], power_rows)
     priors = logger.md_table(["bench", "dev tasks", "seed executions per dev task", "test tasks", "fitted prior (a, b)", "mean success"],
                         [[b, result[b]["dev_tasks"], result[b]["dev_executions_per_task"], result[b]["test_tasks"],
                           f"({result[b]['prior_fitted'][0]:.2f}, {result[b]['prior_fitted'][1]:.2f})", f"{result[b]['mean_success']:.3f}"]
@@ -418,7 +474,8 @@ def record_selection(result):
         "raises the least-solved tasks' probabilities until the expected number of solved tasks grows by g. Seed dev draws: full-panel dev "
         "evaluations of the seed, one row per distinct set of verified episodes (sorted by success).",
         "### Seed task model\n\n" + priors + "\n\n### The seed's dev draws and its test success\n\n" + t3 +
-        "\n\n### Selection rules under no effect\n\n" + t1 + "\n\n### Accept-if-better on the dev panel (two single runs)\n\n" + t2,
+        "\n\n### Selection rules under no effect\n\n" + t1 + "\n\n### Accept-if-better on the dev panel (two single runs)\n\n" + t2 +
+        "\n\n### Power of the replay from the starting draw (one candidate truly better, the others identical)\n\n" + t4,
         ".venv/bin/python -m src.analysis.main.selection compute\n.venv/bin/python -m src.analysis.main.selection draw")
 
 
@@ -519,11 +576,11 @@ def draw_selection(result):
 
 
 def draw_devsize(result):
-    """mech_devsize, one column (3.25 in), the plain-labels rendering (the version the paper uses, formerly mech/devsize_fig.py): two stacked
-    axes against the number of dev tasks (log axis), (a) the dev gain SkillOpt's rule (best of 4) and GEPA's rule (best of 7) announce when
-    every candidate is identical to the seed, and (b) the smallest gain one dev comparison detects with 80% power (MDE80), per benchmark
-    (marker) for the fitted task model (solid) and the flatter one (dashed).  A missing MDE80 point: no effect up to the dev-set size is
-    detected with probability 0.8.  The dev size of the Table 1 runs (30) is marked."""
+    """mech_devsize, one column (3.25 in): the dev gain SkillOpt's rule (best of 4) and GEPA's rule (best of 7) report from a random seed
+    draw when every candidate is identical to the seed, against the number of dev tasks (log axis), per benchmark (marker) for the fitted
+    task model (solid) and the flatter one (dashed).  Sizes beyond a benchmark's dev panel add tasks drawn from the prior (exchangeable
+    tasks).  The dev size of the Table 1 runs (30) is marked.  The MDE80 is not drawn: it depends on the task model and the paper does
+    not use it."""
     plt = style()
     from matplotlib.lines import Line2D
     benches = (("terminal-bench-2-1", "TB2", "s"), ("tau3-bench", r"$\tau^3$-bench", "o"), ("automationbench", "AutoBench", "^"))
@@ -531,32 +588,31 @@ def draw_devsize(result):
     priors = (("fitted", "-"), ("moderate", "--"))
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7,
                          "axes.linewidth": 0.6})
-    fig, axs = plt.subplots(2, 1, figsize=(3.25, 2.75), sharex=True)
-    fig.subplots_adjust(left=0.19, right=0.97, bottom=0.13, top=0.985, hspace=0.12)
+    fig, ax = plt.subplots(figsize=(3.25, 1.75))
+    fig.subplots_adjust(left=0.15, right=0.97, bottom=0.2, top=0.97)
     for bench, _, marker in benches:
         for prior, ls in priors:
             rows = [result[bench]["devsize"][prior][str(s)] for s in DEV_SIZES]
             for rule, _, shade in rules:
-                axs[0].plot(DEV_SIZES, [r[rule]["E_gain_random_points"] for r in rows], color=shade, ls=ls, lw=1.0, marker=marker, markersize=3.5)
-            # a missing point: no gain up to the dev-set size is detected with probability 0.8
-            axs[1].plot(DEV_SIZES, [r["MDE80_points"] for r in rows], color="0.15", ls=ls, lw=1.0, marker=marker, markersize=3.5)
-    for ax in axs:
-        ax.axvline(30, color="0.75", lw=0.8, zorder=0)
-        ax.set_xscale("log")
-        ax.set_xticks(DEV_SIZES)
-        ax.set_xticklabels([str(s) for s in DEV_SIZES])
-        ax.minorticks_off()
-        ax.tick_params(labelsize=7, length=2)
-        ax.spines[["top", "right"]].set_visible(False)
-    axs[0].set_ylabel("(a) gain announced for\nunchanged candidates (pts)", fontsize=7)
-    axs[1].set_ylabel("(b) smallest gain one dev\ncomparison detects (pts)", fontsize=7)
-    axs[1].set_xlabel("dev tasks (30 in our runs)", fontsize=7)
+                ax.plot(DEV_SIZES, [r[rule]["E_gain_random_points"] for r in rows], color=shade, ls=ls, lw=1.0, marker=marker, markersize=3.5)
+    ax.plot([30, 30], [0, 20.5], color="0.75", lw=0.8, zorder=0)
+    ax.set_xscale("log")
+    ax.set_xticks(DEV_SIZES)
+    ax.set_xticklabels([str(s) for s in DEV_SIZES])
+    ax.minorticks_off()
+    ax.tick_params(labelsize=7, length=2)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.set_ylim(0, 27)   # headroom for the legend
+    ax.set_yticks([0, 5, 10, 15, 20])
+    ax.spines["left"].set_bounds(0, 20)
+    ax.set_ylabel("gain reported for\nunchanged candidates (pts)", fontsize=7)
+    ax.set_xlabel("dev tasks (30 in our runs)", fontsize=7)
     rule_handles = [Line2D([], [], color=shade, lw=1.2, label=label) for _, label, shade in rules]
     prior_handles = [Line2D([], [], color="0.3", lw=1.0, ls="-", label="fitted task model"),
                      Line2D([], [], color="0.3", lw=1.0, ls="--", label="flatter task model")]
-    axs[0].legend(handles=rule_handles + prior_handles, loc="upper right", fontsize=6.5, frameon=False, handlelength=1.8, borderaxespad=0.1)
     bench_handles = [Line2D([], [], color="0.3", lw=0, marker=m, markersize=4, label=d) for _, d, m in benches]
-    axs[1].legend(handles=bench_handles, loc="upper right", fontsize=6.5, frameon=False, ncol=3, columnspacing=0.8, handletextpad=0.3, borderaxespad=0.1)
+    ax.legend(handles=rule_handles + prior_handles + bench_handles, loc="upper right", fontsize=6.3, frameon=False, ncol=2,
+              handlelength=1.8, borderaxespad=0.1, columnspacing=0.8, labelspacing=0.25)
     save_figure(fig, "devsize")
 
 
