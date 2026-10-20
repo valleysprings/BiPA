@@ -115,14 +115,15 @@ def _when(paths):
     return mdtable(head, rows), allts
 
 
-def record(name, part, result=None, commands=(), raw=(), notes=(), source=()):
+def record(name, part, result=None, commands=(), raw=(), notes=(), source=(), sections=()):
     """Write paper/assets/data/<pub>/<name>.md (pub from SPECS[name]["pub"]). `part` names the piece of the record this call fills (a script may fill one record in several parts, several scripts one record); result is
-    markdown (the numbers as the paper prints them), commands the exact shell commands (from bipa/), raw absolute paths of run dirs / evaluation files, notes extra caveats."""
+    markdown (the numbers as the paper prints them), commands the exact shell commands (from bipa/), raw absolute paths of run dirs / evaluation files, notes extra caveats,
+    sections extra (title, markdown) sections rendered after the notes as "## 7. <title>", "## 8. ..." (optional)."""
     spec = SPECS[name]
     SIDE.mkdir(parents=True, exist_ok=True); (DATA / pub_of(name)).mkdir(parents=True, exist_ok=True)
     f = SIDE / f"{name}.json"
     parts = json.loads(f.read_text()) if f.is_file() else {}
-    parts[part] = dict(result=result, commands=list(commands), raw=sorted({str(p) for p in raw}), notes=list(notes), source=list(source), stamp=_utc(datetime.now(timezone.utc).timestamp()))
+    parts[part] = dict(result=result, commands=list(commands), raw=sorted({str(p) for p in raw}), notes=list(notes), source=list(source), sections=[list(x) for x in sections], stamp=_utc(datetime.now(timezone.utc).timestamp()))
     f.write_text(json.dumps(parts, indent=1))
     render(name, parts)
 
@@ -157,4 +158,6 @@ def render(name, parts):
     L += [f"- `{r}`" for r in raw] if raw else ["None."]
     L += ["", "## 6. Notes", ""]
     L += [f"- {n}" for n in dict.fromkeys(list(spec["notes"]) + [n for p in parts.values() for n in p["notes"]])]
+    for i, (title, body) in enumerate((x for p in parts.values() for x in p.get("sections", [])), start=7):
+        L += ["", f"## {i}. {title}", "", body.rstrip()]
     (DATA / spec["pub"] / f"{name}.md").write_text("\n".join(L) + "\n")
