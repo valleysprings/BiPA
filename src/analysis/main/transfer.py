@@ -93,7 +93,7 @@ OOD = [  # (target bench, seed Q, local Q per method, transferred Q per method, 
     ("AutoBench", 45.0, {"GEPA": 44.2, "SkillOpt": 41.7, "SkillAdam": 44.7},
      {"GEPA": 40.0, "SkillOpt": 42.5, "SkillAdam": 41.7}, "TB2"),
     ("TB2", 75.9, {"GEPA": 74.1, "SkillOpt": 64.8, "SkillAdam": 68.5},
-     {"GEPA": 77.8, "SkillOpt": 64.7, "SkillAdam": 72.2}, "AutoBench"),
+     {"GEPA": 77.8, "SkillOpt": 66.7, "SkillAdam": 72.2}, "AutoBench"),  # SkillOpt: 12/18 with the retry-recovered task merged (was 11/17)
 ]
 # paper/assets/data/mech/mech_transfer.md (avg@3, GPT-6 Luna on tau3-bench test)
 LUNA_NOSKILL = 64.9

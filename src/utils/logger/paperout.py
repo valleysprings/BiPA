@@ -1,5 +1,5 @@
 """Where paper material goes.
-Two papers: "mech" (paper 1, paper/draft2mech: measurement + mechanism) and "method" (paper 2, paper/draft2method: BACH). Every spec has pub = "mech" | "method".
+Two papers: "mech" (paper 1, paper/draft2mech: measurement + mechanism) and "method" (paper 2, paper/draft2bach: BACH). Every spec has pub = "mech" | "method".
 Figures -> paper/assets/fig/<pub>/<name>.pdf + editable <name>.svg (text kept as text): savefig(fig, name) looks the pub up in SPECS.
 Numbers -> NO data files: paper/assets/data/<pub>/<name>.md, one audit record per draft table / data figure, WRITTEN BY THE SCRIPTS through record(): paper location, producing script and commands,
 dates (UTC) of the underlying runs, the numbers as the paper prints them, raw records (absolute paths), caveats. A record can be filled by several scripts (parts); the parts are kept in
@@ -12,7 +12,7 @@ from pathlib import Path
 H = Path("/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation")
 ASSETS = H / "paper/assets"
 FIG, DATA = ASSETS / "fig", ASSETS / "data"
-DRAFTS = {"mech": H / "paper/draft2mech", "method": H / "paper/draft2method"}
+DRAFTS = {"mech": H / "paper/draft2mech", "method": H / "paper/draft2bach"}
 PUBS = tuple(DRAFTS)
 SIDE = H / "assets/cache/analysis/_records"
 REPO = H / "bipa"
@@ -20,7 +20,7 @@ REPO = H / "bipa"
 BASELINE_NOTE = "Baseline rows (GEPA, SkillOpt, SkillAdam) come from the https reruns `native-20261008-https` (2026-10-08), each evaluated avg@3 on the test split."
 BACH_NOTE = "BACH numbers are from bach-graph-3 (2026-10-10)."
 
-# name -> what the record is about. paper: (label, draft file relative to paper/draft2method, regex of the line to cite, what it shows); files: fig / editable source; notes: static caveats.
+# name -> what the record is about. paper: (label, draft file relative to paper/draft2bach, regex of the line to cite, what it shows); files: fig / editable source; notes: static caveats.
 SPECS = {
     "sec01_teaser": dict(pub="method", paper=[("fig:teaser (Figure 1)", "sections/01-intro.tex", r"label\{fig:teaser\}", "one AutoBench test task solved by the seed skill, SkillOpt's skill and BACH's skill, each drawn as its real episode graph (turns, tool calls, exposure of tool outputs in later turns) with its input-token split")],
                          files="fig/method/sec01_teaser.pdf, fig/method/sec01_teaser.svg", notes=[BASELINE_NOTE, BACH_NOTE]),
