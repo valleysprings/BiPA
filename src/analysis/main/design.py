@@ -191,7 +191,7 @@ def panel(ax, data):
     ax.axhline(0, color="0.3", lw=0.5)
     ax.set_xticks(x)
     ax.set_xticklabels([name for name, _ in groups], fontsize=7)
-    ax.set_ylabel(r"token tax ($\log\rho$)", fontsize=7, labelpad=1)
+    ax.set_ylabel(r"$\log\rho$ (input tokens vs. seed)", fontsize=7, labelpad=1)
     ax.tick_params(axis="y", labelsize=7, length=2)
     ax.tick_params(axis="x", length=0, pad=1)
     ax.set_ylim(min(0, min(counterfactual)) - 0.01, max(measured) * 1.75)
@@ -389,9 +389,6 @@ def panel_gate(ax, data):
     ax.set_ylabel(r"change in log input tokens ($\times$100)", fontsize=7, labelpad=1)
     ax.tick_params(axis="y", labelsize=6.5, length=2)
     ax.tick_params(axis="x", length=0)
-    g = b["gate"]
-    ax.text(0.5, 0.02, f"a cost gate passes\n{g['accepted_kept']} of {g['accepted_total']} and {g['rejected_taken']} of {g['rejected_total']}",
-            transform=ax.transAxes, fontsize=5.8, va="bottom", ha="center", linespacing=1.0)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
 
@@ -584,7 +581,7 @@ def panel_bars(ax, data):
     one that truly solves PLOT_GAIN more dev tasks (dark bar); bar = mean over the three benchmarks, whisker = their range."""
     gain = str(data["plot_gain"])
     benches = list(COLORS)
-    labels = ["one win\n(today)", "one win at\n5% level", "two wins\nin a row", "3-run\ntotal"]
+    labels = ["one win\n(current)", "one win at\n5% level", "two wins\nin a row", "3-run\ntotal"]
     width = 0.38
     for i, (key, _) in enumerate(RULES):
         null = [100 * data[b]["null"][key] for b in benches]
@@ -608,7 +605,7 @@ def panel_bars(ax, data):
 
 # ---------- the Section 5 figure (from implications_fig.py) ----------
 
-TITLES = ["(a) What each rule keeps", "(b) What explains token change", "(c) Seed's calls per turn", "(d) Kept vs. rejected"]
+TITLES = ["(a) P1: what each rule keeps", "(b) P2: what explains token change", "(c) P3: seed's calls per turn", "(d) P4: cost of edits"]
 
 
 def legend_selrules(ax):

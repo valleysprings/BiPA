@@ -1,10 +1,15 @@
 """Table 1 (tab:mech-main): test success Q = avg@3 and the ratios of cost to the Seed skill row, per method and benchmark (DeepSeek-V4.1-Flash and GPT-6 Luna).
 
 Every row is evaluated on three test runs (repetitions 0-2; Q = mean of the per-run success, runs found are in `reps`). Slots whose episodes ran but never
-produced a verdict in any of reps 0-2 are adjudicated as failures (listed in `adjudicated_failures`); they count 0 in Q and drop out of the cost ratios for lack of N/X. The Seed row is the seed's three runs
+produced a verdict in any of reps 0-2 are adjudicated as failures (listed in `adjudicated_failures`); for DeepSeek they count 0 in Q (Luna: see below), and they drop out of the cost ratios for lack of N/X. The Seed row is the seed's three runs
 (native-seed run + rep-1, rep-2); a skill that equals the seed text reports them. All ratios are the geometric mean over tasks of (per-task mean over the row's runs) /
 (per-task mean over the seed's runs) on one common task set (verified outcome, N and X > 0): rho (c = N + X/1000), rho_inv (tool calls N), rho_trj (input tokens X).
-The paper's Table 1 prints Q, rho_trj (as rho) and rho_inv (as rho^calls); the composite rho is not printed.
+The paper's Table 1 prints Q, rho_trj (as rho), rho_turns (as rho^turns) and rho_inv (as rho^calls); the composite rho is not printed.
+GPT-6 Luna uses its own per-episode extraction (`luna_row`, LUNA_EXTRACTION): the provider fails some Luna requests (no usage, retried), so the capture-complete gate of
+dataloader.task_row leaves most Luna episodes without N/X. luna_row drops the provider-failed requests and keeps the completed ones (X = their input tokens, N = their calls
+not marked unexecuted, R = their number, the turns); Luna's Q is the mean over the three runs of the success rate among verified outcomes (slots with no verdict in any run are
+listed in `adjudicated_failures` but not scored as 0), and Luna cells also carry rho_turns (R). This is the extraction of .scratch/luna_avg3.py and mech_attribution_luna / mech_pooled.
+DeepSeek-V4.1-Flash keeps dataloader.task_row and the adjudicated Q; its cells are unchanged (its rho^turns is stats.py's R ratio, mech_stats).
 Bold and underline (rank best / second) are over the five rows of a benchmark; the dagger marks rho > 1.10.
 Outputs: assets/cache/analysis/table1/{table1.json (read by fig1, reruns, facts), table1.tex (body rows)} and the audit record paper/assets/data/mech/mech_table1.md (paperout.record).
 """
@@ -16,6 +21,23 @@ MODEL = "deepseek-flash"
 MODEL_TEX = {"deepseek-flash": "DeepSeek-V4.1-Flash", "gpt-6-luna": "GPT-6 Luna"}
 ROWS = (("No skill", "native-noseed"), ("Seed skill", "native-seed"), ("GEPA", "gepa"), ("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"))
 TEX_BENCHES = ("terminal-bench-2-1", "tau3-bench", "automationbench")
+LUNA = "gpt-6-luna"
+LUNA_EXTRACTION = ("GPT-6 Luna: provider-failed requests (no usage, retried) are dropped; per episode X = input tokens of the distinct completed requests, "
+                   "N = their tool calls not marked unexecuted, R = their number (turns); an episode with no completed request has unknown cost. "
+                   "Q = mean over the three runs of the success rate among verified outcomes (a slot with no verdict in any run is not scored). "
+                   "This is the extraction of .scratch/luna_avg3.py, mech_attribution_luna and mech_pooled; dataloader.task_row's capture-complete gate is not used for Luna.")
+
+def luna_row(ep):
+    """Per-episode row for GPT-6 Luna (see LUNA_EXTRACTION): distinct requests with usage only; success only when verified (boolean, outcome_valid not False)."""
+    reqs = [r for r in {r["request_id"]: r for r in ep.get("requests", [])}.values() if r.get("input_tokens") is not None]
+    ok = type(ep.get("success")) is bool and ep.get("outcome_valid", True) is True
+    s = ep["success"] if ok else None
+    if not reqs: return {"success": s, "N": None, "X": None, "c": None, "nreq": None, "R": None}
+    n = sum(c.get("executed") is not False for r in reqs for c in r.get("tool_calls", [])); x = sum(r["input_tokens"] for r in reqs)
+    return {"success": s, "N": n, "X": x, "c": n + x/1000, "nreq": len(reqs), "R": len(reqs)}
+
+def row_fn(model):
+    return luna_row if model == LUNA else task_row
 
 def test_rows(run, version):
     r = evaluation(run, "test", version)
@@ -64,13 +86,13 @@ def rows_of(f):
     for e in d["episodes"]: eps.setdefault((e["task_id"], e.get("repetition", 0)), e)
     return {(t["task_id"], t.get("repetition", 0)): task_row(eps.get((t["task_id"], t.get("repetition", 0)), {})) for t in d["panel"]}
 
-def merged_rows_of(files):
-    """Merged per-task rows of one repetition over all its evaluation files (union of panels, first file's panel order)."""
-    eps = merged_episodes(files); rows = {}
+def merged_rows_of(files, row=None):
+    """Merged per-task rows of one repetition over all its evaluation files (union of panels, first file's panel order); row = per-episode extraction (default task_row)."""
+    eps = merged_episodes(files); rows = {}; row = row or task_row
     for f in files:
         for t in json.loads(f.read_text())["panel"]:
             k = (t["task_id"], t.get("repetition", 0))
-            if k not in rows: rows[k] = task_row(eps.get(k, {}))
+            if k not in rows: rows[k] = row(eps.get(k, {}))
     return rows
 
 def unresolved_of(files):
@@ -78,16 +100,16 @@ def unresolved_of(files):
     return {k: (e.get("outcome_reason") or "unresolved") for k, e in merged_episodes(files).items()
             if not (type(e.get("success")) is bool and e.get("outcome_valid", True) is True)}
 
-def geo(rows, ref):
-    """geometric mean per task vs the Seed row; rows/ref: {task: {success,N,X}}."""
-    L = {"c": [], "N": [], "X": []}
+def geo(rows, ref, turns=False):
+    """geometric mean per task vs the Seed row; rows/ref: {task: {success,N,X(,R)}}; turns adds rho_turns (R)."""
+    L = {"c": [], "N": [], "X": [], **({"R": []} if turns else {})}
     for k, r in rows.items():
         b = ref.get(k)
         if b is None or r["success"] is None or b["success"] is None: continue
         if all(x and x > 0 for x in (r["N"], r["X"], b["N"], b["X"])):
             for f in L: L[f].append(math.log(r[f]/b[f]))
     n = len(L["c"])
-    return n, {nm: gmean(np.exp(L[f])) for f, nm in (("c", "rho"), ("N", "rho_inv"), ("X", "rho_trj"))}
+    return n, {nm: gmean(np.exp(L[f])) for f, nm in (("c", "rho"), ("N", "rho_inv"), ("X", "rho_trj"), ("R", "rho_turns")) if f in L}
 
 def as_lists(reps):
     """Normalize {rep: file} (manifest) vs {rep: [files]} (rep_groups) to {rep: [files]}."""
@@ -99,23 +121,24 @@ def accumulate(allrows):
     for rows in allrows:
         for (t, _), r in rows.items():
             if r["success"] is not None and r["N"] is not None and r["X"] is not None: per.setdefault(t, []).append(r)
-    return {(t, 0): {"success": True, "N": sum(r["N"] for r in v)/len(v), "X": sum(r["X"] for r in v)/len(v), "c": sum(r["N"] + r["X"]/1000 for r in v)/len(v)} for t, v in per.items()}
+    return {(t, 0): {"success": True, "N": sum(r["N"] for r in v)/len(v), "X": sum(r["X"] for r in v)/len(v), "c": sum(r["N"] + r["X"]/1000 for r in v)/len(v),
+                     **({"R": sum(r["R"] for r in v)/len(v)} if all(r.get("R") is not None for r in v) else {})} for t, v in per.items()}
 
 def mean_rows(reps):
     """Per-run rows and their task means over the runs {rep: file} of a skill."""
     allrows = [rows_of(f) for _, f in sorted(reps.items())]
     return allrows, accumulate(allrows)
 
-def merged_mean_rows(reps):
+def merged_mean_rows(reps, row=None):
     """Per-run rows and their task means over the runs {rep: [files]} of a skill, supplements merged (rep_groups)."""
-    allrows = [merged_rows_of(fs) for _, fs in sorted(reps.items())]
+    allrows = [merged_rows_of(fs, row) for _, fs in sorted(reps.items())]
     return allrows, accumulate(allrows)
 
 def compute(model=MODEL):
-    res = {}
+    res = {}; row = row_fn(model); luna = model == LUNA
     for bench in BENCHES:
         seed_run = current_run("native-seed", model, bench); seed_dirs = [seed_run, repetition_dir(seed_run), seed_run.parent/"rep-1", seed_run.parent/"rep-2"]
-        seed_reps = as_lists(manifest_reps(bench, "native-seed", model)) if manifest() else rep_groups(seed_dirs, vid(SEED_TEXT)); ref = merged_mean_rows(seed_reps)[1]
+        seed_reps = as_lists(manifest_reps(bench, "native-seed", model)) if manifest() else rep_groups(seed_dirs, vid(SEED_TEXT)); ref = merged_mean_rows(seed_reps, row)[1]
         cell = {}
         for name, m in ROWS:
             run = current_run(m, model, bench)
@@ -125,7 +148,7 @@ def compute(model=MODEL):
             reps = {**own_reps, **seed_reps} if asseed else own_reps
             if not reps:
                 cell[name] = None; continue
-            allrows, mean = merged_mean_rows(reps)
+            allrows, mean = merged_mean_rows(reps, row)
             allevid = [unresolved_of(fs) for _, fs in sorted(reps.items())]
             kn = [[r for r in rows.values() if r["success"] is not None] for rows in allrows]
             known_tasks = [{t for (t, _), r in rows.items() if r["success"] is not None} for rows in allrows]
@@ -147,9 +170,10 @@ def compute(model=MODEL):
             d["avg3_complete"] = (set(reps) == {0, 1, 2} and all(
                 {task for task, _ in rows} == expected and all(t in kt or t in adjudicated for t in expected)
                 for rows, kt in zip(allrows, known_tasks)))
-            if d["avg3_complete"]:
+            if luna: d["extraction"] = LUNA_EXTRACTION
+            if d["avg3_complete"] and not luna:
                 d["Q"] = 100*sum(sum(r["success"] is True for r in rows.values()) for rows in allrows)/(len(expected)*len(allrows))
-            d["n"], rr = geo(mean, ref); d.update(rr)
+            d["n"], rr = geo(mean, ref, turns=luna); d.update(rr)
             cell[name] = d
         qs = sorted({round(v["Q"], 6) for v in cell.values() if v and v["avg3_complete"]}, reverse=True)
         for v in cell.values():
@@ -186,12 +210,15 @@ def record(res, models=MODELS):
         for b in TEX_BENCHES:  # bold / underline over all five rows
             qs = sorted({round(res[f"{model}|{b}"][n]["Q"], 6) for n in names}, reverse=True)
             ranked[b] = {n: ("best" if round(res[f"{model}|{b}"][n]["Q"], 6) == qs[0] else "second" if len(qs) > 1 and round(res[f"{model}|{b}"][n]["Q"], 6) == qs[1] else "") for n in names}
-        head = ["Method"] + [f"{lab} {c}" for lab in ("TB2", "tau3", "AutoBench") for c in ("Q", "rho", "rho^calls")]
+        turns = model == LUNA  # Luna cells carry rho_turns (R); DeepSeek's rho^turns is stats.py's R ratio (mech_stats)
+        cols = ("Q", "rho", "rho^turns", "rho^calls") if turns else ("Q", "rho", "rho^calls")
+        head = ["Method"] + [f"{lab} {c}" for lab in ("TB2", "tau3", "AutoBench") for c in cols]
         rows = []
         for n in names:
             r = [n]
             for b in TEX_BENCHES:
-                v = dict(res[f"{model}|{b}"][n], rank=ranked[b][n]); r += [mark(v, f"{v['Q']:.1f}"), f"{v['rho_trj']:.2f}", f"{v['rho_inv']:.2f}"]
+                v = dict(res[f"{model}|{b}"][n], rank=ranked[b][n])
+                r += [mark(v, f"{v['Q']:.1f}"), f"{v['rho_trj']:.2f}"] + ([f"{v['rho_turns']:.2f}"] if turns else []) + [f"{v['rho_inv']:.2f}"]
             rows.append(r)
         blocks.append(f"**{MODEL_TEX[model]}**\n\n" + PO.mdtable(head, rows))
         cells += [res[f"{model}|{b}"][n] for b in BENCHES for n, _ in ROWS if res[f"{model}|{b}"][n]]
@@ -200,10 +227,13 @@ def record(res, models=MODELS):
     sent = ("Skills equal to the seed text (" + "; ".join(seedret) + ") report the Seed row's three runs." if seedret
             else "No optimizer row equals the seed text; every row reports its own three runs.")
     txt = ("Table 1 (Q = avg@3 over three test runs per skill, ratios against the Seed skill row on a common task set). Bold / underline: best / second-best Q of a benchmark within a model.\n\n" + "\n\n".join(blocks)
-           + "\n\nColumn mapping: paper Q = `Q`; paper rho (input tokens) = `rho_trj`; paper rho^calls (tool calls) = `rho_inv`; `rho` (cost c = N + X/1000) is not printed. " + sent)
+           + "\n\nColumn mapping: paper Q = `Q`; paper rho (input tokens) = `rho_trj`; paper rho^turns (turns) = `rho_turns` (GPT-6 Luna block; DeepSeek's rho^turns is stats.py's turns ratio in mech_stats); paper rho^calls (tool calls) = `rho_inv`; `rho` (cost c = N + X/1000) is not printed. " + sent
+           + "\n\nExtraction. DeepSeek-V4.1-Flash: dataloader.task_row (N, X known only when the episode's capture is complete); Q counts slots with no verdict in any of the three runs as failures. "
+           + LUNA_EXTRACTION + " Earlier versions of this record used task_row for Luna too (e.g. SkillAdam AutoBench rho 0.83, TB2 Q 64.8); the paper prints the Luna extraction above.")
     PO.record("mech_table1", "table1", result=txt, source=["bipa/src/analysis/main/table1.py"], commands=["/mnt/shared-storage-gpfs2/safewt2-share/proj_harness/harness-mitigation/bach-harness/.venv/bin/python -m src.analysis.main.table1  # from bipa/"],
               raw=[c["run_dir"] for c in cells] + [c["test_eval"] for c in cells],
-              notes=["rho = geometric mean per task of (mean over the runs of the metric) / (the same mean over the seed's runs)."])
+              notes=["rho = geometric mean per task of (mean over the runs of the metric) / (the same mean over the seed's runs).",
+                     "GPT-6 Luna cells use luna_row (provider-failed requests dropped; Q over verified outcomes), DeepSeek cells use dataloader.task_row; see Extraction in the Result."])
 
 
 def main():

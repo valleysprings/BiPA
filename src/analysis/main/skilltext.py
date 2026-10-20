@@ -1191,7 +1191,7 @@ def skills_draw():
         ax.set_ylim(bottom + 0.5, -0.5)
     skills_draw_split(ax_a, rows, cells)
     skills_draw_rules(ax_b, rows, text)
-    f.text(0.105, 0.985, "(a) Where the token tax goes", fontsize=7.5, fontweight="bold", va="top")
+    f.text(0.105, 0.985, "(a) Where the extra input tokens go", fontsize=7.5, fontweight="bold", va="top")
     f.text(0.545, 0.985, "(b) What the optimizers write", fontsize=7.5, fontweight="bold", va="top")
     # the serialize category reads "one at a time" in this figure, as its column head
     labels = dict(LABEL, serialize="one at a time")

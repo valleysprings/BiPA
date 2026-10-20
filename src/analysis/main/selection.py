@@ -864,43 +864,43 @@ def draw_selection(result):
 
 
 def draw_devsize(result):
-    """mech_devsize, one column (3.25 in): the dev gain SkillOpt's rule (best of 4) and GEPA's rule (best of 7) report from a random seed
-    draw when every candidate is identical to the seed, against the number of dev tasks (log axis), per benchmark (marker) for the fitted
-    task model (solid) and the flatter one (dashed).  Sizes beyond a benchmark's dev panel add tasks drawn from the prior (exchangeable
-    tasks).  The dev size of the Table 1 runs (30) is marked.  The MDE80 is not drawn: it depends on the task model and the paper does
-    not use it."""
+    """mech_devsize, one column (3.25 in; redrawn 2026-10-20): the dev gain SkillOpt's rule (best of 4, left) and GEPA's rule (best of 7,
+    right) report from a random seed draw when every candidate is identical to the seed, against the number of dev tasks (log axis), one
+    coloured line per benchmark, fitted task model only (the moderate prior is given in the text).  Sizes beyond a benchmark's dev panel
+    add tasks drawn from the prior (exchangeable tasks).  The dev size of the Table 1 runs (30) is marked."""
     plt = style()
-    from matplotlib.lines import Line2D
-    benches = (("terminal-bench-2-1", "TB2", "s"), ("tau3-bench", r"$\tau^3$-bench", "o"), ("automationbench", "AutoBench", "^"))
-    rules = (("SkillOpt", "SkillOpt's rule (best of 4)", "0.15"), ("GEPA", "GEPA's rule (best of 7)", "0.6"))
-    priors = (("fitted", "-"), ("moderate", "--"))
+    benches = (("tau3-bench", r"$\tau^3$-bench", "#0072B2", "o"), ("automationbench", "AutoBench", "#009E73", "^"),
+               ("terminal-bench-2-1", "TB2", "#D55E00", "s"))
+    rules = (("SkillOpt", "SkillOpt's rule (best of 4)"), ("GEPA", "GEPA's rule (best of 7)"))
     plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7,
                          "axes.linewidth": 0.6})
-    fig, ax = plt.subplots(figsize=(3.25, 1.75))
-    fig.subplots_adjust(left=0.15, right=0.97, bottom=0.2, top=0.97)
-    for bench, _, marker in benches:
-        for prior, ls in priors:
-            rows = [result[bench]["devsize"][prior][str(s)] for s in DEV_SIZES]
-            for rule, _, shade in rules:
-                ax.plot(DEV_SIZES, [r[rule]["E_gain_random_points"] for r in rows], color=shade, ls=ls, lw=1.0, marker=marker, markersize=3.5)
-    ax.plot([30, 30], [0, 20.5], color="0.75", lw=0.8, zorder=0)
-    ax.set_xscale("log")
-    ax.set_xticks(DEV_SIZES)
-    ax.set_xticklabels([str(s) for s in DEV_SIZES])
-    ax.minorticks_off()
-    ax.tick_params(labelsize=7, length=2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.set_ylim(0, 27)   # headroom for the legend
-    ax.set_yticks([0, 5, 10, 15, 20])
-    ax.spines["left"].set_bounds(0, 20)
-    ax.set_ylabel("gain reported for\nunchanged candidates (pts)", fontsize=7)
-    ax.set_xlabel("dev tasks (30 in our runs)", fontsize=7)
-    rule_handles = [Line2D([], [], color=shade, lw=1.2, label=label) for _, label, shade in rules]
-    prior_handles = [Line2D([], [], color="0.3", lw=1.0, ls="-", label="fitted task model"),
-                     Line2D([], [], color="0.3", lw=1.0, ls="--", label="flatter task model")]
-    bench_handles = [Line2D([], [], color="0.3", lw=0, marker=m, markersize=4, label=d) for _, d, m in benches]
-    ax.legend(handles=rule_handles + prior_handles + bench_handles, loc="upper right", fontsize=6.3, frameon=False, ncol=2,
-              handlelength=1.8, borderaxespad=0.1, columnspacing=0.8, labelspacing=0.25)
+    fig, axes = plt.subplots(1, 2, figsize=(3.25, 1.6), sharey=True)
+    fig.subplots_adjust(left=0.13, right=0.83, bottom=0.22, top=0.88, wspace=0.12)
+    for ax, (rule, title) in zip(axes, rules):
+        ax.axvline(30, color="0.8", lw=0.8, zorder=0)
+        for bench, label, color, marker in benches:
+            ys = [result[bench]["devsize"]["fitted"][str(s)][rule]["E_gain_random_points"] for s in DEV_SIZES]
+            ax.plot(DEV_SIZES, ys, color=color, lw=1.4, marker=marker, markersize=3.2, clip_on=False)
+            if ax is axes[-1]:
+                ax.text(DEV_SIZES[-1] * 1.18, ys[-1], label, color="0.15", fontsize=6.5, va="center", ha="left")
+        ax.set_title(title, fontsize=7, pad=3)
+        ax.set_xscale("log")
+        ax.set_xticks(DEV_SIZES)
+        ax.set_xticklabels([str(s) for s in DEV_SIZES])
+        ax.minorticks_off()
+        ax.tick_params(labelsize=6.5, length=2)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.set_ylim(0, 14)
+        ax.set_yticks([0, 5, 10])
+        ax.grid(axis="y", color="0.92", lw=0.5)
+        ax.set_axisbelow(True)
+    # TB2 and AutoBench end close together at 120: nudge the right-hand labels apart
+    texts = sorted(axes[-1].texts, key=lambda t: t.get_position()[1])
+    for lo, hi in zip(texts, texts[1:]):
+        if hi.get_position()[1] - lo.get_position()[1] < 1.4:
+            hi.set_y(lo.get_position()[1] + 1.4)
+    axes[0].set_ylabel("gain reported for\nidentical candidates (pts)", fontsize=7)
+    fig.text(0.48, 0.02, "dev tasks (log scale; line: 30, our runs)", ha="center", va="bottom", fontsize=7)
     save_figure(fig, "devsize")
 
 
