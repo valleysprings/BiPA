@@ -7,7 +7,7 @@ import json
 import numpy as np
 
 from aux.noise_and_domains import appb
-from src.analysis.selection import BENCHES
+from aux.selection_replay.selection import BENCHES
 from src.utils import dataloader
 from src.utils.fig import save_figure
 

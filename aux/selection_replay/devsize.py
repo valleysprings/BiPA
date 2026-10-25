@@ -1,18 +1,15 @@
 """mech_devsize: how the dev gain reported for identical candidates and the MDE80 of a single-run comparison change with the
-size of the dev panel, under the task model of src.analysis.selection.
+size of the dev panel, under the task model of aux.selection_replay.selection.
 
-Run: python -m aux.selection_replay.devsize compute   -> CACHE/analysis/main/selection_devsize.json, data/mech/mech_devsize.md (reads selection.json)
-     python -m aux.selection_replay.devsize draw      -> fig/mech/mech_devsize.{pdf,svg}
+Run: python -m aux.selection_replay.devsize   -> CACHE/analysis/main/selection_devsize.json, data/mech/mech_devsize.md (reads selection.json)
 """
 import json
-import sys
 
 import numpy as np
 
-from src.analysis.selection import (BENCHES, MODERATE, best_of, check_inputs, executions, fit_prior, mde80, outcomes, reseed, seed_files,
-                                    task_probabilities)
+from aux.selection_replay.selection import (BENCHES, MODERATE, best_of, check_inputs, executions, fit_prior, mde80, outcomes, reseed,
+                                            seed_files, task_probabilities)
 from src.utils import dataloader, logger
-from src.utils.fig import save_figure
 
 DEVSIZE_DRAWS = 40_000
 DEV_SIZES = (9, 15, 30, 60, 120)
@@ -85,64 +82,8 @@ def record_devsize(result):
         "comparison of two single runs. Random seed [20261012, benchmark index, prior index, 100 + size index].",
         logger.md_table(["bench", "prior", "dev size", "seed-draw quantile -> baseline", "SkillOpt E[gain] random (pts)", "SkillOpt E[gain] at quantile (pts)",
                     "GEPA E[gain] random (pts)", "GEPA E[gain] at quantile (pts)", "MDE80 (pts)", "critical net difference (tasks)"], rows),
-        "python -m aux.selection_replay.devsize compute\npython -m aux.selection_replay.devsize draw")
-
-
-def style():
-    """matplotlib with TrueType fonts in the pdf (the ACL check rejects Type 3)."""
-    import matplotlib
-    matplotlib.use("Agg")
-    matplotlib.rcParams["pdf.fonttype"] = 42
-    matplotlib.rcParams["ps.fonttype"] = 42
-    import matplotlib.pyplot as plt
-    return plt
-
-
-def draw_devsize(result):
-    """mech_devsize, one column (3.25 in): the dev gain SkillOpt's rule (best of 4, left) and GEPA's rule (best of 7,
-    right) report from a random seed draw when every candidate is identical to the seed, against the number of dev tasks (log axis), one
-    coloured line per benchmark, fitted task model only (the moderate prior is given in the text).  Sizes beyond a benchmark's dev panel
-    add tasks drawn from the prior (exchangeable tasks).  The dev size of the Table 1 runs (30) is marked."""
-    plt = style()
-    benches = (("tau3-bench", r"$\tau^3$-bench", "#0072B2", "o"), ("automationbench", "AutoBench", "#009E73", "^"),
-               ("terminal-bench-2-1", "TB2", "#D55E00", "s"))
-    rules = (("SkillOpt", "SkillOpt's rule (best of 4)"), ("GEPA", "GEPA's rule (best of 7)"))
-    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7,
-                         "axes.linewidth": 0.6})
-    fig, axes = plt.subplots(1, 2, figsize=(3.25, 1.6), sharey=True)
-    fig.subplots_adjust(left=0.13, right=0.83, bottom=0.22, top=0.88, wspace=0.12)
-    for ax, (rule, title) in zip(axes, rules):
-        ax.axvline(30, color="0.8", lw=0.8, zorder=0)
-        for bench, label, color, marker in benches:
-            ys = [result[bench]["devsize"]["fitted"][str(s)][rule]["E_gain_random_points"] for s in DEV_SIZES]
-            ax.plot(DEV_SIZES, ys, color=color, lw=1.4, marker=marker, markersize=3.2, clip_on=False)
-            if ax is axes[-1]:
-                ax.text(DEV_SIZES[-1] * 1.18, ys[-1], label, color="0.15", fontsize=6.5, va="center", ha="left")
-        ax.set_title(title, fontsize=7, pad=3)
-        ax.set_xscale("log")
-        ax.set_xticks(DEV_SIZES)
-        ax.set_xticklabels([str(s) for s in DEV_SIZES])
-        ax.minorticks_off()
-        ax.tick_params(labelsize=6.5, length=2)
-        ax.spines[["top", "right"]].set_visible(False)
-        ax.set_ylim(0, 14)
-        ax.set_yticks([0, 5, 10])
-        ax.grid(axis="y", color="0.92", lw=0.5)
-        ax.set_axisbelow(True)
-    # TB2 and AutoBench end close together at 120: nudge the right-hand labels apart
-    texts = sorted(axes[-1].texts, key=lambda t: t.get_position()[1])
-    for lo, hi in zip(texts, texts[1:]):
-        if hi.get_position()[1] - lo.get_position()[1] < 1.4:
-            hi.set_y(lo.get_position()[1] + 1.4)
-    axes[0].set_ylabel("gain reported for\nidentical candidates (pts)", fontsize=7)
-    fig.text(0.48, 0.02, "dev tasks (log scale; line: 30, the recorded runs)", ha="center", va="bottom", fontsize=7)
-    save_figure(fig, "devsize")
+        "python -m aux.selection_replay.devsize")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        sys.exit("usage: python -m aux.selection_replay.devsize compute|draw")
-    if sys.argv[1] == "compute":
-        compute()
-    else:
-        draw_devsize(json.loads((dataloader.CACHE / "selection_devsize.json").read_text()))
+    compute()

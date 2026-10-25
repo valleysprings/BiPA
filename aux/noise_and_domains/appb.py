@@ -1,12 +1,10 @@
-"""Rerun figure appB_reruns and its record.
-  python -m aux.noise_and_domains.appb compute   -> CACHE/analysis/appb/reruns.json (every test run of the seed and of the
-      returned skills: success and input-token ratio against the pooled seed)
-  python -m aux.noise_and_domains.appb draw      -> fig/mech/appB_reruns and data/mech/appB_reruns.md
+"""Every test run of the seed and of the returned skills: success and input-token ratio against the pooled seed (the rerun figure's numbers).
+  python -m aux.noise_and_domains.appb   -> CACHE/analysis/appb/reruns.json
 Reruns: the runs are pinned below (the https reruns `native-20261008-https`, the same runs as Table 1;
 each skill's three test executions are the run's own evaluation plus the two under `test-reps/<bench>__<method>__<run>`); per-run rho_X is the
 geometric-mean ratio against the pooled seed (per-task geometric mean over the seed's three runs), a skill's pooled rho_X pools its own runs
-the same way (as in stability.pooled)."""
-import json, math, sys
+the same way (gm_ratio)."""
+import json, math
 import numpy as np
 from src.utils.dataloader import gmean
 
@@ -35,13 +33,50 @@ def out_dir():
     d = od("appb"); d.mkdir(parents=True, exist_ok=True); return d
 
 
+def price(reqs):
+    """input tokens priced at uncached 1, cached 0.1, plus output 4 per token."""
+    tot = 0.0
+    for r in reqs:
+        X = r["input_tokens"]; res = min((r.get("captured_usage") or {}).get("cache_tokens") or 0, X)
+        tot += (X - res) + 0.1 * res + 4 * r["output_tokens"]
+    return tot
+
+
+def load(f):
+    """{task: succ, input tokens X, output tokens O, turns R, executed calls N, price P} of an evaluation.json (first episode per task, duplicate requests dropped)."""
+    eps = {}
+    for e in json.load(open(f))["episodes"]: eps.setdefault(e["task_id"], e)
+    out = {}
+    for t, e in eps.items():
+        seen = set(); reqs = []
+        for r in e.get("requests", []):
+            if r["request_id"] not in seen: seen.add(r["request_id"]); reqs.append(r)
+        calls = [c for r in reqs for c in r.get("tool_calls", [])]
+        out[t] = dict(succ=1.0 if e.get("success") else 0.0, X=sum(r["input_tokens"] for r in reqs), O=sum(r["output_tokens"] for r in reqs),
+                      R=len(reqs), N=sum(c.get("executed") is True for c in calls), P=price(reqs))
+    return out
+
+
+def gm(a, b, tasks, key="X"):
+    l = [math.log(a[t][key] / b[t][key]) for t in tasks if a[t][key] > 0 and b[t][key] > 0]
+    return gmean(np.exp(l)), len(l)
+
+
+def gm_ratio(A, Bs, tasks, k):
+    """geometric-mean over tasks of (per-task geometric mean over runs in A) / (same over Bs)."""
+    d = []
+    for t in tasks:
+        a = [r[t][k] for r in A if t in r and r[t][k] > 0]; b = [r[t][k] for r in Bs if t in r and r[t][k] > 0]
+        if a and b: d.append(sum(map(math.log, a)) / len(a) - sum(map(math.log, b)) / len(b))
+    return gmean(np.exp(d)), len(d)
+
+
 # ---- compute ---------------------------------------------------------------------------------------------------------------------------------
 
 def compute_reruns():
     import itertools
     from src.utils.dataloader import DS, SEED_TEXT, eval_file, final_skill, vid
     from src.analysis.table1 import rep_files
-    from aux.noise_and_domains.stability import load, gm, gm_ratio
     out, raw = {}, []
     for bench, _ in BENCH:
         F = {"seed": [("main", eval_file(DS / "native-seed" / bench / SEED_RUN, "test", vid(SEED_TEXT)))]}
@@ -93,101 +128,8 @@ def compute():
     compute_reruns()
 
 
-# ---- draw ------------------------------------------------------------------------------------------------------------------------------------
-
-def style():
-    import matplotlib; matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    plt.rcParams.update({"font.family": "serif", "font.serif": ["Times New Roman", "Times", "Nimbus Roman", "Liberation Serif", "DejaVu Serif"], "mathtext.fontset": "stix",
-        "font.size": 8, "axes.labelsize": 8, "axes.titlesize": 8, "legend.fontsize": 7.5, "xtick.labelsize": 7.5, "ytick.labelsize": 7.5, "pdf.fonttype": 42, "axes.linewidth": 0.6})
-    return plt
+OC = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}  # optimizer colors, also used by selection_fig
 
 
-def save(fig, name):
-    import matplotlib
-    from src.utils.logger import paperout as PO
-    (PO.FIG / "mech").mkdir(parents=True, exist_ok=True)
-    with matplotlib.rc_context({"svg.fonttype": "none"}): fig.savefig(PO.FIG / "mech" / f"{name}.svg")
-    fig.savefig(PO.FIG / "mech" / f"{name}.pdf"); fig.savefig(out_dir() / f"{name}.png", dpi=200)
-
-
-OC = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}
-OM = {"SkillOpt": "o", "SkillAdam": "s", "GEPA": "^"}
-
-
-def draw_reruns(plt, d):
-    B = d["benches"]
-    fig, axs = plt.subplots(2, 3, figsize=(6.3, 3.9))
-    fig.subplots_adjust(left=0.095, right=0.99, bottom=0.14, top=0.86, hspace=0.62, wspace=0.3)
-    for j, (bench, disp) in enumerate(BENCH):
-        r = B[bench]; sk = r["skills"]; sd = r["seed"]
-        names = ["seed"] + [s for s in ("GEPA", "SkillOpt", "SkillAdam") if s in sk]
-        x = {s: i for i, s in enumerate(names)}
-        for row, ax in enumerate(axs[:, j]):
-            seedvals = sd["succ"] if row == 0 else sd["rho_pool"]
-            ax.axhspan(min(seedvals), max(seedvals), color="0.5", alpha=0.15, lw=0, zorder=0)
-            ax.axhline(float(np.mean(seedvals)), color="0.5", lw=0.8, ls="-", zorder=1)
-            for s in names:
-                vals = sk[s]["succ"] if row == 0 else sk[s]["rho_pool"]
-                col = "0.45" if s == "seed" else OC[s]; mk = "o" if s == "seed" else OM[s]
-                n = len(vals); xs = x[s] + (np.arange(n) - (n - 1) / 2) * min(0.22, 0.5 / max(n, 1))
-                ax.scatter(xs, vals, s=16, marker=mk, color=col, zorder=4, lw=0)
-                if s != "seed" and "rho_pooled" in sk[s] and row == 1:
-                    ax.plot([x[s] - 0.28, x[s] + 0.28], [sk[s]["rho_pooled"]] * 2, color=col, lw=1.4, zorder=3)
-                if row == 0:
-                    ax.plot([x[s] - 0.28, x[s] + 0.28], [float(np.mean(vals))] * 2, color=col, lw=1.4, zorder=3)
-            ax.set_xticks(list(x.values())); ax.set_xticklabels(names, rotation=22, ha="right")
-            ax.set_xlim(-0.55, len(names) - 0.45); ax.spines[["top", "right"]].set_visible(False)
-            if row == 0:
-                ax.set_title(disp, loc="left", fontweight="bold")
-                lo = min(min(sk[s]["succ"]) for s in names) - 2; hi = max(max(sk[s]["succ"]) for s in names) + 2
-                ax.set_ylim(lo, hi)
-            else:
-                ax.set_yscale("log")
-                allv = [v for s in names for v in sk[s]["rho_pool"]] + [1.0]
-                ax.set_ylim(min(allv) / 1.06, max(allv) * 1.06)
-                lo, hi = ax.get_ylim()
-                ticks = [t for t in (0.9, 1.0, 1.1, 1.2, 1.4, 1.6) if lo <= t <= hi]
-                ax.set_yticks(ticks); ax.set_yticklabels([f"{t:.1f}x" for t in ticks]); ax.minorticks_off()
-                ax.axhline(1.0, color="k", lw=0.5, ls="--", zorder=1)
-    axs[0, 0].set_ylabel("test success (%)")
-    axs[1, 0].set_ylabel("input tokens of the run\n/ the pooled seed")
-    h = [plt.Line2D([], [], marker="o", ls="", color="0.45", ms=4), plt.Rectangle((0, 0), 1, 1, fc="0.5", alpha=0.15, lw=0),
-         plt.Line2D([], [], ls="-", color="0.5", lw=1.2)] + [plt.Line2D([], [], marker=OM[s], ls="", color=OC[s], ms=4) for s in ("SkillOpt", "SkillAdam", "GEPA")]
-    fig.legend(h, ["seed run", "seed's 3-run spread", "run mean / pooled ratio", "SkillOpt", "SkillAdam", "GEPA"],
-               loc="upper center", bbox_to_anchor=(0.53, 0.99), frameon=False, fontsize=7.2, ncol=4, handlelength=1.2, columnspacing=1.0, handletextpad=0.3)
-    save(fig, "appB_reruns")
-
-
-def records(reruns):
-    from src.utils.logger import paperout as PO
-    mt = PO.mdtable
-    PO.SPECS.setdefault("appB_reruns", dict(pub="mech",
-        shows="every test run of the seed and of the returned skills: success (top) and the run's input-token ratio against the pooled seed (bottom); the gray band spans the seed's three runs",
-        files="fig/mech/appB_reruns.pdf, fig/mech/appB_reruns.svg",
-        notes=["The seed spreads (0.050, 0.129, 0.037 log input tokens; 0.052, 0.043, 0.054 log tool calls; 4.0, 8.4, 5.6 success points) come from the slopes `reruns` step of aux/cost_appendix (`seed_spread.json`); this figure recomputes per-run ratios from the same evaluation files and asserts them against those frozen values.",
-               "The frozen asserts above cover only the baseline cells."]))
-    B = reruns["benches"]; nm = dict(BENCH)
-    rows = []
-    for b, _ in BENCH:
-        for s, sk in B[b]["skills"].items():
-            rows.append([nm[b], s, ", ".join(sk["runs"]), ", ".join(f"{v:.1f}" for v in sk["succ"]),
-                         ", ".join(f"{v:.3f}" for v in sk["rho_pool"]), f"x{sk['rho_pooled']:.2f}" if "rho_pooled" in sk else ""])
-        sd = B[b]["seed"]
-        rows.append([nm[b], "seed spread", "3 runs", f"span {sd['span']:.1f} pts", f"pairwise max x{sd['spread_X']:.2f}", f"flip {100*sd['flip']:.0f}%, any-flip {100*sd['anyflip']:.0f}%"])
-    PO.record("appB_reruns", "fig", result=mt(["Benchmark", "skill", "runs", "success per run (%)", "input tokens / pooled seed per run", "pooled ratio / flips"], rows)
-              + "\n\nPer-run success and geometric-mean input-token ratio against the pooled seed (per-task geometric mean over the seed's three runs), all on the test split; a skill's pooled ratio pools its own runs the same way.",
-              source=["aux/noise_and_domains/appb.py", "aux/noise_and_domains/stability.py"],
-              commands=["python -m aux.noise_and_domains.appb compute", "python -m aux.noise_and_domains.appb draw"], raw=reruns["raw"])
-
-
-def main():
-    if len(sys.argv) < 2:
-        sys.exit("usage: python -m aux.noise_and_domains.appb compute|draw")
-    if sys.argv[1] == "compute": compute(); return
-    plt = style()
-    r = json.loads((out_dir() / "reruns.json").read_text())
-    draw_reruns(plt, r); records(r)
-
-
-if __name__ == "__main__": main()
+if __name__ == "__main__":
+    compute()

@@ -1,7 +1,7 @@
-"""Stratified convergence control of the exploration analysis (explore.py).
+"""Do a task's three runs agree more under a learned skill, stratified by how its success moved.
 
-Same runs, tasks and definitions as explore.py (THETA 0.5; D = 1 - mean pairwise edit similarity; converged = D(own) < D(ref);
-tasks with 3 verified runs, R > 0, on both sides). Each task-contrast gets k_ref, k_own = successes out of 3.
+Runs: Table 1's avg@3 test runs (dynamics.load_cell). D = 1 - mean pairwise edit similarity of the executed tool-name sequences;
+converged = D(own) < D(ref); tasks with 3 verified runs, R > 0, on both sides. Each task-contrast gets k_ref, k_own = successes out of 3.
 Question: is the excess convergence of learned-skill gains over the seed (65% vs 48% of unchanged) a ceiling effect of
 2->3 gains? (1) Converged share per transition k_ref->k_own, (2) gains against unchanged tasks at the same
 starting level (k_own = k_ref) and at the same end level, with Mantel-Haenszel odds ratios (Robins-Breslow-Greenland CI),
@@ -15,7 +15,7 @@ import math
 import numpy as np
 
 from src import layout
-from src.analysis import dynamics as D
+from aux.headline_numbers import dynamics as D
 
 THETA = 0.5
 OUT = layout.OUT / "transfer_and_trajectories/explore_strat.json"

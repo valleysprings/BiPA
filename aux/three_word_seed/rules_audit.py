@@ -1,17 +1,16 @@
-"""(f) Rule audit of the four RETURNED from-scratch skills (final/SKILL.md), sentence by sentence, with the S0-S3 rubric of aux/skill_paths/compare:
+"""(f) Rule audit of the four RETURNED from-scratch skills (final/SKILL.md), sentence by sentence, with the S0-S3 rubric:
   S0 task-independent good practice (would be correct in any benchmark)
   S1 a convention of the whole benchmark (its CLI, files, conversation protocol, reporting rules) that names no specific app / tool / field
   S2 names a specific tool, app, service, field or command (and how to use it)
   S3 holds only for one class of tasks or one task instance (domain procedure, concrete facts)
 Collapsed: general = S0; benchmark-wide = S1; specific = S2 + S3.  'literal' marks sentences that contain a benchmark-specific literal (command, file, tool name, API name, domain term).
-Labels below are hand labels (one reading pass, reasons in the dict); for the two AutoBench skills every sentence also exists in the blind J1/J2 judging of path-compare (matched by text), reported next to the hand labels.
-Run: python -m aux.three_word_seed.rules_audit   (after sentences; reads the judges of aux.skill_paths.compare)
+Labels below are hand labels (one reading pass, reasons in the dict).
+Run: python -m aux.three_word_seed.rules_audit   (after sentences)
 """
-import collections, json, re
+import collections, json
 from src import layout
 
 OUT = layout.OUT / "three_word_seed"
-P = layout.OUT / "skill_paths/compare"
 
 # sentence index -> (level, literal?, reason)
 L = {
@@ -50,15 +49,8 @@ L = {
   22: ("S1", 0, "do not transfer merely because inconvenient (tau3 transfer convention)"), 23: ("S0", 0, "try all supported actions first"), 24: ("S1", 0, "transfer when policy requires, prescribed sequence"),
   25: ("S1", 0, "customer-facing tone"), 26: ("S1", 0, "do not expose internal notes"), 27: ("S1", 0, "report verified outcome and end the conversation")},
 }
-RUN = {"skillopt|automationbench": "N-skillopt", "gepa|automationbench": "N-gepa"}
-
-
 def main():
     S = json.load(open(OUT / "sentences.json"))
-
-    norm = lambda s: re.sub(r"\W+", " ", s.lower()).strip()
-    allS = json.load(open(P / "sentences_all.json"))
-    J = {j: {json.loads(l)["id"]: json.loads(l) for l in open(P / f"judge_{j}.jsonl")} for j in ("J1", "J2")}
     res = {}
     for key, labels in L.items():
         sents = S[key]["sentences"]
@@ -73,23 +65,8 @@ def main():
                  general_S0_share=cnt["S0"] / n, benchmark_wide_S1_share=cnt["S1"] / n, specific_S2S3_share=(cnt["S2"] + cnt["S3"]) / n, specific_S2S3_word_share=(wc["S2"] + wc["S3"]) / W,
                  S3_count=cnt["S3"], literal_count=sum(v[1] for v in labels.values()), literal_share=sum(v[1] for v in labels.values()) / n,
                  verbatim_examples={lv: [sents[i] for i in sorted(labels) if labels[i][0] == lv][:3] for lv in ("S0", "S1", "S2", "S3")})
-        if key in RUN:
-            idx = collections.defaultdict(list)
-            for r in allS:
-                if r["run"] == RUN[key]:
-                    idx[norm(r["text"])].append(r)
-            jj = {}
-            for j in ("J1", "J2"):
-                lv = [J[j][idx[norm(s)][0]["id"]]["level"] for s in sents]
-                c = collections.Counter(lv)
-                jj[j] = dict(counts={k: c.get(k, 0) for k in ("S0", "S1", "S2", "S3", "X")}, S0_share=c["S0"] / n, S2S3_share=(c["S2"] + c["S3"]) / n, S3_count=c["S3"],
-                             agree_with_mine=sum(a == labels[i][0] for i, a in enumerate(lv)), per_sentence=lv)
-            d["blind_judges_matched_sentences"] = sum(1 for s in sents if idx.get(norm(s))); d["blind_judges"] = jj
         res[key] = d
         print(key, "n", n, "words", W, d["mine"], "S0 %.3f S1 %.3f S2+S3 %.3f (words %.3f) literal %.3f" % (d["general_S0_share"], d["benchmark_wide_S1_share"], d["specific_S2S3_share"], d["specific_S2S3_word_share"], d["literal_share"]))
-        if key in RUN:
-            for j, v in d["blind_judges"].items():
-                print("    ", j, v["counts"], "S0 share %.3f S2+S3 share %.3f agree with mine %d/%d" % (v["S0_share"], v["S2S3_share"], v["agree_with_mine"], n))
     json.dump(res, open(OUT / "rules_audit.json", "w"), indent=1, ensure_ascii=False)
     json.dump({k: {str(i): dict(sentence=S[k]["sentences"][i], level=v[0], literal=v[1], reason=v[2]) for i, v in lab.items()} for k, lab in L.items()}, open(OUT / "rules_labels.json", "w"), indent=1, ensure_ascii=False)
 

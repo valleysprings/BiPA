@@ -10,7 +10,7 @@
 | `adapters/` | `gepa.py`, `skillopt.py`, `skilladam.py`: each upstream loop on our batches, executor and model client |
 | `prompts/skilladam/` | SkillAdam's benchmark prompt files (vendor role, metric, failure and success types, iteration example) |
 | `graph/episode.py` | The per-episode bipartite graph: turns, context components, tool calls |
-| `analysis/` | Table 1 and the main-text figures and numbers; `python -m src.analysis` runs them in order |
+| `analysis/` | `table1.py` and `stats.py` (Table 1 and its paired statistics), `slopes.py` and `attribution.py` (turn slopes and the four-term split on the episode graph), `episodes.py` and `common.py` (their shared readers); `python -m src.analysis` runs them in order. Every other figure and number is in `aux/` |
 | `utils/dataloader/` | The pinned run of each cell (`configs/experiments.yaml`) and evaluation readers for the analyses; analysis cache under `$BIPA_ASSETS/cache/analysis` |
 | `utils/logger/` | Analysis records under `$BIPA_OUT/data/mech` |
 | `utils/fig/` | Figures under `$BIPA_OUT/fig/mech` |

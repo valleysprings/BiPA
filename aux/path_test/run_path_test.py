@@ -28,6 +28,7 @@ import os
 import sys
 from pathlib import Path
 
+from aux.headline_numbers.dynamics import slot
 from src import layout
 
 EXECUTION, RESULTS, SEED_FILE = layout.EXECUTION, layout.RESULTS, layout.SEED_FILE
@@ -50,10 +51,6 @@ FINGERPRINT = {"old": "aeb56401ca74e127821c4f9126dcb669", "new": "e72d3c7f663d3e
 def version(text):
     files = {} if text is None else {"SKILL.md": text}
     return hashlib.sha256(json.dumps(files, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
-
-
-def slot(row):
-    return (row, 0) if isinstance(row, str) else (row["task_id"], row.get("repetition", 0))
 
 
 def normalized(panel):

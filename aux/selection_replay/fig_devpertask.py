@@ -10,7 +10,7 @@ Run:  python -m aux.selection_replay.fig_devpertask   (after collect)
 import json, os, pickle
 import numpy as np
 from aux.selection_replay.style import FONT, INK, MUTED, GRID, BENCH_NAME, setup_mpl  # noqa
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 
 from src import layout
 
@@ -32,11 +32,6 @@ def seed_noise(bench):
 def flips(a, b):
     t = [k for k in a if k in b]
     return (sum(1 for k in t if a[k] == 0 and b[k] == 1), sum(1 for k in t if a[k] == 1 and b[k] == 0), len(t))
-
-
-def rate(a, b):
-    t = [k for k in a if k in b]
-    return 100 * sum(a[k] for k in t) / len(t), 100 * sum(b[k] for k in t) / len(t)
 
 
 def main():

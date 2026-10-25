@@ -7,7 +7,7 @@ Run: python -m aux.three_word_seed.collect_dev
 import glob, json
 from pathlib import Path
 from src import layout
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 
 EXE = layout.EXECUTION / "gpt-6-luna"
 OUT = layout.OUT / "three_word_seed"

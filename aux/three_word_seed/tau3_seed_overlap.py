@@ -2,7 +2,7 @@
 Run: python -m aux.three_word_seed.tau3_seed_overlap"""
 import json, glob
 from src import layout
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 EXE = str(layout.EXECUTION / 'gpt-6-luna')
 OUT = layout.OUT / "three_word_seed"
 

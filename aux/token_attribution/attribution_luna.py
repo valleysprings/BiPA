@@ -22,13 +22,14 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
+from aux.headline_numbers.dynamics import known, slot, valid_slots
 from src import layout
 from src.analysis import attribution as A
 from src.analysis import table1 as T
 from src.analysis.episodes import metrics
 from src.analysis.episodes import fe_reg
 from src.graph import episode as W
-from src.utils.dataloader import SEED_TEXT, vid, current_run
+from src.utils.dataloader import SEED_TEXT, vid
 from src.utils import logger
 
 OUT = layout.OUT / "token_attribution"
@@ -39,21 +40,6 @@ BENCH2 = [("tau3-bench", "tau3"), ("automationbench", "AutoB")]
 TERMS = A.TERMS
 B = 10000
 RNG = np.random.default_rng(20261020)
-
-
-# Luna episodes (src.run repeat merge, Luna extraction)
-def slot(row):
-    return (row, 0) if isinstance(row, str) else (row["task_id"], row.get("repetition", 0))
-
-
-def valid_slots(data):
-    panel = [slot(r) for r in data.get("panel", [])]
-    eps = [slot(r) for r in data.get("episodes", [])]
-    return len(set(panel)) == len(panel) and len(set(eps)) == len(eps) and set(eps) <= set(panel)
-
-
-def known(ep):
-    return type(ep.get("success")) is bool and ep.get("outcome_valid", True) is True
 
 
 def luna_side(arm, bench):
@@ -167,7 +153,7 @@ def luna_cells():
         seed = runs[("native-seed", bench)]
         for disp, m in OPT:
             own = runs[(m, bench)]
-            # Table 1 Luna common set: per-task means over runs, both sides N, X > 0 (src.analysis.transfer.rho_geo)
+            # Table 1 Luna common set: per-task means over runs, both sides N, X > 0 (aux.headline_numbers.transfer.rho_geo)
             mean = lambda rs, key: sum(r["row"][key] for r in rs) / len(rs)
             common = [t for t in sorted(seed) if t in own and all(x > 0 for x in (mean(seed[t], "N"), mean(seed[t], "X"), mean(own[t], "N"), mean(own[t], "X")))]
             t1 = {t: math.log(mean(own[t], "X") / mean(seed[t], "X")) for t in common}
@@ -416,7 +402,7 @@ def record():
             "Luna TB2 is excluded from A and B: all three optimizers returned the seed, so every term is 0.")
     runs = ("GPT-6-Luna: seed native-seed native-20261011; GEPA, SkillOpt, SkillAdam native-20261012; "
             "rep 0 from the run directory, reps 1-2 and unknown-only supplements from test-reps/<bench>__<arm>__<tag>, merged as src.run repeat does (only verified outcomes; a supplement "
-            "fills a slot only if it is still unknown) -- the same merge and episode extraction as Table 1's Luna panel (src.analysis.transfer). "
+            "fills a slot only if it is still unknown) -- the same merge and episode extraction as Table 1's Luna panel (aux.headline_numbers.transfer). "
             "DeepSeek-V4.1-Flash: as mech_attribution3 (skills native-20261008-https + test-reps; seed native-20261003-trace-final + rep-1/rep-2), recomputed here per task for the bootstrap.")
     agg = ("Luna episodes: provider-failed requests (no usage, retried) are removed before the episode graph is built, so R = completed requests, X = their input tokens, N = calls "
            "not marked unexecuted; graph R, N, X equal Table 1's Luna extraction on every episode (0 mismatches). Per task and side, R, N, X, F are averaged over the runs Table 1 "

@@ -12,8 +12,8 @@ import json, random
 import numpy as np
 
 from src import layout
-from src.analysis import dynamics as D
-from src.analysis import transfer as L
+from aux.headline_numbers import dynamics as D
+from aux.headline_numbers import transfer as L
 from src.utils.dataloader import DS
 
 HERE = layout.OUT / "transfer_and_trajectories"

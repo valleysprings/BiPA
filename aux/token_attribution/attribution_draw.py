@@ -1,62 +1,13 @@
-"""Draw the four-term heatmap and write mech_attribution3.md from attribution.json (written by the attribution compute step)."""
+"""Write mech_attribution3.md from attribution.json (written by the attribution compute step).
+Run:  python -m aux.token_attribution.attribution_draw"""
 import json
 import math
 
-import numpy as np
-
 from src.utils import dataloader, logger
-from src.utils.fig import save_figure
 
 TERMS = ["more_actions", "turn_splitting", "content", "skill_text"]
 TERM_LABEL = dict(more_actions="more actions", turn_splitting="turn-splitting", content="content per turn", skill_text="skill text")
 PREFIX = ["system", "tool_schemas", "task", "skill"]
-
-
-def draw_heatmap(cells):
-    """Heatmap in the style of appC_attribution: rows = skills grouped by optimizer (benchmark labels), columns = four terms + measured total, RdBu_r centred at 0."""
-    import matplotlib
-    matplotlib.rcParams["svg.fonttype"] = "none"
-    import matplotlib.pyplot as plt
-    head = ["more\nactions", "turn-\nsplitting", "content\nper turn", "skill\ntext", "total\n(measured)"]
-    bshort = {"tau3-bench": r"$\tau^3$", "automationbench": "AutoBench", "terminal-bench-2-1": "TB2"}
-    keys = TERMS + ["total"]
-    M = np.array([[c["A"][k] for k in keys] for c in cells])
-    methods = [c["method"] for c in cells]
-    bounds = [i for i in range(1, len(cells)) if methods[i] != methods[i - 1]]
-    groups = [(m, sum(i for i, x in enumerate(methods) if x == m) / methods.count(m)) for m in dict.fromkeys(methods)]
-    fig, ax = plt.subplots(figsize=(3.25, 2.6))
-    fig.subplots_adjust(left=0.21, right=0.86, bottom=0.01, top=0.88)
-    v = np.abs(M).max()
-    im = ax.imshow(M, cmap="RdBu_r", vmin=-v, vmax=v, aspect="auto")
-    for i in range(M.shape[0]):
-        for j in range(M.shape[1]):
-            ax.text(j, i, f"{M[i, j]:+.2f}", ha="center", va="center", fontsize=7,
-                    color="white" if abs(M[i, j]) > 0.62 * v else "k", fontweight="bold" if j == 4 else "normal")
-    ax.set_xticks(range(5))
-    ax.set_xticklabels(head, fontsize=6.4, linespacing=0.95)
-    ax.xaxis.set_ticks_position("top")
-    ax.tick_params(axis="x", length=0, pad=2)
-    # second level of row labels: benchmark names right-aligned against the cells
-    ax.set_yticks(range(len(cells)))
-    ax.set_yticklabels([bshort[c["bench"]] for c in cells], fontsize=7)
-    ax.tick_params(axis="y", length=0, pad=2)
-    ax.set_xticks(np.arange(-0.5, 5, 1), minor=True)
-    ax.set_yticks(np.arange(-0.5, len(cells), 1), minor=True)
-    ax.grid(which="minor", color="white", lw=1.0)
-    ax.tick_params(which="minor", length=0)
-    for sp in ax.spines.values():
-        sp.set_visible(False)
-    for y in [b - 0.5 for b in bounds]:
-        ax.plot([-0.5, 4.5], [y, y], color="k", lw=0.9, clip_on=False)
-    # first level: optimizer name once per group, bold, far left
-    for name, yc in groups:
-        ax.text(-0.33, yc, name, transform=ax.get_yaxis_transform(), ha="center", va="center", rotation=90, fontsize=7, fontweight="bold", clip_on=False)
-    cb = fig.colorbar(im, ax=ax, fraction=0.06, pad=0.02, ticks=[-0.2, 0, 0.2])
-    cb.ax.set_yticklabels(["-0.2", "0", "+0.2"], fontsize=7)
-    cb.outline.set_visible(False)
-    cb.ax.tick_params(length=0)
-    cb.set_label("change in log input tokens", fontsize=7)
-    save_figure(fig, "attribution3")
 
 
 def f(x, nd=3):
@@ -97,9 +48,7 @@ def record(cells):
 
 
 def main():
-    cells = json.loads((dataloader.CACHE / "attribution.json").read_text())["cells"]
-    draw_heatmap(cells)
-    record(cells)
+    record(json.loads((dataloader.CACHE / "attribution.json").read_text())["cells"])
 
 
 if __name__ == "__main__":

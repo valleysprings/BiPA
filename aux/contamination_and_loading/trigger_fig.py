@@ -3,23 +3,21 @@
 (a) Delivery 2x2 on tau3 test (DeepSeek-V4.1-Flash 1017 version, one run per cell): input-token ratio rho of SkillOpt over the
     seed when the skill is always resident (full text in the first user message) and when it is loaded on demand (OpenCode
     native --skill with an activation directive), and the on-demand overhead (on demand over always resident) per skill.
-    Same cells, episodes and ratio as delivery_check.py / mech_delivery.md.
+    Same cells, episodes and ratio as mech_delivery.md.
 (b) Trigger cells (same model version, one run per cell, on demand without an activation instruction): share of episodes that
     load SKILL.md through the skill tool (bars), median first-load turn (label above the bar; turn index from 0 = the first
     request), and rho of the cell's input tokens over the same benchmark's seed cell (row at the top).
-    Same cells and statistics as trigger_rate.py / mech_trigger.md.
-Both loaders are re-implemented here; main() asserts that the values match the records.
-Style and colors are rq4_figs.py's; files go through src.utils.fig.save_figure (pdf + editable svg).
+    Same cells and statistics as mech_trigger.md.
+main() asserts that the values match those records.
+Style and colors are those of aux.transfer_and_trajectories.plot_style; files go through src.utils.fig.save_figure (pdf + editable svg).
 Run:  python -m aux.contamination_and_loading.trigger_fig
 """
 import json
 import math
 import statistics
 
-from aux.transfer_and_trajectories import rq4_figs as R  # sets the shared rcParams
-
-import matplotlib.pyplot as plt
-
+from aux.transfer_and_trajectories import plot_style as R
+from aux.headline_numbers.dynamics import known
 from src.layout import relocate
 from src.utils import fig
 from src.utils.dataloader import DS as EXD
@@ -43,11 +41,7 @@ EXPECT_TRIG = {("tau3-bench", "seed"): (0, 75, None, 1.000), ("tau3-bench", "ski
                ("automationbench", "gepa-autob"): (67, 120, 27, 1.203), ("automationbench", "gepa-tau3"): (79, 120, 1, 1.145)}
 
 
-# ---------- (a) delivery: delivery_check.py's loader ----------
-
-def known(ep):
-    return type(ep.get("success")) is bool and ep.get("outcome_valid", True) is True
-
+# ---------- (a) delivery ----------
 
 def delivery_rows(d):
     eps = {}
@@ -81,7 +75,7 @@ def delivery():
     return out, q
 
 
-# ---------- (b) trigger: analyze.py's loader ----------
+# ---------- (b) trigger ----------
 
 def trig_rows(cell):
     p = json.loads((cell / "trigger-summary.json").read_text())["evaluation_path"]
@@ -106,7 +100,7 @@ def trigger():
             firsts = sorted(v["first"] for v in r.values() if v["trig"])
             common = [t for t in r if t in seed and r[t]["X"] and seed[t]["X"]]
             rho = math.exp(sum(math.log(r[t]["X"] / seed[t]["X"]) for t in common) / len(common))
-            med = firsts[len(firsts) // 2] if firsts else None  # analyze.py's median (upper middle for an even count)
+            med = firsts[len(firsts) // 2] if firsts else None  # upper middle for an even count
             got = (len(firsts), len(r), med, round(rho, 3))
             assert got == EXPECT_TRIG[(bench, cell)], (bench, cell, got)
             q = 100 * sum(bool(v["S"]) for v in r.values()) / len(r)
@@ -119,6 +113,7 @@ def trigger():
 # ---------- figure ----------
 
 def draw(dl, tr):
+    plt = R.pyplot()
     figure, (axa, axb) = plt.subplots(1, 2, figsize=(6.3, 2.0), gridspec_kw=dict(width_ratios=[0.8, 1.6], wspace=0.17))
     figure.subplots_adjust(left=0.065, right=0.995, bottom=0.3, top=0.86)
     # (a) bars from rho = 1
@@ -175,7 +170,7 @@ def write_record(dl, q, tr, paths):
         files="fig/mech/mech_trigger.pdf, fig/mech/mech_trigger.svg",
         notes=["All cells: DeepSeek-V4.1-Flash 1017 version (fingerprint e72d3c7f), one test run per cell; compare only within this figure (Table 1 runs are the earlier snapshot). Full per-cell tables: mech_delivery.md (panel a) and mech_trigger.md (panel b).",
                "rho = per-task geometric mean of input-token ratios on tasks with X > 0 in both cells (n = 75 for every pair in (a)). In (b) the reference is the same benchmark's seed cell of the trigger runs, so the two seed bars have rho = 1 by construction.",
-               "Turn = request index from 0 (0 = the first request; in (a) the activation directive puts every load at turn 0). Median as in analyze.py (upper middle value for an even count); the quartile column for gepa-autob on tau3 lists its two load turns.",
+               "Turn = request index from 0 (0 = the first request; in (a) the activation directive puts every load at turn 0). Median = the upper middle value for an even count; the quartile column for gepa-autob on tau3 lists its two load turns.",
                "(a) uses an explicit activation directive, so every on-demand episode loads the skill at turn 0 (75/75 in both on-demand cells); (b) has none, so loading is measured.",
                "Hollow bars in (b): off-distribution skills (GEPA's AutoBench skill on tau3, GEPA's tau3 skill on AutoBench). Light bars in (a): the on-demand overhead ratios.",
                "Noise and an artifact: opencode lists the bundle path, so the bundle directory name (seed, skillopt-autob, gepa-tau3, ...) was visible to the agent. Seed and skillopt-autob share name and description; their AutoBench loading (21 vs 37 of 120) bounds noise plus this artifact. On tau3, SkillOpt's skill is never loaded and still reads 1.076 times the seed cell's tokens, although its body never reaches the agent: one-run spread plus whatever the resident name, description and directory name change.",
@@ -200,8 +195,7 @@ def write_record(dl, q, tr, paths):
     P.record("mech_trigger_fig", "figure", result="\n".join(L),
              commands=["python -m aux.contamination_and_loading.trigger_fig"],
              raw=[str(p) for p in DELIVERY.values()] + [str(TRIG / b / c) for b, c, *_ in TRIG_CELLS] + paths,
-             source=["aux/contamination_and_loading/" + f for f in ("trigger_fig.py", "delivery_check.py", "trigger_rate.py")]
-                    + ["aux/transfer_and_trajectories/rq4_figs.py"])
+             source=["aux/contamination_and_loading/trigger_fig.py", "aux/transfer_and_trajectories/plot_style.py"])
 
 
 def main():

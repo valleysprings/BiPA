@@ -4,7 +4,7 @@ Run:  python -m aux.transfer_and_trajectories.transfer_ci
 """
 import random
 
-from src.analysis import transfer as L
+from aux.headline_numbers import transfer as L
 
 
 def ci(m, ref):

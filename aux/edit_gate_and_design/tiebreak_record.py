@@ -60,7 +60,7 @@ def main():
              "## Method", "",
              "- Per edge, on the shared dev tasks: success difference D = sum over tasks of (child - parent) with paired SE sqrt(n) sd(d); token change "
              "L = mean over tasks of log(X_child / X_parent), X = episode input tokens (DeepSeek `dataloader.task_row`; Luna: distinct completed requests, as Table 1), "
-             "paired SE sd(l)/sqrt(n). Separable = |z| >= 1.96; for success also |D| >= the one-sided 0.05 critical value of src.analysis.selection.critical_value "
+             "paired SE sd(l)/sqrt(n). Separable = |z| >= 1.96; for success also |D| >= the one-sided 0.05 critical value of aux.selection_replay.selection.critical_value"
              "(TB2 9 tasks: 2; tau3 30: 5, 10: 3; AutoBench 30: 4, 10: 3; the DeepSeek values are applied to Luna too).",
              "- D reproduces mech_edges' dQ x n_pair / 100 on all 59 edges; L correlates 0.999 with its dlogX (dlogX keeps only lever-valid tasks).",
              "- Pool rule (GEPA, SkillOpt, SkillAdam x TB2: every version the run scored on its full dev panel, seed included): eligible = versions whose dev "

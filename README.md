@@ -47,9 +47,9 @@ bipa/
 │   ├── llm.py        # the optimizer's model client
 │   ├── layout.py     # paths, all taken from environment variables
 │   ├── adapters/     # GEPA, SkillOpt, SkillAdam: upstream loops on our batches, executor and model client
-│   ├── analysis/     # Table 1, the main-text figures and numbers
+│   ├── analysis/     # Table 1, its statistics, the turn slopes and the four-term attribution
 │   └── graph/        # the per-episode bipartite graph
-├── aux/          # appendix analyses, one folder per topic (aux/README.md)
+├── aux/          # every other figure, number and appendix analysis, one folder per topic (aux/README.md)
 ├── optimizers/   # vendored upstream sources at pinned commits (optimizers/README.md)
 ├── skills/       # the seed and every returned skill (skills/README.md)
 ├── configs/      # tasks.yaml: panels, batches, executor; experiments.yaml: pinned runs and caches
@@ -133,7 +133,7 @@ Run everything from the repository root, either as `python -m src.run ...` in a 
 python -m src.run suite deepseek-flash --execute
 python -m src.run run skillopt tau3 gpt-6-luna --tag my-run --execute          # one cell
 python -m src.run repeat skillopt tau3 deepseek-flash --execute                # avg@3 test repetitions of one run
-python -m src.analysis                                                         # Table 1, main-text figures and numbers
+python -m src.analysis                                                         # Table 1, its statistics, slopes, four-term attribution
 # transfer: a returned skill evaluated unchanged under another model or on another benchmark, then its repetitions
 python -m src.run transfer skillopt tau3 deepseek-flash --to gpt-6-luna --execute    # -> gpt-6-luna/skillopt/tau3-bench/ood-from-deepseek-flash
 python -m src.run transfer gepa tb2 deepseek-flash --to autob --execute              # -> deepseek-flash/gepa/automationbench/ood-from-bench-terminal-bench-2-1
@@ -143,12 +143,16 @@ python -m src.run repeat skillopt tau3 gpt-6-luna --tag ood-from-deepseek-flash 
 
 A test slot that ran in all three repetitions but never got a verdict scores 0 (`adjudicated_failures`, never retried); a slot with no episode blocks the average (`collect` in `src/run.py`).
 
-**Analyses.** They resolve every run through the tags pinned in `configs/experiments.yaml`; a cell with no pin and several finished runs is an error. `python -m src.analysis` runs the main-text analyses in dependency order, `--list` prints them, and `python -m src.analysis selection` runs one module's steps. Figures are `draw` steps of the module whose compute step wrote their cache:
+**Analyses.** They resolve every run through the tags pinned in `configs/experiments.yaml`; a cell with no pin and several finished runs is an error. `python -m src.analysis` runs the main result and the method's analyses in dependency order, `--list` prints them, and `python -m src.analysis slopes` runs one module's steps:
 
 - **Table 1:** `table1` (both models), `stats` (the paired statistics behind it).
-- **RQ1:** `selection` (seed-replay control, Fig. 4), `pooled` (pooled success and token ratio over all cells, task coverage).
-- **RQ2:** `slopes` (Fig. 3), `attribution` (the four-term split), `cumulative` (Fig. 5), `teaser` (Fig. 1).
-- **RQ3:** `edges` (parent-to-child edits), `skilltext` (rule coding of the added text; `luna` for GPT-6-Luna).
-- **Transfer:** `transfer` (Luna avg@3 cells, cross-benchmark runs).
+- **Method:** `slopes` (within-task turn slopes of input tokens, output tokens and calls; `draw-input` draws the input-token figure), `attribution` (the four-term split of the change in input tokens).
 
-Caches go to `$BIPA_ASSETS/cache/analysis/`, records to `$BIPA_OUT/data/mech/`, figures to `$BIPA_OUT/fig/mech/`. The appendix analyses are in `aux/`, one folder per topic; see [aux/README.md](aux/README.md).
+The other figures and numbers run as `python -m aux.<folder>.<module>` after it; each folder's README gives the order:
+
+- **Selection control:** `aux.selection_replay.selection compute|draw` (seed-replay control of the selection rules).
+- **Pooled numbers and transfer:** `aux.headline_numbers.pooled` (pooled success and token ratio over all cells, task coverage), `aux.headline_numbers.transfer` (Luna avg@3 cells, cross-benchmark runs).
+- **Figures:** `aux.figures.teaser compute|draw`, `aux.figures.cumulative` (input tokens read up to each turn, by prompt component).
+- **Rule coding:** `aux.rule_coding.edges build` (parent-to-child edits), then `aux.rule_coding.skilltext compute|record|luna` (rule coding of the added text; `luna` for GPT-6-Luna).
+
+Caches go to `$BIPA_ASSETS/cache/analysis/`, records to `$BIPA_OUT/data/mech/`, figures to `$BIPA_OUT/fig/mech/`. The folders of `aux/` are listed in [aux/README.md](aux/README.md).

@@ -1,4 +1,4 @@
-"""Cheatsheet (answer-leakage) audit of the learned skills, L0 static text audit + L2 compilation.
+"""Cheatsheet (answer-leakage) audit of the learned skills: static text audit against the dev-task materials.
 
 Question: does a learned skill's TEXT carry answer-key information about the
 tasks (task ids, file paths, expected output values, command sequences — a cheatsheet), or is it generic procedure (pondering:
@@ -18,13 +18,10 @@ frozen native-v1 protocol, 30 / 30 / 9 tasks for tau3 / AutoBench / TB2; identic
         corpus (specific = in <= 3 dev tasks); numeric literals (>= 3 digits) that occur in the answer corpus (same);
         command-looking skill lines (>= 20 chars, CLI verbs / automationbench_cli.py) found verbatim in the answer corpus;
     (c) rule level: the 337 hand-coded added units of the nine DeepSeek skills (assets/cache/analysis/main/skilltext.json,
-        src/analysis/skilltext.py) get a heuristic task-specificity tag — a unit is tagged when it names a task id, or carries
+        aux/rule_coding/skilltext.py) get a heuristic task-specificity tag — a unit is tagged when it names a task id, or carries
         a path / value / 8-gram hit against the answer corpus; tagged units are printed verbatim with their evidence for the
         manual spot-check pass. Luna skills have no hand coding; they are audited at text level only.
   control: the seed skill against the same corpora (a generic text's background overlap).
-
-L2 — compilation of the existing records, no new analysis: OOD rep0 (assets/artifacts/results/ood-cross-bench.json,
-mech_ood.md), pass@k (assets/cache/analysis/main/dynamics.json, mech_dynamics.md), dev-edge selection (mech_edges.md, quoted).
 
 No model calls, no benchmark execution. Command:
   python -m aux.contamination_and_loading.cheatsheet   -> assets/cache/analysis/main/cheatsheet.json, data/mech/mech_cheatsheet.md
@@ -272,7 +269,7 @@ def record(res):
             "+ tau3 runtime task_config.json with expected_actions). Metrics: word 5-gram/8-gram/13-gram overlap shares, key-info hits (dev task "
             "ids, answer-corpus paths / numeric values / verbatim command lines; specific = occurring in <= 3 dev tasks, wider-shared ones are "
             "generic environment conventions and reported separately), and a heuristic task-specificity tag on the 337 hand-coded skill units. "
-            "Control: the seed skill on the same corpora. L2: compilation of the OOD, pass@k and dev-edge records, then the four-hypothesis verdict.")
+            "Control: the seed skill on the same corpora, then the verdict.")
     runs = ("Skills: DeepSeek nine = final_skill of the native-20261008-https optimizer runs (gepa/skillopt/skilladam x tau3/AutoBench/TB2); "
             "Luna = native-20261012 optimizer runs (tau3, AutoBench; TB2's three returned the seed text and are marked). Dev panel = the frozen "
             "native-v1 selection panel `sel` (30/30/9 tasks; identical between the DeepSeek and Luna protocols, checked). Task materials: "
@@ -280,42 +277,14 @@ def record(res):
     agg = ("Tokens = lowercased alphanumerics; overlap = share of the skill's n-grams present in the corpus. Specific path/value = occurs in the "
            "answer corpus of at most 3 dev tasks (out of 30/30/9). Binary/undecodable task files skipped. The rule-level tag is heuristic "
            "(task id, path, value or 8-gram hit against the answer corpus); every tagged unit is printed verbatim with its evidence for the "
-           "manual spot-check. L2 numbers are quoted from mech_ood.md (rep0), mech_dynamics.md / dynamics.json (avg@3) and mech_edges.md.")
+           "manual spot-check.")
     table = ("### L0-a. n-gram overlap and key-info hits per skill (seed = control)\n\n" + table_a
              + "\n\n### L0-b. Key-info hit evidence (all hits quoted)\n\n" + table_b
              + "\n\n### L0-c. Rule level: task-specificity tag on the 337 coded units (DeepSeek nine)\n\n" + table_c
              + "\n\n### L0-c2. Tagged units, verbatim, for the manual spot-check\n\n" + table_cx
              + "\n\n### L0-c3. Generic-convention hits (shared by > 3 dev tasks — environment conventions, NOT task-specific)\n\n" + table_cg
-             + "\n\n### L2. Compilation of the existing evidence\n\n" + l2_section()
              + "\n\n### Verdict\n\n" + verdict(res))
     logger.write_record("cheatsheet", what, runs, agg, table, "python -m aux.contamination_and_loading.cheatsheet")
-
-
-def l2_section():
-    """The compilation: OOD rep0 and pass@k read from the caches; dev edges quoted from mech_edges.md."""
-    dyn = json.loads((dataloader.CACHE / "dynamics.json").read_text())["cells"]
-    rows = []
-    for model, mshort in (("deepseek-flash", "DeepSeek"), ("gpt-6-luna", "Luna")):
-        for bench in ("tau3-bench", "automationbench"):
-            arms = dyn[f"{model}|{bench}"]["arms"]
-            for arm, label in (("native-noseed", "No skill"), ("native-seed", "Seed"), ("gepa", "GEPA"), ("skillopt", "SkillOpt"), ("skilladam", "SkillAdam")):
-                h = arms[arm]["h4"]
-                rows.append([mshort, SHORT[bench], label, h["n"], f"{h['pass1']:.1f}", f"{h['pass3']:.1f}", f"{h['pass3'] - h['pass1']:+.1f}"])
-    passk = logger.md_table(["model", "bench", "arm", "n", "pass@1", "pass@3", "gap"], rows)
-    ood = json.loads((layout.RESULTS / "ood-cross-bench.json").read_text())
-    orows = [[SHORT[o["train"]], "->", SHORT[o["bench"]], o["method"], f"{o['Q']:.1f} ({o['known']}/{o['total']})", f"{o['rho']:.2f}", f"{o['rho_inv']:.2f}"] for o in ood]
-    oodt = logger.md_table(["train bench", "eval bench", "method", "Q (rep0)", "rho", "rho^calls"], orows)
-    return ("**OOD, cross-bench transfer, rep0** (mech_ood.md; assets/artifacts/results/ood-cross-bench.json; seed references: AutoB Q 45.0, "
-            "TB2 Q 75.9, Table 1 avg@3):\n\n" + oodt
-            + "\n\nReading (mech_ood.md): the token tax transfers (5 of 6 cells rho > 1.2) but there is no OOD collapse — transferred skills sit "
-            "in the same Q band as locally optimized ones; a memorized-answer skill should crash far below seed on the wrong bench and does not."
-            "\n\n**pass@k** (mech_dynamics.md, avg@3):\n\n" + passk
-            + "\n\nReading: No skill's pass@3 is below the seed's on every evidence cell (tau3 / AutoBench x both models) — without a skill the "
-            "model does not reach part of the knowledge region. The skills' pass@3 never exceeds the seed's on DeepSeek; on Luna AutoBench "
-            "SkillOpt raises pass@1 and pass@3 together, not pass@3 alone."
-            "\n\n**Dev-edge selection** (mech_edges.md, 59 dev edges of the native-20261008-https runs): accepted edges add +10.0 (x100 log pts) "
-            "input tokens vs parent, rejected ones +12.8 — the tax grows on both, selection does not ratchet cost; accepted minus rejected "
-            "dQ = +7.0 pts [95% CI 2.8, 11.4] — the dev gate selects real dev gains.")
 
 
 def verdict(res):
@@ -333,12 +302,7 @@ def verdict(res):
     return ("**Cheatsheet tendency: %s** (heuristic thresholds, see the L0 tables). Over the %d learned skills (9 DeepSeek + %d Luna; Luna TB2's "
             "three optimizer runs returned the seed text and are not audited separately): the largest answer-corpus overlap of any skill is "
             "%s at 5-grams and %s at 8-grams (seed control max %s at 8-grams), dev task ids named in skill texts: %d, specific key-info hits "
-            "(paths + values + verbatim commands): %d, rule units tagged task-specific: %d of %d. H1 (fewer attractors): contradicted — "
-            "mech_dynamics shows skill runs are not more similar across reps and per-turn content rises. H2 (squeezed thinking): strongly "
-            "supported — 77-100%% of the tasks a skill pushes to more turns gain no success, landing on the declining part of the model's own "
-            "test-time curve. H3 (memorization): mixed — dev->test shrinkage exists, but the token tax transfers cross-bench and there is no "
-            "OOD collapse (rep0); this L0 audit finds %s answer leakage in the skill texts. H4 (knowledge trigger): half supported — No skill's "
-            "pass@3 is below the seed's everywhere, but skill gains are not pass@3-only."
+            "(paths + values + verbatim commands): %d, rule units tagged task-specific: %d of %d; the audit finds %s answer leakage in the skill texts."
             % (strength.upper(), len(learned), n_luna, pct(max_ov5), pct(max_ov), pct(seed_max), ids, spec, tagged, units,
                {"none": "no", "weak": "only weak", "strong": "strong"}[strength]))
 

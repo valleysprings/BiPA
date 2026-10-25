@@ -17,13 +17,33 @@ import pickle
 import numpy as np
 
 from aux.token_attribution import attribution_luna
-from aux.token_attribution.bipcommon import OUT, group_of, load_cached
+from src import layout
 from src.analysis import attribution as A
+from src.graph import episode as W
 
+OUT = layout.OUT / "token_attribution"
 GROUPS = ["prompt", "skill", "tools", "messages"]
 LUNA_JSON = OUT / "attribution_luna.json"
 LUNA_GCACHE = OUT / "graph_cache.pkl"
 BENCH = [("tau3-bench", "tau3"), ("automationbench", "AutoB"), ("terminal-bench-2-1", "TB2")]
+
+
+def load_cached(eval_path):
+    """Episodes of one DeepSeek evaluation.json, through the shared parse cache (src.graph.episode.load, filled on a miss)."""
+    return W.load(eval_path)
+
+
+def group_of(comp):
+    """Coarse component group of a graph column: rest of prompt, skill text, tool outputs, conversation (messages so far)."""
+    if comp == "skill":
+        return "skill"
+    if comp in ("system", "tool_schemas", "task"):
+        return "prompt"
+    if comp == "history":
+        return "messages"
+    if comp.startswith("tool:"):
+        return "tools"
+    return "other"
 
 
 def compact(e):

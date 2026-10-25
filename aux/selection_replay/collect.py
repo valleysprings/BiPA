@@ -6,7 +6,7 @@ The returned skill = the non-seed version whose test success equals summary.eval
 Run: python -m aux.selection_replay.collect
 """
 import glob, json, os, pickle
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 
 from src import layout
 

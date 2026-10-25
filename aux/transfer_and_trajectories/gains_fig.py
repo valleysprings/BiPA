@@ -1,33 +1,25 @@
-"""The gains figure (mech_gains) and the attractor figure (mech_explore).
+"""The numbers of the gains figure, written to the record mech_gains.md.
 
-mech_gains  (a) tasks solved in at least one of three runs by one side only, seed over no skill and learned skills over
-                seed (summed over GEPA, SkillOpt, SkillAdam), per (model, benchmark) cell and pooled; exact two-sided sign
-                test on the pooled counts.   Source: pass3_ci.json (4 cells) + gains_tb2.json (DeepSeek TB2).
-            (b) share of tasks whose three runs agree more (diverge less) than under the reference arm, among tasks whose
-                success went up / stayed the same / went down; stratified Mantel-Haenszel odds ratio (up vs same, strata
-                = the reference arm's successes out of three), the only interval drawn.
-                Source: explore_strat.json per_cell_pairs (4 cells) + gains_tb2.json pairs (DeepSeek TB2).
-            Luna TB2 is omitted (its three optimizers returned the seed text, so learned-over-seed would compare the seed with itself).
-mech_explore  share of tasks whose three runs follow more than one behavior, per arm and cell; drawn only
-              with the argument `explore`.
+(a) tasks solved in at least one of three runs by one side only, seed over no skill and learned skills over
+    seed (summed over GEPA, SkillOpt, SkillAdam), per (model, benchmark) cell and pooled; exact two-sided sign
+    test on the pooled counts.   Source: pass3_ci.json (4 cells) + gains_tb2.json (DeepSeek TB2).
+(b) share of tasks whose three runs agree more (diverge less) than under the reference arm, among tasks whose
+    success went up / stayed the same / went down; stratified Mantel-Haenszel odds ratio (up vs same, strata
+    = the reference arm's successes out of three).
+    Source: explore_strat.json per_cell_pairs (4 cells) + gains_tb2.json pairs (DeepSeek TB2).
+Luna TB2 is omitted (its three optimizers returned the seed text, so learned-over-seed would compare the seed with itself).
 Record mech_gains.md: sections 1-6 from write_record(); section 7 (five-cell addendum: seed vs learned odds-ratio test, 2->3
 shares, per-optimizer discordance) from addendum().
-Style and colors are rq4_figs.py's; files go through src.utils.fig.save_figure (pdf + editable svg).
-Inputs: pass3_ci.json, gains_tb2.json (src.analysis.pooled), explore.json, explore_strat.json (this subset).
-Run:  python -m aux.transfer_and_trajectories.gains_fig [explore]
+Inputs: pass3_ci.json, gains_tb2.json (aux.headline_numbers.pooled), explore_strat.json (this subset).
+Run:  python -m aux.transfer_and_trajectories.gains_fig
 """
 import functools
 import json
 import math
-import sys
 
-from aux.transfer_and_trajectories import rq4_figs as R  # sets the shared rcParams
-
-import matplotlib.pyplot as plt
-
+from aux.transfer_and_trajectories import plot_style as R
 from aux.transfer_and_trajectories import explore_strat as ES  # mh(): Mantel-Haenszel OR with the Robins-Breslow-Greenland interval
-from src.analysis import dynamics as D
-from src.utils import fig
+from aux.headline_numbers import dynamics as D
 from src.utils.dataloader import CACHE
 from src.utils.logger import paperout as P
 
@@ -36,7 +28,6 @@ HERE = R.HERE
 LEARNED_KEYS = ("gepa_vs_seed", "skillopt_vs_seed", "skilladam_vs_seed")
 TB2 = "deepseek-flash|terminal-bench-2-1"
 CELLS = [(TB2, "DeepSeek TB2")] + [(k, lab.replace("\n", " ")) for k, lab in R.CELLS]
-TICKS = ["TB2", r"$\tau^3$", "AutoB", r"$\tau^3$", "AutoB", "pooled"]
 
 
 def sign_p(a, b):
@@ -92,7 +83,7 @@ def counts(pairs):
 
 
 def agreement():
-    """Pooled (k_ref, k_own, agrees more) pairs. Without TB2 they reproduce explore.json / explore_strat.json exactly."""
+    """Pooled (k_ref, k_own, agrees more) pairs. Without TB2 they reproduce explore_strat.json exactly."""
     strat = json.loads((HERE / "explore_strat.json").read_text())
     cells = dict(strat["per_cell_pairs"])
     cells[TB2] = {"seed": tb2()["deepseek-flash"]["pairs"]["seed_vs_noskill"],
@@ -109,93 +100,6 @@ def agreement():
         out[name]["no_tb2"]["mh"] = mh4
         out[name]["tb2"] = counts([tuple(p) for p in cells[TB2][name]])
     return out
-
-
-def draw_gains(cov, ps, pl, st):
-    figure, (axa, axb) = plt.subplots(1, 2, figsize=(6.3, 1.95), gridspec_kw=dict(width_ratios=[1.45, 1], wspace=0.22))
-    figure.subplots_adjust(left=0.06, right=0.995, bottom=0.25, top=0.9)
-    # (a) up = tasks only the newer arm solves in some run, down = tasks only the reference solves
-    xs = [0, 1, 2, 3, 4, 5.45]
-    w = 0.36
-    for x, (label, s, l) in zip(xs, cov):
-        gap = 0.24 if label == "pooled" else 0.04  # wider in the pooled group so the p labels clear the next bar
-        for j, ((own, ref), color) in enumerate(((s, R.SEED), (l, R.LEARNED))):
-            xx = x + (j - 0.5) * (w + gap)
-            axa.bar(xx, own, width=w, color=color, edgecolor="white", linewidth=0.4)
-            axa.bar(xx, -ref, width=w, color=color, alpha=0.38, edgecolor="white", linewidth=0.4)
-            axa.text(xx, own + 1.5, f"{own}", ha="center", va="bottom", fontsize=5.6, color="#222222")
-            axa.text(xx, -ref - 1.5, f"{ref}", ha="center", va="top", fontsize=5.6, color="#222222")
-    xp = xs[-1]
-    # only the seed-over-no-skill label is drawn: the learned-over-seed sign test (pl, p = 0.59) stays in the
-    # record mech_gains.md but is not printed on the figure, where a non-significant p reads as evidence of absence
-    for j, p in enumerate((ps,)):
-        xx = xp + (j - 0.5) * (w + 0.24)
-        top = cov[-1][1 + j][0]
-        axa.text(xx, top + 9.5, f"$p$={p:.3f}" if p < 0.01 else f"$p$={p:.2f}", ha="center", va="bottom", fontsize=5.6, color="#222222")
-    axa.axhline(0, color="#333333", lw=0.6)
-    axa.axvline((xs[4] + xs[5]) / 2, color="#BBBBBB", lw=0.6, ls=":")
-    axa.set_xticks(xs)
-    axa.set_xticklabels(TICKS, fontsize=6.4)
-    axa.tick_params(axis="x", length=0, pad=2)
-    for x0, x1, model in ((xs[0], xs[2], "DeepSeek"), (xs[3], xs[4], "Luna")):
-        axa.plot([x0 - 0.35, x1 + 0.35], [-0.13, -0.13], transform=axa.get_xaxis_transform(), color="#999999", lw=0.5, clip_on=False)
-        axa.text((x0 + x1) / 2, -0.16, model, transform=axa.get_xaxis_transform(), ha="center", va="top", fontsize=6.4)
-    axa.set_ylim(-84, 78)
-    axa.set_yticks([-60, -30, 0, 30, 60])
-    axa.set_yticklabels(["60", "30", "0", "30", "60"])
-    axa.set_ylabel("tasks", fontsize=7, labelpad=1)
-    axa.text(-0.55, 74, "solved only by the seed / learned skill", ha="left", va="top", fontsize=6, color="#444444")
-    axa.text(-0.55, -80, "solved only by no skill / the seed", ha="left", va="bottom", fontsize=6, color="#444444")
-    axa.set_xlim(-0.6, 6.05)
-    axa.set_title("(a) tasks solved in some run by one side only", fontsize=7, loc="left")
-    R.style(axa)
-    # (b) runs agree more than under the reference, by how success moved
-    groups = [("gain", "success\nup"), ("tie", "success\nsame"), ("loss", "success\ndown")]
-    for j, (name, color) in enumerate((("seed", R.SEED), ("learned", R.LEARNED))):
-        for g, (k, _) in enumerate(groups):
-            conv, n, v = st[name][k]
-            x = g + (j - 0.5) * 0.34
-            axb.bar(x, v, width=0.3, color=color, edgecolor="white", linewidth=0.4)
-            axb.text(x, 3, f"{conv}/{n}", ha="center", va="bottom", fontsize=5.6, color="white", rotation=90)
-    axb.axhline(50, color="#333333", lw=0.6, ls=":")
-    for i, (name, color) in enumerate((("seed", R.SEED), ("learned", R.LEARNED))):
-        mh = st[name]["mh"]
-        y = 88 - 8 * i
-        axb.plot(1.02, y, marker="s", ms=3.2, color=color, lw=0, clip_on=False)
-        axb.text(1.12, y, f"{mh['OR']:.2f}", ha="left", va="center", fontsize=5.8, color="#222222")
-    axb.text(0.94, 97, "odds ratio, up vs same", ha="left", va="center", fontsize=5.8, color="#444444")
-    axb.set_xticks(range(3))
-    axb.set_xticklabels([g[1] for g in groups], fontsize=6.4)
-    axb.tick_params(axis="x", length=0, pad=2)
-    axb.set_xlim(-0.5, 2.5)
-    axb.set_ylim(0, 100)
-    axb.set_ylabel("share of tasks (%)", fontsize=7, labelpad=1)
-    axb.set_title("(b) tasks whose runs agree more", fontsize=7, loc="left")
-    R.style(axb)
-    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=R.SEED, label="seed over no skill"),
-               plt.Rectangle((0, 0), 1, 1, facecolor=R.LEARNED, label="learned skills over seed")]
-    figure.legend(handles=handles, loc="lower center", bbox_to_anchor=(0.53, -0.01), ncol=2, frameon=False, fontsize=6.4,
-                  handlelength=0.9, handletextpad=0.3, columnspacing=1.2)
-    fig.save_figure(figure, "gains")
-
-
-def draw_explore_a():
-    cells = json.loads((HERE / "explore.json").read_text())["cells"]
-    figure, ax = plt.subplots(figsize=(6.4, 1.75))
-    figure.subplots_adjust(left=0.07, right=0.83, bottom=0.14, top=0.97)
-    w = 0.16
-    for g, (key, _) in enumerate(R.CELLS):
-        for j, (arm, label, color) in enumerate(R.ARMS):
-            v = 100 * (1 - cells[key]["arms"][arm]["A_share"][0])
-            ax.bar(g + (j - 2) * w, v, width=w * 0.88, color=color, edgecolor="white", linewidth=0.4, label=label if g == 0 else None)
-    ax.set_xticks(range(4))
-    ax.set_xticklabels([c[1].replace("\n", " ") for c in R.CELLS], fontsize=6.4)
-    ax.tick_params(axis="x", length=0, pad=2)
-    ax.set_ylabel("tasks with $>$1 behavior (%)", fontsize=7, labelpad=1)
-    ax.set_ylim(0, 22)
-    R.style(ax)
-    ax.legend(loc="center left", bbox_to_anchor=(1.01, 0.5), frameon=False, fontsize=6.4, handlelength=0.9, handletextpad=0.4)
-    fig.save_figure(figure, "explore")
 
 
 def raw_paths():
@@ -269,7 +173,7 @@ def write_record(cov, ps, pl, st, cov4):
                    luna["contrasts"]["seed_vs_noskill"]["only_own"], luna["contrasts"]["seed_vs_noskill"]["only_ref"],
                    lc["gain"][0], lc["gain"][1], lc["tie"][0], lc["tie"][1], lc["loss"][0], lc["loss"][1]),
                "Learned-over-seed counts are summed over GEPA, SkillOpt and SkillAdam (three contrasts per cell); seed-over-no-skill is one contrast per cell.",
-               "Runs and task sets: Table 1's avg@3 test runs via src.analysis.dynamics.load_cell; (a) tasks with a verified outcome in all 3 runs on both sides (pooled.pass3, pooled.tb2); (b) tasks with 3 verified runs with R > 0 on both sides (explore_strat.py, pooled.tb2)."])
+               "Runs and task sets: Table 1's avg@3 test runs via aux.headline_numbers.dynamics.load_cell; (a) tasks with a verified outcome in all 3 runs on both sides (pooled.pass3, pooled.tb2); (b) tasks with 3 verified runs with R > 0 on both sides (explore_strat.py, pooled.tb2)."])
     L = ["Panel (a). Tasks solved in at least one of three runs by the newer arm only / by the reference only (pass@3 discordant tasks).", "",
          P.mdtable(["cell", "seed over no skill: newer only / reference only", "learned over seed (3 optimizers summed): newer only / reference only"],
                    [[lab.replace(r"$\tau^3$", "tau3"), f"{s[0]} / {s[1]}", f"{l[0]} / {l[1]}"] for lab, s, l in cov]), "",
@@ -289,23 +193,19 @@ def write_record(cov, ps, pl, st, cov4):
     L += [P.mdtable(["contrast", "cells", "success up", "same", "down", "MH OR, up vs same (strata: reference successes out of 3; RBG 95% CI)"], rows), ""]
     L += ["Attractors-only view (mech_explore.pdf): numbers in mech_explore.md section A."]
     P.record("mech_gains", "figure", result="\n".join(L),
-             commands=["python -m src.analysis.pooled gains",
+             commands=["python -m aux.headline_numbers.pooled gains",
                        "python -m aux.transfer_and_trajectories.explore_strat",
                        "python -m aux.transfer_and_trajectories.gains_fig"],
              raw=raw_paths(),
-             source=["aux/transfer_and_trajectories/" + f for f in ("gains_fig.py", "explore_strat.py", "rq4_figs.py")] + ["src/analysis/pooled.py"],
+             source=["aux/transfer_and_trajectories/" + f for f in ("gains_fig.py", "explore_strat.py", "plot_style.py")] + ["aux/headline_numbers/pooled.py"],
              sections=[("Five-cell addendum", addendum(st))])
 
 
 def main():
-    if sys.argv[1:] == ["explore"]:
-        draw_explore_a()
-        return
     cov, ps, pl = coverage()
     four = cov[1:-1]  # the four cells without DeepSeek TB2
     cov4 = [tuple(sum(r[1 + j][i] for r in four) for i in range(2)) for j in range(2)]
     st = agreement()
-    draw_gains(cov, ps, pl, st)
     write_record(cov, ps, pl, st, cov4)
     for lab, s, l in cov:
         print(f"{lab:16s} seed {s[0]:3d}/{s[1]:3d}   learned {l[0]:3d}/{l[1]:3d}")

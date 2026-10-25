@@ -1,4 +1,4 @@
-"""Prior-free robustness of the selection replay (src.analysis.selection).
+"""Prior-free robustness of the selection replay (aux.selection_replay.selection).
 
 Re-runs selection.py's replay (its own best_of / skilladam_null / mde80 / paired, unchanged) per optimizer x benchmark under task models
 that drop the Beta-prior exchangeability assumption (A2):
@@ -26,8 +26,8 @@ import numpy as np
 
 from aux.edit_gate_and_design import design as D
 from aux.selection_replay import devsize as DV
+from aux.selection_replay import selection as S
 from src import layout
-from src.analysis import selection as S
 
 OUT = layout.OUT / "noise_and_domains"
 EXCLUDE = ("native-20261020-1017", "lodo")

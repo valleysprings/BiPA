@@ -1,4 +1,4 @@
-"""The evidence behind the design principles for a cost-aware skill optimizer.  Four subcommands:
+"""The evidence behind the design principles for a cost-aware skill optimizer.  Three subcommands:
 
   batching   design principle "issue independent calls in one turn": what does spreading the same tool calls over more turns cost in input
              tokens?  The harness re-sends its history every turn, so input tokens X grow faster than turns R; an editor that writes rules
@@ -25,12 +25,8 @@
              one-sided 0.05 critical value of a single-run comparison under no effect, (c) better then better again on
              a fresh draw, (d) mean of 3 runs.
              -> CACHE/analysis/main/selrules.json, data/mech/mech_selrules.md
-  draw       the design-principles evidence figure: one panel per principle, laid out from the three caches:
-             (a) selrules panel_bars (what each rule keeps), (b) designev panel_predict (what explains token change), (c) batching panel
-             (the tax with the seed's calls per turn restored), (d) designev panel_gate (kept vs rejected proposals and the cost-aware gate)
-             -> fig/mech/mech_implications.{pdf,svg}
 
-Run: python -m aux.edit_gate_and_design.design {batching|designev|selrules|draw}
+Run: python -m aux.edit_gate_and_design.design {batching|designev|selrules}
 """
 import argparse
 import json
@@ -39,11 +35,11 @@ import math
 import numpy as np
 from scipy import stats
 
+from aux.rule_coding import edges as E
+from aux.selection_replay import selection as S
 from src.analysis import attribution as A
-from src.analysis import edges as E
-from src.analysis import selection as S
 from src.analysis import table1 as T
-from src.utils import fig, logger, dataloader
+from src.utils import logger, dataloader
 
 
 # ---------- batching (from batching.py) ----------
@@ -175,28 +171,6 @@ def compute_batching():
 def mean_over(cells, key):
     """Mean of a cell field over a list of cells."""
     return float(np.mean([c[key] for c in cells]))
-
-
-def panel(ax, data):
-    """Compact panel: per benchmark (and all nine skills) the mean token tax log rho of the three skills as recorded and with the seed's calls per turn restored."""
-    groups = [(BENCH_NAME[b], [c for c in data["cells"] if c["bench"] == b]) for b, _ in A.BENCH]
-    groups.append(("all", data["cells"]))
-    x = np.arange(len(groups))
-    width = 0.38
-    measured = [mean_over(cells, "log_rho") for _, cells in groups]
-    counterfactual = [mean_over(cells, "log_rho_cf") for _, cells in groups]
-    ax.bar(x - width / 2, measured, width, color="#9e9e9e", label="as recorded")
-    ax.bar(x + width / 2, counterfactual, width, color="#2166ac", label="at seed's calls per turn")
-    ax.axhline(0, color="0.3", lw=0.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels([name for name, _ in groups], fontsize=7)
-    ax.set_ylabel(r"$\log\rho$ (input tokens vs. seed)", fontsize=7, labelpad=1)
-    ax.tick_params(axis="y", labelsize=7, length=2)
-    ax.tick_params(axis="x", length=0, pad=1)
-    ax.set_ylim(min(0, min(counterfactual)) - 0.01, max(measured) * 1.75)
-    ax.legend(fontsize=6, frameon=False, loc="upper left", handlelength=0.9, borderaxespad=0.1, labelspacing=0.2, handletextpad=0.4)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
 
 
 def record_batching(data):
@@ -344,54 +318,6 @@ def compute_designev():
     return out
 
 
-def panel_predict(ax, data):
-    """R^2 of dlogX on skill-length change, turns and actions: dev edges (dark bars) and, for the length and turn ratios, the nine test-level skills (light bars)."""
-    edge = data["A"]["edge_level"]
-    test = data["A"]["test_level"]
-    # two populations, drawn as two labelled groups: the dev-scored edits (top) and the nine learned skills (bottom)
-    labels = ["skill length", "turns", "tool calls", "skill length", "turns"]
-    values = [edge["skill length"]["r2"], edge["turns"]["r2"], edge["actions"]["r2"], test["skill length"]["r2"], test["turns"]["r2"]]
-    colors = ["#999999", "#2166ac", "#2166ac", "#cccccc", "#92c5de"]
-    ypos = np.array([5.6, 4.6, 3.6, 1.4, 0.4])
-    ax.barh(ypos, values, color=colors, height=0.68)
-    ax.text(-0.02, 6.45, "59 dev-scored edits", transform=ax.get_yaxis_transform(), ha="right", va="center", fontsize=6.5, fontweight="bold")
-    ax.text(-0.02, 2.25, "9 learned skills", transform=ax.get_yaxis_transform(), ha="right", va="center", fontsize=6.5, fontweight="bold")
-    ax.set_ylim(-0.3, 6.8)
-    for y, v in zip(ypos, values):
-        ax.text(v + 0.02, y, f"{v:.2f}", va="center", fontsize=6.5)
-    ax.set_yticks(ypos)
-    ax.set_yticklabels(labels, fontsize=6.5, linespacing=0.9)
-    ax.set_xlim(0, 1.0)
-    ax.set_xlabel(r"token change explained ($R^2$)", fontsize=7, labelpad=1)
-    ax.tick_params(axis="x", labelsize=6.5, length=2)
-    ax.tick_params(axis="y", length=0)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-
-
-def panel_gate(ax, data):
-    """dlogX (x100 log points) of rejected and accepted proposals as a strip with a zero line; the share above zero and the cost-aware gate result are written on the panel."""
-    b = data["B"]
-    rng = np.random.default_rng(0)
-    groups = [("rejected", b["rejected"], "#b2182b"), ("accepted", b["accepted"], "#2166ac")]
-    for i, (name, g, color) in enumerate(groups):
-        values = 100 * np.array(g["values"])
-        jitter = rng.uniform(-0.17, 0.17, len(values))
-        ax.scatter(i + jitter, values, s=7, color=color, alpha=0.75, linewidths=0)
-        ax.hlines(100 * g["mean"], i - 0.3, i + 0.3, color="k", lw=1.0)
-        ax.text(i, 112, f"{100 * g['share_above']:.0f}% add", ha="center", va="top", fontsize=6)
-    ax.axhline(0, color="0.4", lw=0.6)
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels([f"rejected\n({b['rejected']['n']} edits)", f"kept\n({b['accepted']['n']} edits)"], fontsize=6.5, linespacing=0.9)
-    ax.set_xlim(-0.7, 1.7)
-    ax.set_ylim(-95, 115)
-    ax.set_ylabel(r"change in log input tokens ($\times$100)", fontsize=7, labelpad=1)
-    ax.tick_params(axis="y", labelsize=6.5, length=2)
-    ax.tick_params(axis="x", length=0)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-
-
 def fmt(x, nd=2):
     """Number with nd decimals, 'n/a' for None."""
     return "n/a" if x is None else f"{x:.{nd}f}"
@@ -439,9 +365,6 @@ RULES = [("better", "(a) better on one run"), ("critical", "(b) gain >= one-side
 TRUE_GAINS = (1, 2, 4)       # tasks; the panel shows PLOT_GAIN
 PLOT_GAIN = 2
 DRAWS = 100_000
-COLORS = {"terminal-bench-2-1": "#D55E00", "tau3-bench": "#0072B2", "automationbench": "#009E73"}
-
-
 # ---- the simulation ----------------------------------------------------------------------------------------------------------------
 
 def runs_total(p, repeats):
@@ -575,87 +498,16 @@ def compute_selrules():
     record_selrules(result)
 
 
-def panel_bars(ax, data):
-    """One axes for the design-principle figure: per acceptance rule, how often it keeps a candidate identical to its parent (light bar) and
-    one that truly solves PLOT_GAIN more dev tasks (dark bar); bar = mean over the three benchmarks, whisker = their range."""
-    gain = str(data["plot_gain"])
-    benches = list(COLORS)
-    labels = ["one win\n(current)", "one win at\n5% level", "two wins\nin a row", "3-run\ntotal"]
-    width = 0.38
-    for i, (key, _) in enumerate(RULES):
-        null = [100 * data[b]["null"][key] for b in benches]
-        power = [100 * data[b]["power"][gain][key] for b in benches]
-        for offset, values, color in ((-width / 2, null, "0.72"), (width / 2, power, "#0072B2")):
-            mean = float(np.mean(values))
-            ax.bar(i + offset, mean, width=width, color=color, edgecolor="none")
-            ax.plot([i + offset] * 2, [min(values), max(values)], color="0.15", lw=0.7)
-    ax.set_xticks(range(len(RULES)))
-    ax.set_xticklabels(labels, fontsize=6, linespacing=0.95)
-    ax.set_xlim(-0.6, len(RULES) - 0.4)
-    # headroom above 100 for the legend
-    ax.set_ylim(0, 128)
-    ax.set_yticks([0, 25, 50, 75, 100])
-    ax.set_ylabel("edits kept (%)", fontsize=7, labelpad=1)
-    ax.tick_params(axis="y", labelsize=7, length=2)
-    ax.tick_params(axis="x", length=0, pad=2)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.spines["left"].set_bounds(0, 100)
-
-
-# ---------- the design-principles figure (mech_implications) ----------
-
-TITLES = ["(a) P1: what each rule keeps", "(b) P2: what explains token change", "(c) P3: seed's calls per turn", "(d) P4: cost of edits"]
-
-
-def legend_selrules(ax):
-    """Panel (a) legend above its bars: which candidate a bar counts."""
-    from matplotlib.patches import Patch
-    handles = [Patch(facecolor="0.72", label="unchanged edit"), Patch(facecolor="#0072B2", label="+2 dev tasks")]
-    ax.legend(handles=handles, loc="upper center", ncol=2, fontsize=5.8, frameon=False, handlelength=0.9, handletextpad=0.3,
-              columnspacing=0.6, borderaxespad=0.0)
-
-
-def draw():
-    """Load the three caches and draw the 1x4 figure at full text width."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix",
-                         "font.size": 7, "axes.linewidth": 0.6})
-    sel = json.loads((dataloader.CACHE / "selrules.json").read_text())
-    dev = json.loads((dataloader.CACHE / "designev.json").read_text())
-    bat = json.loads((dataloader.CACHE / "batching.json").read_text())
-
-    figure, axes = plt.subplots(1, 4, figsize=(6.75, 1.72), gridspec_kw=dict(width_ratios=[1.35, 1, 0.9, 0.85]))
-    figure.subplots_adjust(left=0.065, right=0.995, bottom=0.235, top=0.875, wspace=0.62)
-
-    # (a) the four acceptance rules on the fitted seed task model
-    panel_bars(axes[0], sel)
-    legend_selrules(axes[0])
-    # (b) what predicts an edit's change in input tokens
-    panel_predict(axes[1], dev)
-    # (c) the tax with the seed's calls per turn restored
-    panel(axes[2], bat)
-    # (d) rejected vs accepted proposals and the cost-aware gate
-    panel_gate(axes[3], dev)
-
-    for ax, title in zip(axes, TITLES):
-        ax.set_title(title, fontsize=7, loc="left", pad=3, fontweight="bold")
-    fig.save_figure(figure, "implications")
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("step", choices=["batching", "designev", "selrules", "draw"])
+    ap.add_argument("step", choices=["batching", "designev", "selrules"])
     step = ap.parse_args().step
     if step == "batching":
         record_batching(compute_batching())
     elif step == "designev":
         record_designev(compute_designev())
-    elif step == "selrules":
-        compute_selrules()
     else:
-        draw()
+        compute_selrules()
 
 
 if __name__ == "__main__":

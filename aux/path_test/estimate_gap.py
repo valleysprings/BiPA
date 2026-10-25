@@ -1,6 +1,6 @@
 """Maximum-likelihood estimate of the deepseek-flash model-version shift (old aeb564... -> new 1017 e72d3c...) on the seed skill.
 
-Old-model data: the seed's executions that src/analysis/selection.py uses (dev: executions(seed_files(bench)[0]); test: its three
+Old-model data: the seed's executions that aux/selection_replay/selection.py uses (dev: executions(seed_files(bench)[0]); test: its three
 test runs, seed_files(bench)[1]; checked by check_inputs).  New-model data: the seed calibration runs of run_path_test.py
 (out/deepseek-flash/seed__<bench>/results/evaluations/{dev,test}/4fd5ca441c55-*/evaluation.json), plus any --extra-new evaluation files.
 
@@ -13,7 +13,6 @@ Sensitivity (paired): each task keeps its own old posterior Beta(a + k, b + n - 
 sigmoid(logit p + delta); this uses the task identity (same tasks on both models), which the marginal model ignores.
 
   python -m aux.path_test.estimate_gap              # needs the calibration runs; prints one block per benchmark
-  python -m aux.path_test.estimate_gap --selftest   # synthetic counts with known delta; no data needed
 """
 import argparse
 import glob
@@ -25,8 +24,8 @@ import sys
 import numpy as np
 from scipy import optimize, special, stats
 
+from aux.selection_replay import selection as S
 from src import layout
-from src.analysis import selection as S
 
 PATH_TEST = layout.ARTIFACTS / "path-test"
 os.environ.setdefault("MPLCONFIGDIR", str(layout.OUT / ".mplconfig"))
@@ -34,7 +33,6 @@ os.environ.setdefault("MPLCONFIGDIR", str(layout.OUT / ".mplconfig"))
 BENCHES = ("tau3-bench", "automationbench", "terminal-bench-2-1")
 SEED = "4fd5ca441c55"
 NEW_FINGERPRINT = "e72d3c7f663d3e1383b00b3884cb4501"
-OLD_FINGERPRINT = "aeb56401ca74e127821c4f9126dcb669"
 QUAD = (np.arange(4000) + 0.5) / 4000  # equal-weight quantile quadrature (handles the U-shaped Beta's endpoint mass)
 
 
@@ -164,69 +162,10 @@ def real(extra_new):
     return status
 
 
-def shifted(p, a, b, delta, generator):
-    """New-model task probabilities: 'mean' = the asked model (the prior's mean logit shifted by delta, concentration fixed; each task
-    keeps its quantile), 'task' = every task's own logit shifted by delta."""
-    if generator == "task":
-        return special.expit(special.logit(p) + delta)
-    c, m = a + b, a / (a + b)
-    m2 = special.expit(logit(m) + delta)
-    return stats.beta.ppf(stats.beta.cdf(p, a, b), m2 * c, (1 - m2) * c)
-
-
-def true_points(a, b, delta, generator):
-    p = np.clip(stats.beta.ppf(QUAD, a, b), 1e-12, 1 - 1e-12)
-    return 100 * float(np.mean(shifted(p, a, b, delta, generator)) - a / (a + b))
-
-
-def synthetic(rng, a, b, delta, generator, n_dev=30, n_test=75, old_reps=3, new_reps=1):
-    """Tasks p ~ Beta(a, b); old counts with old_reps executions; new counts with one execution at the shifted probabilities."""
-    p = np.clip(rng.beta(a, b, n_dev + n_test), 1e-9, 1 - 1e-9)
-    q = np.clip(shifted(p, a, b, delta, generator), 0, 1)
-    names = [f"t{i}" for i in range(n_dev + n_test)]
-    old = {t: [int(x) for x in rng.random(old_reps) < pi] for t, pi in zip(names, p)}
-    new = {t: (int((rng.random(new_reps) < qi).sum()), new_reps) for t, qi in zip(names, q)}
-    split = lambda d: {"dev": {t: d[t] for t in names[:n_dev]}, "test": {t: d[t] for t in names[n_dev:]}}  # noqa: E731
-    return split(old), split(new)
-
-
-def selftest(reps):
-    rng = np.random.default_rng(20261024)
-    # the tau3 seed prior of the paper's inputs: U-shaped, most tasks nearly always or never solved
-    a0, b0 = 0.548, 0.193
-    print(f"selftest: tasks ~ Beta({a0}, {b0}) (tau3 seed prior); 30 dev + 75 test tasks, 3 old executions each, 1 new execution; "
-          f"{reps} replicates per cell.  Columns: mean delta_hat (sd) of the joint dev+test fit, mean test-split points vs the truth, "
-          f"P(LR rejects delta=0 at 0.05)")
-    failures = 0
-    for generator in ("mean", "task"):
-        for true in (0.0, -0.8, 0.8):
-            est = {"marginal": [], "paired": []}
-            for _ in range(reps):
-                old, new = synthetic(rng, a0, b0, true, generator)
-                old_split = {s: {t: (sum(v), len(v)) for t, v in d.items()} for s, d in old.items()}
-                a, b = S.fit_prior(list(old_split["dev"].values()) + list(old_split["test"].values()))
-                for name, rows in (("marginal", marginal(old_split, new, a + b)), ("paired", paired(old_split, new, a, b))):
-                    est[name].append((rows["dev+test"][1], rows["test"][2], rows["dev+test"][4]))
-            truth = true_points(a0, b0, true, generator)
-            for name, rows in est.items():
-                d, pts, p = (np.array(x) for x in zip(*rows))
-                print(f"   generator {generator:<4} true delta {true:+.1f} ({truth:+5.1f} pts)  {name:<8}: delta_hat {d.mean():+.3f} "
-                      f"(sd {d.std():.3f}), test points {pts.mean():+5.1f}, P(reject) {np.mean(p < 0.05):.2f}")
-                own = (generator == "mean") == (name == "marginal")  # each estimator under its own generating model
-                if own and abs(d.mean() - true) > 3 * d.std() / math.sqrt(reps) + 0.1:
-                    failures += 1
-                    print(f"      FAIL: {name} is off its own model's delta")
-    print(f"selftest {'passed' if not failures else 'FAILED'}: each estimator recovers delta under its own model")
-    return 1 if failures else 0
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--reps", type=int, default=40, help="selftest replicates per true delta")
     parser.add_argument("--extra-new", nargs="*", default=[], help="BENCH=PATH: extra new-model (1017) seed evaluation.json files to include")
-    args = parser.parse_args(argv)
-    return selftest(args.reps) if args.selftest else real(args.extra_new)
+    return real(parser.parse_args(argv).extra_new)
 
 
 if __name__ == "__main__":

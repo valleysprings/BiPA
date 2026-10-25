@@ -1,4 +1,4 @@
-"""Collect the trajectory test passes into OUT/path_test/path_test.json (read by aux.selection_replay.fig_chance) and a plain summary.
+"""Collect the trajectory test passes into OUT/path_test/path_test.json and path_test_detail.json (read by the path test figure) and a plain summary.
 
 For every run, the path skills (seed, intermediate, returned) with a test success: DeepSeek from this script's new-model passes (out/deepseek-flash/...; the new-model seed calibration is
 out/deepseek-flash/seed__<bench>), Luna from the passes here plus the run's own seed and returned test evaluations (same model).  Test success = share of the panel's tasks with a verified

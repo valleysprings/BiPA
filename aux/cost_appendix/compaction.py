@@ -19,7 +19,7 @@ each side; rho = geometric mean over tasks of Xbar'_skill / Xbar'_seed, the same
 (task fixed effects) slope of log X' on log R pooled over the six episodes of every task of the cell. At k = inf rho equals Table 1's rho_trj on these tasks.
 
 Commands:  python -m aux.cost_appendix.compaction compute  -> assets/cache/analysis/main/compaction.json
-                               python -m aux.cost_appendix.compaction draw -> fig/mech/mech_compaction.{pdf,svg}, data/mech/mech_compaction.md
+           python -m aux.cost_appendix.compaction record   -> data/mech/mech_compaction.md
 """
 import argparse
 import json
@@ -29,8 +29,7 @@ import numpy as np
 
 from src.analysis import table1 as T
 from src.analysis import attribution as A
-from src.utils import fig, logger, dataloader
-from src.utils.fig import save_figure
+from src.utils import logger, dataloader
 WINDOWS = [1, 3, 5, 10, None]               # None = infinity
 CAPS = [8000, 32000, 64000, 128000, None]   # None = infinity
 
@@ -144,54 +143,6 @@ def pick(cell, policy, param):
     return [r for r in cell["results"] if r["policy"] == policy and r["param"] == param][0]
 
 
-def draw(cells):
-    """Per-skill dumbbell, rows grouped by benchmark in the row order of mech_price: rho as recorded (hollow) to rho with only the last turn kept (filled), rho_turns as a tick, reference line at 1."""
-    import matplotlib
-    matplotlib.rcParams["svg.fonttype"] = "none"
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7, "axes.linewidth": 0.6})
-    color = {"SkillOpt": "#0072B2", "SkillAdam": "#D55E00", "GEPA": "#009E73"}
-    marker = {"SkillOpt": "o", "SkillAdam": "s", "GEPA": "^"}
-    bench = [("tau3-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench"), ("terminal-bench-2-1", "TB2")]
-    order = ["GEPA", "SkillOpt", "SkillAdam"]
-    by = {(c["method"], c["bench"]): c for c in cells}
-    fig, ax = plt.subplots(figsize=(3.375, 2.5))
-    fig.subplots_adjust(left=0.27, right=0.97, bottom=0.25, top=0.99)
-    y = 0.0
-    ticks, labels = [], []
-    for b, disp in bench:
-        ax.text(-0.36, y, disp, transform=ax.get_yaxis_transform(), ha="left", va="center", fontweight="bold", fontsize=7)
-        y += 1
-        for o in order:
-            c = by[(o, b)]
-            rec, one = pick(c, "window", "inf")["rho"], pick(c, "window", "1")["rho"]
-            ax.plot([one, rec], [y, y], color=color[o], lw=1.1, zorder=2)
-            ax.plot(rec, y, marker=marker[o], ms=4.5, mfc="white", mec=color[o], mew=0.9, ls="", zorder=4)
-            ax.plot(one, y, marker=marker[o], ms=4.5, color=color[o], ls="", zorder=5)
-            ax.plot(c["rho_turns"], y, marker="|", ms=7, mec="0.15", mew=1.3, ls="", zorder=3)
-            ticks.append(y)
-            labels.append(o)
-            y += 1
-        y += 0.4
-    ax.axvline(1.0, color="0.2", lw=0.8, ls=(0, (3, 2)), zorder=1)
-    ax.text(1.0, -1.0, "seed = 1", ha="center", va="center", fontsize=7, color="0.2")
-    ax.set_ylim(y - 0.3, -1.5)
-    ax.set_xlim(0.97, 1.46)
-    ax.set_yticks(ticks)
-    ax.set_yticklabels(labels)
-    ax.tick_params(axis="y", length=0, pad=2)
-    ax.tick_params(axis="x", length=2.5, width=0.6)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    handles = [Line2D([], [], marker="o", ls="", mfc="white", mec="0.3", ms=4.5, mew=0.9), Line2D([], [], marker="o", ls="", color="0.3", ms=4.5),
-               Line2D([], [], marker="|", ls="", mec="0.15", ms=7, mew=1.3)]
-    fig.legend(handles, ["as recorded", "last turn only", "turn ratio"], loc="lower center", bbox_to_anchor=(0.6, -0.005), ncol=3, frameon=False,
-               fontsize=7, handlelength=1.0, columnspacing=1.0, handletextpad=0.3)
-    ax.annotate("input-token ratio to the seed", xy=(0.5, -0.1), xycoords="axes fraction", ha="center", va="top", fontsize=7)
-    save_figure(fig, "compaction")
-
-
 def fmt(x, nd=3):
     return f"{x:.{nd}f}"
 
@@ -227,19 +178,16 @@ def record(cells):
            "rho = geometric mean over tasks of skill / seed with the same policy on both sides; rho_turns the same on turn counts R (graph requests); slope = within-task (task fixed effects) slope of log X' on log R pooled over the "
            "six episodes of each task. Window inf and cap inf are the recorded run (rho = Table 1 rho_trj on these tasks, up to the graph-episode input sum: SkillOpt TB2 1.423 vs 1.429, GEPA TB2 1.290 on 17 of 18 tasks vs 1.338). "
            "Caution on log rho / log rho_turns: it is unstable where rho_turns is near 1 (SkillOpt tau3); the robust reading is the gap rho - rho_turns and the slope.")
-    logger.write_record("compaction", what, runs, agg, "\n\n".join(sections), "python -m aux.cost_appendix.compaction compute\npython -m aux.cost_appendix.compaction draw")
+    logger.write_record("compaction", what, runs, agg, "\n\n".join(sections), "python -m aux.cost_appendix.compaction compute\npython -m aux.cost_appendix.compaction record")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("step", choices=["compute", "draw"])
-    step = ap.parse_args().step
-    if step == "compute":
+    ap.add_argument("step", choices=["compute", "record"])
+    if ap.parse_args().step == "compute":
         compute()
-        return
-    cells = json.loads((dataloader.CACHE / "compaction.json").read_text())["cells"]
-    draw(cells)
-    record(cells)
+    else:
+        record(json.loads((dataloader.CACHE / "compaction.json").read_text())["cells"])
 
 
 if __name__ == "__main__":

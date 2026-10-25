@@ -1,4 +1,4 @@
-"""(f) Split each returned skill (final/SKILL.md, front matter and headings removed) into sentences with the same splitter as aux/skill_paths/compare/prep_sentences.py, number them, write sentences.json.
+"""(f) Split each returned skill (final/SKILL.md, front matter and headings removed) into sentences, number them, write sentences.json.
 Run: python -m aux.three_word_seed.sentences"""
 import json, re
 from src import layout

@@ -18,9 +18,9 @@ from collections import defaultdict
 from pathlib import Path
 import numpy as np
 
+from aux.rule_coding import edges as E
+from aux.selection_replay import selection as S
 from src import layout
-from src.analysis import edges as E
-from src.analysis import selection as S
 from src.utils import dataloader as C
 from src.utils.dataloader import vid, SEED_TEXT
 

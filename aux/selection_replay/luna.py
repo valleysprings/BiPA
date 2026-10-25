@@ -1,4 +1,4 @@
-"""mech_selection_luna: the selection replay of src.analysis.selection for the GPT-6 Luna runs of Table 1.
+"""mech_selection_luna: the selection replay of aux.selection_replay.selection for the GPT-6 Luna runs of Table 1.
 
 Run: python -m aux.selection_replay.luna   -> CACHE/analysis/main/selection_luna.json, data/mech/mech_selection_luna.md
 """
@@ -8,11 +8,11 @@ from collections import defaultdict
 
 import numpy as np
 
+from aux.selection_replay.selection import (BENCHES, DRAWS, MODERATE, POWER_GAINS, SEED_VERSION, batch_gain_tail, best_of, check_inputs,
+                                            executions, fit_prior, mid_quantile, outcomes, posterior_mean, replay_power, reseed, seed_files,
+                                            signature, skilladam_accepts, skilladam_null, skilladam_observed, skilladam_reported_gain,
+                                            task_probabilities, verified)
 from src import layout
-from src.analysis.selection import (BENCHES, DRAWS, MODERATE, POWER_GAINS, SEED_VERSION, batch_gain_tail, best_of, check_inputs,
-                                    executions, fit_prior, mid_quantile, outcomes, posterior_mean, replay_power, reseed, seed_files,
-                                    signature, skilladam_accepts, skilladam_null, skilladam_observed, skilladam_reported_gain,
-                                    task_probabilities, verified)
 from src.analysis.table1 import rep_groups
 from src.utils import dataloader, logger
 

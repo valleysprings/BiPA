@@ -4,7 +4,7 @@ import pickle, os
 import numpy as np
 from aux.noise_and_domains import domains as D
 from src import layout
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 from src.analysis import table1 as T
 
 BENCHES = ["terminal-bench-2-1", "tau3-bench", "automationbench"]

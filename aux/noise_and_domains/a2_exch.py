@@ -9,7 +9,7 @@ import json, math, os
 import numpy as np
 from scipy import optimize, special, stats as sps
 from aux.noise_and_domains import load
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 DRAWS = 40000
 NBOOT = 300
 

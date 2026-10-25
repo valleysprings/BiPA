@@ -1,4 +1,4 @@
-"""(d, part 2) Replay of the paper's own selection model (src/analysis/selection.py) on the from-scratch runs.
+"""(d, part 2) Replay of the paper's own selection model (aux/selection_replay/selection.py) on the from-scratch runs.
 
 Model (selection.py docstring): per benchmark a Beta(a, b) prior over per-task success probability, fitted by beta-binomial maximum likelihood to the SEED's distinct
 executions of the dev and test tasks; each dev task's probability is the posterior Beta(a + s, b + n - s) from its own distinct dev executions; a candidate identical to
@@ -17,7 +17,7 @@ Run: python -m aux.three_word_seed.selection_replay
 import glob, json
 from pathlib import Path
 import numpy as np
-from src.analysis import selection as S
+from aux.selection_replay import selection as S
 
 from aux.selection_replay.luna import null_probabilities
 from src import layout
@@ -41,11 +41,6 @@ def seed_files(bench):
 
 def all_dev_files(bench):
     return sorted(glob.glob(str(EXE / f"*/{bench}/fromscratch/results/evaluations/dev/*/evaluation.json")))
-
-
-def chunked(fn, draws=DRAWS, chunk=CHUNK):
-    parts = [fn(chunk) for _ in range(draws // chunk)]
-    return np.concatenate(parts)
 
 
 def summarize(g, n_dev, observed_tasks):

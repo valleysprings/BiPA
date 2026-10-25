@@ -1,10 +1,8 @@
-"""The main-text analyses in dependency order: python -m src.analysis [--list] [MODULE ...] (default: all)."""
+"""Table 1 and the method's analyses in dependency order: python -m src.analysis [--list] [MODULE ...] (default: all)."""
 import subprocess, sys
 
-STEPS = [("table1",), ("stats",), ("selection", "compute"), ("selection", "draw"), ("slopes", "compute"),
-         ("slopes", "draw-input"), ("attribution", "compute"), ("attribution", "attr"), ("edges", "build"),
-         ("skilltext", "compute"), ("skilltext", "record"), ("skilltext", "luna"), ("cumulative",),
-         ("teaser", "compute"), ("teaser", "draw"), ("pooled",), ("transfer",)]
+STEPS = [("table1",), ("stats",), ("slopes", "compute"), ("slopes", "draw-input"), ("attribution", "compute"),
+         ("attribution", "attr")]
 
 if __name__ == "__main__":
     names = [arg for arg in sys.argv[1:] if arg != "--list"]

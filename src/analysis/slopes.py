@@ -1,4 +1,4 @@
-"""Within-task turn slopes of input tokens, output tokens and calls (DeepSeek test episodes), and Figure 3.
+"""Within-task turn slopes of input tokens, output tokens and calls (DeepSeek test episodes), and the input-token figure.
 
 compute     -> <cache>/analysis/main/slopes.json
 draw-input  -> fig/mech/mech_slopes_input2 (the input-token row)
@@ -57,7 +57,7 @@ def compute():
 
 
 def draw_input():
-    """Figure 3: input tokens against turns, both over the task's mean, every episode, with the fitted and slope-1 lines."""
+    """The input-token figure: input tokens against turns, both over the task's mean, every episode, with the fitted and slope-1 lines."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt

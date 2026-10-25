@@ -25,10 +25,8 @@ Read-only rule (the recorded arguments decide):
 A turn with several calls is never "a single read-only call", whatever the calls are.
 
 No model calls. Runs as attribution.py.
-Commands:  python -m aux.calls_and_writes.callsperturn   -> assets/cache/analysis/main/callsperturn.json, data/mech/mech_callsperturn.md
-                                python -m aux.calls_and_writes.callsperturn draw -> fig/mech/mech_calls.{pdf,svg}, data/mech/mech_calls.md
+Command:  python -m aux.calls_and_writes.callsperturn   -> assets/cache/analysis/main/callsperturn.json, data/mech/mech_callsperturn.md
 """
-import argparse
 import collections
 import json
 import re
@@ -38,7 +36,7 @@ import numpy as np
 
 from src.analysis import table1 as T
 from src.analysis import attribution as A
-from src.utils import fig, logger, dataloader
+from src.utils import logger, dataloader
 from src.graph.episode import LOOKUP
 
 READ_PROGRAMS = {"cat", "head", "tail", "ls", "grep", "find", "wc"}
@@ -48,9 +46,6 @@ FIND_WRITE = {"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fpri
 READ_TOOLS = {"read", "grep", "glob", "list", "ls", "webfetch", "websearch"}
 SETUP = re.compile(r"^(cd|set|export)$|^\w+=")
 SEPARATORS = {";", "&&", "||", "|", "&", ";;"}
-SHORT = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
-
-
 def bash_pure_read(command, extra=frozenset()):
     """True if the shell command is a pure read by the rule in the module docstring; False for anything else, including unparsable commands."""
     # command substitution and heredocs hide what is really run
@@ -292,69 +287,7 @@ def record(cells):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("cmd", nargs="?", choices=["draw"])
-    if ap.parse_args().cmd == "draw":
-        run_draw()
-    else:
-        record(compute())
-
-
-# ---------------------------------------------------------------------------------------------------------------------------------
-# mech_calls figure (the `draw` subcommand)
-#
-# Share of AutoBench turns with 0, 1 and 2+ executed calls, seed vs learned skill, per optimizer (stacked 100% bars); calls per turn
-# (seed -> skill) printed at the right. Reads assets/cache/analysis/main/callsperturn.json (cell 'AutoB').
-# ---------------------------------------------------------------------------------------------------------------------------------
-FIG_OPTS = ["GEPA", "SkillOpt", "SkillAdam"]
-COLORS = ["#D9D9D9", "#9ECAE1", "#2171B5"]
-LABELS = ["0 calls", "1 call", "2+ calls"]
-
-
-def draw_calls():
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    cells = {c["method"]: c for c in json.loads((dataloader.CACHE / "callsperturn.json").read_text())["cells"] if c["short"] == "AutoB"}
-    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif"], "mathtext.fontset": "stix", "font.size": 7})
-    f, ax = plt.subplots(figsize=(4.0, 1.6))
-    f.subplots_adjust(left=0.23, right=0.79, bottom=0.04, top=0.84)
-    y, ys, numbers = 0.0, [], []
-    for o in FIG_OPTS:
-        ytop = y
-        for kind, lab in (("seed", "seed"), ("skill", "skill")):
-            c = cells[o][kind]
-            sh = [c["share0"], c["share1"], c["share2p"]]
-            left = 0.0
-            for s, col in zip(sh, COLORS):
-                ax.barh(y, s * 100, left=left, height=0.8, color=col, lw=0)
-                if s >= 0.12:
-                    ax.text(left + s * 50, y, f"{s * 100:.0f}", ha="center", va="center", fontsize=7,
-                            color="white" if col == COLORS[2] else "black")
-                left += s * 100
-            ax.text(-1.5, y, lab, ha="right", va="center", fontsize=7)
-            numbers.append((o, kind, round(sh[0] * 100, 1), round(sh[1] * 100, 1), round(sh[2] * 100, 1), round(c["m"], 2), c["turns"]))
-            y += 1
-        ax.text(102, ytop + 0.5, f"{cells[o]['seed']['m']:.2f} → {cells[o]['skill']['m']:.2f}", ha="left", va="center", fontsize=7)
-        ax.text(-15, ytop + 0.5, o, ha="right", va="center", fontsize=7, fontweight="bold")
-        y += 0.55
-    ax.set_xlim(0, 100)
-    ax.set_ylim(y - 0.55, -0.6)
-    ax.axis("off")
-    ax.text(102, -0.6, "calls / turn", ha="left", va="center", fontsize=7)
-    handles = [plt.Rectangle((0, 0), 1, 1, color=c) for c in COLORS]
-    f.legend(handles, LABELS, loc="upper center", ncol=3, frameon=False, fontsize=7, bbox_to_anchor=(0.45, 1.0),
-             handlelength=1.0, columnspacing=1.5)
-    fig.save_figure(f, "calls")
-    return numbers
-
-
-def run_draw():
-    numbers = draw_calls()
-    table = logger.md_table(["optimizer", "skill", "0 calls %", "1 call %", "2+ calls %", "calls/turn", "turns"], numbers)
-    logger.write_record("calls", "Share of AutoBench turns with 0, 1, 2+ executed calls, seed vs learned skill; calls per turn at the right.",
-                   "deepseek-flash, AutoBench, each optimizer's own seed and learned-skill AutoBench runs (callsperturn.json).", "Pooled over episodes and turns.", table,
-                   "python -m aux.calls_and_writes.callsperturn draw")
+    record(compute())
 
 
 if __name__ == "__main__":

@@ -1,20 +1,18 @@
-"""Accepted vs rejected optimizer edges, the Holm-adjusted rule-category contrasts and the mech_edges figure, on the edge table of
-src.analysis.edges (59 dev parent->child edges of native-20261008-https; SkillAdam x terminal-bench-2-1 excluded).
+"""Accepted vs rejected optimizer edges and the Holm-adjusted rule-category contrasts, on the edge table of
+aux.rule_coding.edges (59 dev parent->child edges of native-20261008-https; SkillAdam x terminal-bench-2-1 excluded).
 
 Accepted and rejected candidates are compared on the change in log input tokens (dlogX = actions + turn-splitting + content + text + resid)
 and on the dev success change (dQ, points), with a bootstrap 95% interval over edges (10,000 resamples, seed 20261012).
 
   python -m aux.edit_gate_and_design.edges_contrast        -> CACHE/analysis/main/edges.json, data/mech/mech_edges.md
   python -m aux.edit_gate_and_design.edges_contrast holm   -> CACHE/analysis/main/edges_holm.json, data/mech/mech_edges_holm.md
-  python -m aux.edit_gate_and_design.edges_contrast draw   -> fig/mech/mech_edges.{pdf,svg}, data/mech/mech_edges_fig.md
 """
-import json
 import sys
 
 import numpy as np
 
-from src.analysis.edges import EXCLUDED_REASON, OPTS, load_dev_edges
-from src.utils import dataloader, fig, logger
+from aux.rule_coding.edges import EXCLUDED_REASON, OPTS, load_dev_edges
+from src.utils import dataloader, logger
 
 TERMS = ["dlogX", "actions", "turnsplit", "content", "text", "resid", "dQ"]
 RESAMPLES = 10000
@@ -144,7 +142,7 @@ def run():
         "Whether rejected candidates also read more than their parents (the editor adds the input-token tax and success-only selection lets it through) "
         "or whether accepted ones read more than rejected ones (selection ratchets cost). Each edge is a scored candidate against its parent on the same dev tasks.",
         "Current runs native-20261008-https (GEPA, SkillOpt, SkillAdam x tau3-bench, automationbench, terminal-bench-2-1); 59 dev edges from "
-        "`CACHE/analysis/main/edges_table.json` (built by `src.analysis.edges build`), accepted and rejected candidates. "
+        "`CACHE/analysis/main/edges_table.json` (built by `aux.rule_coding.edges build`), accepted and rejected candidates. "
         "Excluded: all 14 SkillAdam terminal-bench-2-1 dev edges, because " + EXCLUDED_REASON + ".",
         "dlogX = change in mean log input tokens per task of child vs parent on the shared dev tasks, split into actions, turn-splitting, content, text (+ resid). "
         "Group means are unweighted over edges and weighted by n_pair. Differences accepted minus rejected carry a bootstrap 95% interval over edges.",
@@ -214,7 +212,7 @@ def run_holm():
         "Whether the rule-category contrasts on the per-edge four-term split (with-minus-without the category, on the actions and turn-splitting "
         "terms) survive Holm's adjustment for the 20 tests.",
         f"The {len(edges)} dev parent->child edges of CACHE/analysis/main/edges_table.json (Table 1 baseline runs) without SkillAdam x "
-        f"terminal-bench-2-1 ({EXCLUDED_REASON}); categories and the {MIN_CHARS}-character rule as in category_presence.",
+        f"terminal-bench-2-1 ({EXCLUDED_REASON}); an edge has a category when it adds at least {MIN_CHARS} characters of it.",
         f"Unweighted means over edges. Bootstrap: {HOLM_RESAMPLES:,} resamples, each side resampled within itself, seed {HOLM_SEED}; two-sided p = 2 x the "
         f"smaller tail mass at zero with the +1 correction; Holm step-down over the {len(tests)} tests, alpha {ALPHA}. Differences in log points x 100.",
         logger.md_table(["category", "term", "edges with/without", "difference", "95% bootstrap interval", "p", "p (Holm, 20 tests)",
@@ -222,102 +220,9 @@ def run_holm():
         "python -m aux.edit_gate_and_design.edges_contrast holm")
 
 
-GROUPS = ["verify", "reread", "enumerate", "test", "format", "business", "scope_stop", "economize", "serialize", "other"]
-# plain names of the keyword groups (patterns in src.analysis.edges.CATEGORY_PATTERNS)
-NAME = {"verify": "verify", "reread": "re-read state", "enumerate": "check every item", "test": "run tests", "format": "output format",
-        "business": "domain rules", "scope_stop": "stop or budget", "economize": "save calls or reads", "serialize": "one at a time", "other": "other"}
-FIG_TERMS = [("actions", "more actions", "#0072B2", "o"), ("turnsplit", "turn-splitting", "#E69F00", "s")]
-
-
-def category_presence(dev):
-    """Per keyword group: edges with / without >= 150 added characters of it, and the with-minus-without contrast of actions, turn-splitting
-    and dlogX (unweighted means over edges) with a 3,000-resample bootstrap over edges, each side resampled within itself, seed 0."""
-    rng = np.random.default_rng(0)
-    present = {}
-    for c in GROUPS:
-        has = [e for e in dev if e["mass_add"][c] >= 150]
-        present[c] = {"edges_with": len(has), "edges_without": len(dev) - len(has)}
-        if 1 < len(has) < len(dev) - 1:
-            no = [e for e in dev if e["mass_add"][c] < 150]
-            present[c]["with"] = {t: float(np.mean([e[t] for e in has])) for t in ("actions", "turnsplit", "dlogX")}
-            present[c]["without"] = {t: float(np.mean([e[t] for e in no])) for t in ("actions", "turnsplit", "dlogX")}
-            present[c]["contrast"] = {}
-            for t in ("actions", "turnsplit", "dlogX"):
-                diff = present[c]["with"][t] - present[c]["without"][t]
-                reps = []
-                for _ in range(3000):
-                    a = [has[i][t] for i in rng.integers(0, len(has), len(has))]
-                    b = [no[i][t] for i in rng.integers(0, len(no), len(no))]
-                    reps.append(float(np.mean(a) - np.mean(b)))
-                present[c]["contrast"][t] = [diff, float(np.percentile(reps, 2.5)), float(np.percentile(reps, 97.5))]
-    return present
-
-
-def draw_edges():
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    pres = category_presence(load_dev_edges())
-    holm = {(t["category"], t["term"]): t for t in json.load(open(dataloader.CACHE / "edges_holm.json"))["tests"]}
-    term_name = {"actions": "more actions", "turnsplit": "turn-splitting"}
-    # rows sorted by their largest difference, biggest effect on top
-    rows = sorted(GROUPS, key=lambda g: -max(pres[g]["contrast"]["actions"][0], pres[g]["contrast"]["turnsplit"][0]))
-    plt.rcParams.update({"font.family": "serif", "font.serif": ["Liberation Serif", "STIXGeneral", "DejaVu Serif"], "font.size": 7,
-                         "mathtext.fontset": "stix"})
-    f, ax = plt.subplots(figsize=(4.5, 2.8))
-    off = {"actions": -0.17, "turnsplit": 0.17}
-    ax.axvline(0, color="black", lw=1.2, zorder=1)
-    ax.set_axisbelow(True)
-    ax.grid(axis="y", color="0.92", lw=0.5)
-    table = []
-    for i, g in enumerate(rows):
-        line = [NAME.get(g, g), pres[g]["edges_with"], pres[g]["edges_without"]]
-        for key, _, col, mk in FIG_TERMS:
-            d, lo, hi = pres[g]["contrast"][key]
-            y = i + off[key]
-            h = holm[(g, term_name[key])]
-            thin = h["without"] < 5 and h["survives"]  # survives, but the comparison group is tiny
-            if thin:
-                ax.scatter([d], [y], s=20, marker=mk, facecolor="white", edgecolor="0.55", lw=0.9, zorder=3)
-                ax.annotate("only 2 edits without", (d, y), xytext=(-5, 0), textcoords="offset points", ha="right", va="center",
-                            fontsize=6.5, color="0.4")
-            elif h["survives"]:
-                ax.scatter([d], [y], s=30, marker=mk, color=col, edgecolor="black", lw=0.6, zorder=4)
-                ax.annotate(f"{d:+.2f}", (d, y), xytext=(5, 0), textcoords="offset points", ha="left", va="center", fontsize=7, weight="bold")
-            else:
-                ax.scatter([d], [y], s=16, marker=mk, facecolor="white", edgecolor=col, lw=0.9, zorder=3)
-            line += [d, lo, hi]
-        table.append(line)
-    ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels([f"{NAME.get(g, g)}  {pres[g]['edges_with']}/{pres[g]['edges_without']}" for g in rows])
-    ax.tick_params(axis="y", length=0, pad=3)
-    ax.set_ylim(len(rows) - 0.5, -0.5)
-    ax.set_xlim(-0.2, 0.26)
-    ax.set_xticks([-0.2, -0.1, 0, 0.1, 0.2])
-    ax.set_xticklabels(["$-$0.2", "$-$0.1", "0", "0.1", "0.2"])
-    ax.set_xlabel("edits with the group minus edits without, change in log input tokens")
-    ax.spines[["top", "right", "left"]].set_visible(False)
-    h = [plt.Line2D([], [], marker=mk, ls="none", color=col, ms=4.5, mec="black", mew=0.5) for _, _, col, mk in FIG_TERMS]
-    h.append(plt.Line2D([], [], marker="o", ls="none", mfc="white", mec="0.35", ms=4.5, mew=0.9))
-    f.legend(h, ["more actions", "turn-splitting", "hollow: not reliable after correcting for 20 comparisons"],
-             loc="upper center", ncol=3, frameon=False, fontsize=6.5, handletextpad=0.3, columnspacing=1.0, bbox_to_anchor=(0.55, 1.0))
-    f.subplots_adjust(left=0.24, right=0.985, top=0.9, bottom=0.17)
-    fig.save_figure(f, "edges")
-    body = logger.md_table(["group", "with", "without", "d actions", "[95%]", "d turn-splitting", "[95%]"],
-                      [[r[0], r[1], r[2], f"{r[3]*100:+.1f}", f"[{r[4]*100:.1f}, {r[5]*100:.1f}]", f"{r[6]*100:+.1f}", f"[{r[7]*100:.1f}, {r[8]*100:.1f}]"] for r in table])
-    logger.write_record("edges_fig", "Per keyword group of the added text, the with-minus-without difference of the actions and turn-splitting terms of the change in log input tokens per edit (59 dev edits), with 95% bootstrap intervals over edits. Replaces the appendix table of edit categories.",
-                   "59 canonical dev edges of native-20261008-https (SkillAdam x TB2 excluded); an edit is 'with' a group when its added text holds >= 150 characters of the group's keywords.",
-                   "Unweighted mean over edits, with minus without; 95% bootstrap over edits (3000 resamples, each side within itself). Values x100 log points in this table; the figure axis is in log units.",
-                   body, "python -m aux.edit_gate_and_design.edges_contrast draw")
-    return table
-
-
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else None
     if cmd == "holm":
         run_holm()
-    elif cmd == "draw":
-        for r in draw_edges():
-            print(r)
     else:
         run()
