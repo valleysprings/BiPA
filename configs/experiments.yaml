@@ -1,50 +1,34 @@
-# BiPA native runs. Optimizer and evaluation settings live in configs/tasks.yaml.
-harness: opencode
-env:
-  HARNESS_PROTOCOL: native-v1
-  HARNESS_CAPTURE_PROTOCOL: native-v1
-  HARNESS_FEEDBACK_MODE: full
-  HARNESS_STRICT_OUTCOMES: '1'
-  HARNESS_LLM_ATTEMPT_LEDGER: '1'
-  SKILLOPT_STRICT_OUTCOMES: '1'
-  HARNESS_LLM_ANSWER_REPLAY: '0'
-benchmarks:
-  tau3-bench:
-    alias: tau3
-  automationbench:
-    alias: autob
-  terminal-bench-2-1:
-    alias: tb2
-scale: main
-test_runs: 3
+# The recorded run of every cell (execution/<model>/<method>/<benchmark>/<tag>) and each model's episode cache
+# (a directory under <BIPA_ASSETS>/cache).
 models:
   deepseek-flash:
     run: native-20261008-https
-    arms:
-    - skillopt
-    - gepa
-    - skilladam
-    slots: 16
-    args:
-    - --full-train
-    cache_root: native-20261003-timeout-fix/trace-fix
-    seed: native-20261003
+    seed: native-20261003-trace-final
     noseed:
       tau3-bench: native-20261003-timeout-fix
       automationbench: native-20261003-trace-fix
       terminal-bench-2-1: native-20261003-trace-fix
+    cache_root: native-20261003-timeout-fix/trace-fix
   gpt-6-luna:
     run: native-20261012
-    arms:
-    - skillopt
-    - gepa
-    - skilladam
-    slots: 16
-    args:
-    - --full-train
-    cache_root: luna-native-20261011
     seed: native-20261011
     noseed:
       tau3-bench: native-20261011
       automationbench: native-20261011
       terminal-bench-2-1: native-20261011
+    cache_root: luna-native-20261011
+
+# The run every analysis reads per cell; edit a tag here to report another run.
+pins:
+  deepseek-flash:
+    native-noseed: {tau3-bench: native-20261003-timeout-fix, automationbench: native-20261003-trace-fix, terminal-bench-2-1: native-20261003-trace-fix}
+    native-seed: {tau3-bench: native-20261003-trace-final, automationbench: native-20261003-trace-final, terminal-bench-2-1: native-20261003-trace-final}
+    gepa: {tau3-bench: native-20261008-https, automationbench: native-20261008-https, terminal-bench-2-1: native-20261008-https}
+    skillopt: {tau3-bench: native-20261008-https, automationbench: native-20261008-https, terminal-bench-2-1: native-20261008-https}
+    skilladam: {tau3-bench: native-20261008-https, automationbench: native-20261008-https, terminal-bench-2-1: native-20261008-https}
+  gpt-6-luna:
+    native-noseed: {tau3-bench: native-20261011, automationbench: native-20261011, terminal-bench-2-1: native-20261011}
+    native-seed: {tau3-bench: native-20261011, automationbench: native-20261011, terminal-bench-2-1: native-20261011}
+    gepa: {tau3-bench: native-20261012, automationbench: native-20261012, terminal-bench-2-1: native-20261012}
+    skillopt: {tau3-bench: native-20261012, automationbench: native-20261012, terminal-bench-2-1: native-20261012}
+    skilladam: {tau3-bench: native-20261012, automationbench: native-20261012, terminal-bench-2-1: native-20261012}

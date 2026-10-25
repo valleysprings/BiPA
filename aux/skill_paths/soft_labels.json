@@ -1,0 +1,486 @@
+{
+ "what": "hand labels of sentence pairs (same bench, different runs) for calibrating the tf-idf cosine threshold; S = states substantially the same rule, R = related / overlapping but not the same rule, D = different. Single rater (the analyst writing the record), judged on the pair text only, not blind to the cosine value. Pairs were sampled per cosine band (<=10 per band 0.15-0.30, all pairs above 0.30, 12 from 0.10-0.15) with random.Random(20261023) / (20261024) on the universe built by analyze_shared.build_universe.",
+ "labels": [
+  {
+   "key": "8a14dc8c2e",
+   "a": "about to call a one shot tool without every item collected",
+   "b": "execute make the single call one shot actions cannot be repeated",
+   "label": "R"
+  },
+  {
+   "key": "306d018d41",
+   "a": "the policy and knowledge base define everything you may do",
+   "b": "the task policy tool documentation and knowledge base procedures are authoritative",
+   "label": "S"
+  },
+  {
+   "key": "55dd2bf034",
+   "a": "about to silently exclude a qualifying option or present an unavailable conditional option as fully available",
+   "b": "for at or below the price paid exclude higher priced options among qualifying options choose the closest price when requested",
+   "label": "D"
+  },
+  {
+   "key": "2c2e764d67",
+   "a": "call start conversation exactly once",
+   "b": "some domains require authentication at the start of every conversation e g retail locate user id by email or name zip even if the user gives an id",
+   "label": "D"
+  },
+  {
+   "key": "059f4c7ea0",
+   "a": "check again after each relevant fix ask the user to retry the requested service and verify the outcome with an available diagnostic or user report",
+   "b": "verify the outcome with a fresh read back",
+   "label": "R"
+  },
+  {
+   "key": "14add947f3",
+   "a": "include an aggregate total when the requested report summarizes multiple acted on amounts",
+   "b": "when totals are requested calculate them from the eligible source records show the appropriate grouping and include the total in the message",
+   "label": "S"
+  },
+  {
+   "key": "74af98157c",
+   "a": "for cellular data problems check airplane mode sim status network mode mobile data data restrictions roaming and speed as indicated",
+   "b": "one diagnostic record read often surfaces several independent faults at once airplane mode missing sim data off roaming off old network type usage over limit enumerate them all fix them one at a time re run the goal check",
+   "label": "S"
+  },
+  {
+   "key": "ac557efb2f",
+   "a": "a tool s success response id ok true success true is not evidence",
+   "b": "an api success response alone is not proof of completion",
+   "label": "S"
+  },
+  {
+   "key": "2225303c0d",
+   "a": "authenticate using the domain policy s required lookup even if the user provides an id",
+   "b": "follow the domain policy on when identity is required do not over apply one domain s rule to another",
+   "label": "R"
+  },
+  {
+   "key": "cc93cd64cd",
+   "a": "do a fresh read of persisted state and diff expected vs actual line by line",
+   "b": "run execute the full command fresh complete after a side effecting action re read the persisted state or artifact it produced",
+   "label": "S"
+  },
+  {
+   "key": "c1226eafc4",
+   "a": "do not make further tool calls after the conversation has ended or a stop signal has been received",
+   "b": "do not make further tool calls or send more messages",
+   "label": "S"
+  },
+  {
+   "key": "12f9855809",
+   "a": "my custom test passed run the task s own test",
+   "b": "run the task s own reference implementation checker or provided tool where one exists and report its literal output",
+   "label": "S"
+  },
+  {
+   "key": "22c11cec6d",
+   "a": "use only supported tool names arguments and methods",
+   "b": "use only tool names that appear in the policy kb",
+   "label": "S"
+  },
+  {
+   "key": "815ecfe9b4",
+   "a": "about to perform an action the policy doesn t authorize simply because the user asked for it",
+   "b": "taking an action merely because the user asked a related question e g don t process anything for that",
+   "label": "S"
+  },
+  {
+   "key": "ce9b10a81c",
+   "a": "about to claim something succeeded without reading back the state",
+   "b": "done it should now be x without reading the object back",
+   "label": "S"
+  },
+  {
+   "key": "0c368e315a",
+   "a": "preserve source values verbatim when requested",
+   "b": "source values paraphrased rounded or renamed",
+   "label": "S"
+  },
+  {
+   "key": "96a61f337c",
+   "a": "for device troubleshooting and long procedures give the user one step at a time and wait for the result before the next step",
+   "b": "wait for the result read it verbatim",
+   "label": "R"
+  },
+  {
+   "key": "e6fa54c237",
+   "a": "issue mutating calls one at a time sequentially parallel is safe only for reads",
+   "b": "running parallel mutating calls or favoring parallel for writes",
+   "label": "S"
+  },
+  {
+   "key": "64d2b83731",
+   "a": "avoid overlapping state changing calls to shared services or records perform mutations sequentially especially for batches",
+   "b": "perform state changing calls sequentially when they share an application or workbook",
+   "label": "S"
+  },
+  {
+   "key": "b7a446a267",
+   "a": "after each consequential state changing action inspect its result or reread the affected state when available",
+   "b": "state changing actions any write send mutation tool call",
+   "label": "R"
+  },
+  {
+   "key": "4d08c23313",
+   "a": "avoid overlapping state changing calls to shared services or records perform mutations sequentially especially for batches",
+   "b": "perform mutations sequentially especially when they update the same service or persisted world state",
+   "label": "S"
+  },
+  {
+   "key": "161b6ba144",
+   "a": "before transferring check whether applicable documented in scope steps remain",
+   "b": "exhaust applicable documented troubleshooting before transferring",
+   "label": "S"
+  },
+  {
+   "key": "76564bce3f",
+   "a": "list exact details ids items amounts target obtain explicit yes execute once re read result",
+   "b": "list the exact action and obtain explicit confirmation state items amounts addresses payment methods and consequences",
+   "label": "S"
+  },
+  {
+   "key": "b4c90d7fd6",
+   "a": "if verification reveals a failed or overwritten update correct it with a sequential write and verify again",
+   "b": "write 1 verify write 2 verify write 3 verify",
+   "label": "R"
+  },
+  {
+   "key": "9122d5da53",
+   "a": "a request that violates policy must be denied not escalated",
+   "b": "silently complying with or partially doing a request that violates policy instead of denying it and offering a compliant alternative",
+   "label": "S"
+  },
+  {
+   "key": "0a6b370ecc",
+   "a": "report the verified result with its evidence",
+   "b": "verify the resulting itinerary and payment history",
+   "label": "R"
+  },
+  {
+   "key": "c07b0c12d7",
+   "a": "a successful write response alone is not sufficient",
+   "b": "an api success response alone is not proof of completion",
+   "label": "S"
+  },
+  {
+   "key": "53b4b343eb",
+   "a": "before acting identify the authoritative source records applicable policies and exceptions eligibility conditions required actions and exact destination for each result",
+   "b": "read the source records and applicable procedures before acting",
+   "label": "S"
+  },
+  {
+   "key": "d57d28cbed",
+   "a": "in api mode pass query parameters through params as json rather than appending them to the url",
+   "b": "pass query parameters and body fields through the documented tool arguments",
+   "label": "S"
+  },
+  {
+   "key": "fad143ad40",
+   "a": "explain the discrepancy and follow policy escalation",
+   "b": "make a safe correction only if permitted otherwise explain the discrepancy",
+   "label": "R"
+  },
+  {
+   "key": "65f90de214",
+   "a": "do not make further tool calls or send more messages",
+   "b": "make one tool call per step where the policy requires it",
+   "label": "D"
+  },
+  {
+   "key": "165eaae618",
+   "a": "a successful response alone is not proof that a change persisted",
+   "b": "a successful write response alone is not sufficient",
+   "label": "S"
+  },
+  {
+   "key": "7c106df3a7",
+   "a": "each mutating call loads state applies the change and saves the whole state back parallel writes or independent calls that overlap are last write wins and silently drop earlier changes even though every call reported success",
+   "b": "never run two writes in parallel each mutating call loads the whole world applies one change and saves the whole world concurrent calls race and silently drop earlier writes e g an email send clobbered by a slack post",
+   "label": "S"
+  },
+  {
+   "key": "171b115a51",
+   "a": "perform independent reads in parallel when useful",
+   "b": "prefer parallel calls for independent reads",
+   "label": "S"
+  },
+  {
+   "key": "12b598e35a",
+   "a": "close enough value copy source values verbatim",
+   "b": "preserve source values verbatim in notifications and records",
+   "label": "S"
+  },
+  {
+   "key": "22e17f723f",
+   "a": "follow knowledge base directions on whether a tool is agent discoverable or user discoverable",
+   "b": "unlock agent discoverable tools with unlock discoverable agent tool before calling them give user discoverable tools with the exact documented name and arguments",
+   "label": "R"
+  },
+  {
+   "key": "9f9ca464e3",
+   "a": "each following step must be one user message or one tool call never both",
+   "b": "either send a message or call a tool never both in one step",
+   "label": "S"
+  },
+  {
+   "key": "e3a4bcb286",
+   "a": "concurrent writes can silently overwrite one another",
+   "b": "mutations that share persisted state must run one at a time parallel writes can silently overwrite each other",
+   "label": "S"
+  },
+  {
+   "key": "70d370ab19",
+   "a": "confirm list the exact details and get an explicit yes before any write",
+   "b": "list exact details ids items amounts target obtain explicit yes execute once re read result",
+   "label": "S"
+  },
+  {
+   "key": "47bf3659fb",
+   "a": "do not narrate skipped excluded or rejected items",
+   "b": "handle excluded items silently in the action do not narrate skipped work",
+   "label": "S"
+  },
+  {
+   "key": "08a4f007d3",
+   "a": "report only what the evidence confirms",
+   "b": "verify does the evidence confirm every requirement in the claim",
+   "label": "R"
+  },
+  {
+   "key": "c016457a33",
+   "a": "close enough value copy source values verbatim",
+   "b": "preserve source values verbatim when required",
+   "label": "S"
+  },
+  {
+   "key": "88ef64616d",
+   "a": "close enough value copy source values verbatim",
+   "b": "preserve source values verbatim when requested",
+   "label": "S"
+  },
+  {
+   "key": "bef85c52bc",
+   "a": "do not make further tool calls after the conversation has ended or a stop signal has been received",
+   "b": "when the user signals they are done or the runtime reports that the conversation has ended stop immediately",
+   "label": "S"
+  },
+  {
+   "key": "c88995203a",
+   "a": "a successful response alone is not proof that a change persisted",
+   "b": "an api success response alone is not proof of completion",
+   "label": "S"
+  },
+  {
+   "key": "9829957816",
+   "a": "base actions on live records and applicable procedures",
+   "b": "read the source records and applicable procedures before acting",
+   "label": "S"
+  },
+  {
+   "key": "907dbfb404",
+   "a": "before acting identify the authoritative source records applicable policies and exceptions eligibility conditions required actions and exact destination for each result",
+   "b": "before making changes reconcile authoritative source records with applicable policies exceptions eligibility rules dates and requested outcomes",
+   "label": "S"
+  },
+  {
+   "key": "b8d16cc6f5",
+   "a": "preserve source values verbatim when requested",
+   "b": "preserve source values verbatim when required",
+   "label": "S"
+  },
+  {
+   "key": "26e4474359",
+   "a": "preserve source values verbatim in notifications and records",
+   "b": "preserve source values verbatim when required",
+   "label": "S"
+  },
+  {
+   "key": "3a858739f5",
+   "a": "preserve source values verbatim in notifications and records",
+   "b": "preserve source values verbatim when requested",
+   "label": "S"
+  },
+  {
+   "key": "c532a1522d",
+   "a": "first run python workspace automationbench cli py init read workspace tooling md and check workspace agent config json for allowed services and initial task data",
+   "b": "read workspace tooling md and workspace agent config json confirm available tools and allowed services",
+   "label": "S"
+  },
+  {
+   "key": "14da054197",
+   "a": "name the exact tool action and arguments to run",
+   "b": "unlock agent discoverable tools with unlock discoverable agent tool before calling them give user discoverable tools with the exact documented name and arguments",
+   "label": "R"
+  },
+  {
+   "key": "cafcee6613",
+   "a": "re read task policies checklist execute verify each report",
+   "b": "re read the task and every artifact it references policy sop sheet config schema superseding email channel history from scratch ignoring what you already did",
+   "label": "S"
+  },
+  {
+   "key": "fb85cd2ecd",
+   "a": "acting on the first matching object without checking the rest",
+   "b": "done it should now be x without reading the object back",
+   "label": "D"
+  },
+  {
+   "key": "cdb650475d",
+   "a": "action persisted email sent record created file updated re read the persisted state artifact shows the change the tool returned a success response",
+   "b": "it reports intent not persisted state",
+   "label": "R"
+  },
+  {
+   "key": "1f1d9d564f",
+   "a": "a single authoritative read is evidence about many things at once mine all of it before deciding the next step",
+   "b": "for device troubleshooting and long procedures give the user one step at a time and wait for the result before the next step",
+   "label": "D"
+  },
+  {
+   "key": "6dc86bdd28",
+   "a": "i listed what i skipped only report acted on items",
+   "b": "summarize only completed actions and the items acted on",
+   "label": "S"
+  },
+  {
+   "key": "46064514af",
+   "a": "identify what authoritative check or read back proves each requested requirement",
+   "b": "identity verification precondition checks confirmation and read back apply",
+   "label": "R"
+  },
+  {
+   "key": "0d2921e7b8",
+   "a": "collect and confirm all intended item changes for that order before calling the tool",
+   "b": "done sent refunded because you called the tool a call is not evidence of effect",
+   "label": "D"
+  },
+  {
+   "key": "d17b18caa7",
+   "a": "confirm the exact requested fields and values required relationships and associations such as recipient linked record project or section and any required notifications",
+   "b": "read back affected records or use an appropriate verification operation confirm the intended entity recipient or channel fields values and relationships and correct discrepancies before proceeding or claiming completion",
+   "label": "S"
+  },
+  {
+   "key": "6321096c35",
+   "a": "inspect both order and product details verify the replacement is an available variant of the same product and use item ids in item level actions",
+   "b": "list exact details ids items amounts target obtain explicit yes execute once re read result",
+   "label": "D"
+  },
+  {
+   "key": "6b39800d39",
+   "a": "do not treat advice a submitted request or completing one part as completing the rest",
+   "b": "treating one satisfied condition as eligible and skipping the rest",
+   "label": "R"
+  },
+  {
+   "key": "0e344a4789",
+   "a": "do not perform a later step until the earlier step is confirmed complete",
+   "b": "for one time or irreversible actions confirm the complete intended list first and explain any resulting restrictions",
+   "label": "D"
+  }
+ ],
+ "seed_pairs_what": "hand judgement (analyst, single rater) of the 10 closest (by cosine) added-sentence / hand-written-seed-sentence pairs of each near-empty-seed run: S = the added sentence states the same rule as the seed sentence, R = same general principle (verify before claiming completion) but another object or wording, D = different. Keyed by run and the first words of the normalized added sentence.",
+ "seed_pairs": [
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "a successful write response alone is not sufficient",
+   "label": "R"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "complete the requested workflow using",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "check for current policy updates and",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "perform independent reads in parallel",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "use actual line breaks in the",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "summarize only completed actions and",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "if verification reveals a failed",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "send api mode gmail messages using",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "do not invent violations or requirements",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__gepa__automationbench__fromscratch",
+   "prefix": "include all requested names identifiers",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "make only necessary in scope changes",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "complete every independently required communication",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "before acting identify the authoritative source",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "verify that each message is recorded",
+   "label": "R"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "read back affected records or use",
+   "label": "R"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "if the required service is unavailable",
+   "label": "R"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "report completed actions clearly and",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "pass query parameters and body",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "if verification finds a missing",
+   "label": "D"
+  },
+  {
+   "run": "gpt-6-luna__skillopt__automationbench__fromscratch",
+   "prefix": "follow explicit instructions and structured",
+   "label": "D"
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 # Skills
 
-The hand-written seed and the skill each optimizer returned in the paper's runs, exactly as the agent received them at test time.
+The hand-written seed and the skill each optimizer returned in the recorded runs, exactly as the agent received them at test time.
 
 GEPA rewrites the whole skill, including its `name` and `description`; SkillOpt and SkillAdam edit the body and keep the seed's name and description. With GPT-6-Luna on Terminal-Bench 2.1 all three optimizers return the seed unchanged, so that cell has no separate file.
 
@@ -10,6 +10,6 @@ GEPA rewrites the whole skill, including its `name` and `description`; SkillOpt 
 | AutomationBench | [GEPA](deepseek-v4.1-flash/automationbench/gepa/SKILL.md) · [SkillOpt](deepseek-v4.1-flash/automationbench/skillopt/SKILL.md) · [SkillAdam](deepseek-v4.1-flash/automationbench/skilladam/SKILL.md) | [GEPA](gpt-6-luna/automationbench/gepa/SKILL.md) · [SkillOpt](gpt-6-luna/automationbench/skillopt/SKILL.md) · [SkillAdam](gpt-6-luna/automationbench/skilladam/SKILL.md) |
 | Terminal-Bench 2.1 | [GEPA](deepseek-v4.1-flash/terminal-bench-2.1/gepa/SKILL.md) · [SkillOpt](deepseek-v4.1-flash/terminal-bench-2.1/skillopt/SKILL.md) · [SkillAdam](deepseek-v4.1-flash/terminal-bench-2.1/skilladam/SKILL.md) | all three return the [seed](seed/SKILL.md) |
 
-Seed: [seed/SKILL.md](seed/SKILL.md).
+Seed: [seed/SKILL.md](seed/SKILL.md). The SkillAdam skills are those of its dev-batch gate (the runs in `configs/experiments.yaml`).
 
-To evaluate a skill, see Reproduction in the [top-level README](../README.md): step 2 runs the three test repetitions of a returned skill, and `analysis.sh transfer` runs one unchanged under another model or benchmark.
+To evaluate a skill, see Reproduction in the [top-level README](../README.md): `python -m src.run repeat` runs the three test repetitions of a returned skill, and `python -m src.run transfer` runs one unchanged under another model or on another benchmark.

@@ -1,1 +1,0 @@
-"""Scheduled job drivers formerly in scripts/: RQ4 transfer evaluations, run-evidence audits, and the offline results refresh (main table, weekly status, skill-history export). Run as ``python -m src.dynamics.<module>`` from the bipa root."""
