@@ -5,7 +5,7 @@ tasks (task ids, file paths, expected output values, command sequences — a che
 the gain, if any, comes from thinking/searching more)?
 
 L0 — static text audit, per learned skill, against its benchmark's DEV panel task materials (the selection panel `sel` of the
-frozen native-v1 protocol, 30 / 30 / 9 tasks for tau3 / AutoBench / TB2; identical across arms and models, verified here):
+frozen native-v1 setup, 30 / 30 / 9 tasks for tau3 / AutoBench / TB2; identical across arms and models, verified here):
   corpora per dev task (harness-bench assets/benchmarks/<bench>/tasks/<id>/):
     prompt = instruction.md + task.toml (what the agent legitimately sees; tau3's instruction.md embeds the domain policy,
              so overlap with the prompt corpus is expected and is NOT leakage);
@@ -272,7 +272,7 @@ def record(res):
             "Control: the seed skill on the same corpora, then the verdict.")
     runs = ("Skills: DeepSeek nine = final_skill of the native-20261008-https optimizer runs (gepa/skillopt/skilladam x tau3/AutoBench/TB2); "
             "Luna = native-20261012 optimizer runs (tau3, AutoBench; TB2's three returned the seed text and are marked). Dev panel = the frozen "
-            "native-v1 selection panel `sel` (30/30/9 tasks; identical between the DeepSeek and Luna protocols, checked). Task materials: "
+            "native-v1 selection panel `sel` (30/30/9 tasks; identical between the DeepSeek and Luna setups, checked). Task materials: "
             "harness-bench/assets/benchmarks/<bench>/tasks/<id>/. Seed: skills/seed/SKILL.md.")
     agg = ("Tokens = lowercased alphanumerics; overlap = share of the skill's n-grams present in the corpus. Specific path/value = occurs in the "
            "answer corpus of at most 3 dev tasks (out of 30/30/9). Binary/undecodable task files skipped. The rule-level tag is heuristic "

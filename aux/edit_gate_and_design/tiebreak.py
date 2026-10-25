@@ -7,7 +7,7 @@ Writes OUT/edit_gate_and_design/tiebreak.json (all numbers) and prints a summary
 (a) per dev-scored edge (child vs its parent on their shared dev panel): success difference D (tasks) with paired SE sqrt(n) sd(d),
     mean per-task log input-token ratio L with paired SE sd(l)/sqrt(n); 'distinguishable' = |z| >= 1.96, and for success also the
     one-sided 0.05 critical value of selection.critical_value (TB2 9 -> 2, tau3 30 -> 5 / 10 -> 3, AutoBench 30 -> 4 / 10 -> 3; |D| >= c).
-    Seed-vs-seed noise floor: per-task log token ratio between two distinct full-panel seed dev draws (selection.seed_files, paper_input).
+    Seed-vs-seed noise floor: per-task log token ratio between two distinct full-panel seed dev draws (selection.seed_files, and the kept draws of selection.kept_dev).
 (b) tie-break replay: pool rule (GEPA, SkillOpt, SkillAdam TB2: every version scored on the run's full dev panel) = among versions whose dev
     success is not significantly below the pool best (best - s < c), the one with the lowest mean log dev input tokens (ties -> earliest);
     sequential gate (SkillOpt chain, SkillAdam iterations) = against the current skill on the panel of the comparison, accept iff
@@ -188,16 +188,16 @@ def noise_floor():
             ok = [e for e in d["episodes"] if S.verified(e)]
             key = frozenset((e["task_id"], S.signature(e)) for e in ok)
             draws.setdefault(key, f)
-        files = list(draws.values())
+        evals = [(f.split("deepseek-flash/")[1], load_eval(f)) for f in draws.values()]
+        evals += [(runs[0], {t: (o, x) for t, o, x in rows}) for runs, rows in S.kept_dev(bench, dev_files).items()]
         pairs = []
-        for i in range(len(files)):
-            for j in range(i + 1, len(files)):
-                a, b = load_eval(files[i]), load_eval(files[j])
-                st = compare(a, b)
-                st["files"] = [files[i].split("deepseek-flash/")[1], files[j].split("deepseek-flash/")[1]]
+        for i in range(len(evals)):
+            for j in range(i + 1, len(evals)):
+                st = compare(evals[i][1], evals[j][1])
+                st["files"] = [evals[i][0], evals[j][0]]
                 pairs.append(st)
         sd = [p["sd_l"] for p in pairs]
-        out[bench] = {"draws": len(files), "pairs": pairs, "sd_task_log_ratio": float(np.mean(sd)) if sd else None,
+        out[bench] = {"draws": len(evals), "pairs": pairs, "sd_task_log_ratio": float(np.mean(sd)) if sd else None,
                       "mean_abs_L": float(np.mean([abs(p["L"]) for p in pairs])) if pairs else None,
                       "se_L_mean": float(np.mean([p["se_L"] for p in pairs])) if pairs else None}
     return out

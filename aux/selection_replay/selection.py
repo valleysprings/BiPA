@@ -1,7 +1,8 @@
 """The dev gain each optimizer's selection rule reports when no candidate differs from the seed (DeepSeek, Table 1 runs), and the dev-to-test figure.
 
 Task model: a Beta prior fitted by beta-binomial maximum likelihood to the seed's distinct dev and test executions (sensitivity: a
-moderate prior Beta(4m, 4(1 - m))); each dev task draws from its posterior. SkillOpt keeps the best of K candidates if strictly above the
+moderate prior Beta(4m, 4(1 - m))); each dev task draws from its posterior. The dev executions of runs the assets no longer hold are kept
+in aux/data/seed_dev_extra.json and read by seed_executions. SkillOpt keeps the best of K candidates if strictly above the
 baseline, GEPA takes the argmax over the seed and K candidates, SkillAdam accepts the first of up to `budget` patches that beats the current
 skill on a random dev subset.
 
@@ -13,6 +14,7 @@ from collections import defaultdict
 
 import numpy as np
 
+from src import layout
 from src.analysis.common import rep_files, rows_of
 from src.utils import logger
 from src.utils.dataloader import CACHE, DS, out_dir, write_json
@@ -33,6 +35,7 @@ LAST_RUN_DATE = "20261015"  # later seed runs use another dev panel or the upgra
 EXCLUDED_RUN_TAGS = ("lodo", "-1017")
 # (dev tasks, distinct dev executions, distinct test executions) of the seed inputs
 PAPER_INPUTS = {"terminal-bench-2-1": (9, 18, 54), "tau3-bench": (30, 90, 225), "automationbench": (30, 89, 360)}
+KEPT_DEV = layout.ROOT / "aux/data/seed_dev_extra.json"
 RULE = {"skillopt": "SkillOpt", "gepa": "GEPA", "skilladam": "SkillAdam"}
 
 
@@ -60,8 +63,13 @@ def executions(files):
     return {task: list(runs.values()) for task, runs in seen.items()}
 
 
+def run_name(path):
+    """<method>/<bench>/<run> of an evaluation file."""
+    return str(path).split("deepseek-flash/")[1].split("/results")[0]
+
+
 def paper_input(path):
-    run = path.split("deepseek-flash/")[1].split("/results")[0].split("/")[-1]
+    run = run_name(path).split("/")[-1]
     dated = re.search(r"(2026\d{4})", run)
     return not any(tag in run for tag in EXCLUDED_RUN_TAGS) and (dated is None or dated.group(1) < LAST_RUN_DATE)
 
@@ -73,9 +81,33 @@ def seed_files(bench):
     return dev, test
 
 
+def kept_dev(bench, dev_files):
+    """{runs sharing one evaluation: [(task, 0/1, input tokens)]} of the seed dev executions kept in KEPT_DEV, leaving out those whose runs are in dev_files."""
+    if not KEPT_DEV.exists():
+        raise FileNotFoundError(f"{KEPT_DEV} is missing: it keeps the seed dev executions of runs the assets no longer hold")
+    kept = json.loads(KEPT_DEV.read_text())
+    found = {run_name(f) for f in dev_files}
+    out = defaultdict(list)
+    for b, task, outcome, run, x in kept["executions"]:
+        if b == bench and not found & set(kept["runs"][run]):
+            out[tuple(kept["runs"][run])].append((task, outcome, x))
+    return out
+
+
+def seed_executions(bench):
+    """(dev, test, dev files): the seed's {task: [0/1 per distinct execution]} with the kept dev executions, checked against PAPER_INPUTS."""
+    dev_files, test_files = seed_files(bench)
+    dev, test = executions(dev_files), executions(test_files)
+    for rows in kept_dev(bench, dev_files).values():
+        for task, outcome, _ in rows:
+            dev.setdefault(task, []).append(outcome)
+    check_inputs(bench, dev, test)
+    return dev, test, dev_files
+
+
 def check_inputs(bench, dev, test):
     found = (len(dev), sum(map(len, dev.values())), sum(map(len, test.values())))
-    assert found == PAPER_INPUTS[bench], f"{bench}: seed executions {found} differ from {PAPER_INPUTS[bench]}; check seed_files"
+    assert found == PAPER_INPUTS[bench], f"{bench}: seed executions {found} differ from {PAPER_INPUTS[bench]}; check seed_files and {KEPT_DEV.name}"
 
 
 def seed_test_avg3(bench):
@@ -88,8 +120,8 @@ def seed_test_avg3(bench):
     return round(100 * sum(rates) / len(rates), 1)
 
 
-def dev_draws(dev_files, n_dev):
-    """The seed's distinct full-panel dev draws, sorted by success."""
+def dev_draws(bench, dev_files, n_dev):
+    """The seed's distinct full-panel dev draws, the kept ones included, sorted by success."""
     draws = defaultdict(lambda: {"runs": []})
     for path in dev_files:
         episodes = json.load(open(path))["episodes"]
@@ -98,8 +130,9 @@ def dev_draws(dev_files, n_dev):
         ok = [e for e in episodes if verified(e)]
         draw = draws[frozenset((e["task_id"], signature(e)) for e in ok)]
         draw.update(solved=sum(bool(e["success"]) for e in ok), verified=len(ok))
-        draw["runs"].append(path.split("deepseek-flash/")[1].split("/results")[0])
-    return sorted(draws.values(), key=lambda d: d["solved"] / d["verified"])
+        draw["runs"].append(run_name(path))
+    kept = [{"runs": list(runs), "solved": sum(o for _, o, _ in rows), "verified": len(rows)} for runs, rows in kept_dev(bench, dev_files).items()]
+    return sorted([*draws.values(), *kept], key=lambda d: d["solved"] / d["verified"])
 
 
 def fit_prior(tasks):
@@ -271,16 +304,14 @@ def spread(g0, G, **extra):
 
 def analyse(bench):
     """Every number of one benchmark under both priors, and the dev/test-figure replay rows (fitted prior)."""
-    dev_files, test_files = seed_files(bench)
-    dev, test = executions(dev_files), executions(test_files)
-    check_inputs(bench, dev, test)
+    dev, test, dev_files = seed_executions(bench)
     n_dev = len(dev)
     pooled = [(sum(v), len(v)) for v in list(dev.values()) + list(test.values())]
     a, b = fit_prior(pooled)
     mean = sum(k for k, _ in pooled) / sum(n for _, n in pooled)
     obs = observed(bench, n_dev)
     out = {"dev_tasks": n_dev, "dev_executions_per_task": sorted({len(v) for v in dev.values()}), "test_tasks": len(test),
-           "prior_fitted": [a, b], "mean_success": mean, "observed": obs, "priors": {}, "seed_dev_draws": dev_draws(dev_files, n_dev),
+           "prior_fitted": [a, b], "mean_success": mean, "observed": obs, "priors": {}, "seed_dev_draws": dev_draws(bench, dev_files, n_dev),
            "test_avg3": seed_test_avg3(bench),
            "expected_seed_success": {"dev": posterior_mean(dev, a, b), "test": posterior_mean(test, a, b), "prior_mean": 100 * a / (a + b)}}
     index, replay = [x for x, _ in BENCHES].index(bench), []

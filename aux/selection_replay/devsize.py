@@ -7,8 +7,8 @@ import json
 
 import numpy as np
 
-from aux.selection_replay.selection import (BENCHES, MODERATE, best_of, check_inputs, executions, fit_prior, mde80, outcomes, reseed,
-                                            seed_files, task_probabilities)
+from aux.selection_replay.selection import (BENCHES, MODERATE, best_of, fit_prior, mde80, outcomes, reseed, seed_executions,
+                                            task_probabilities)
 from src.utils import dataloader, logger
 
 DEVSIZE_DRAWS = 40_000
@@ -42,9 +42,7 @@ def compute():
     sel = json.loads((dataloader.CACHE / "selection.json").read_text())
     result = {}
     for index, (bench, _) in enumerate(BENCHES):
-        dev_files, test_files = seed_files(bench)
-        dev, test = executions(dev_files), executions(test_files)
-        check_inputs(bench, dev, test)
+        dev, test, _ = seed_executions(bench)
         pooled = [(sum(v), len(v)) for v in list(dev.values()) + list(test.values())]
         a, b = fit_prior(pooled)
         mean = sum(k for k, _ in pooled) / sum(n for _, n in pooled)

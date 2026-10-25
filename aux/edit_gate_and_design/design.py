@@ -399,9 +399,7 @@ def panel_threshold(dev, prior, size, index) -> int:
 
 def analyse(bench) -> dict:
     """Null acceptance and power per rule for one benchmark, plus the critical values of the panel sizes used by the logged edges."""
-    dev_files, test_files = S.seed_files(bench)
-    dev, test = S.executions(dev_files), S.executions(test_files)
-    S.check_inputs(bench, dev, test)
+    dev, test, _ = S.seed_executions(bench)
     n_dev = len(dev)
     pooled = [(sum(v), len(v)) for v in list(dev.values()) + list(test.values())]
     prior = S.fit_prior(pooled)

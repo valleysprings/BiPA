@@ -1,7 +1,7 @@
 """Second-coder agreement on the eight-category coding of the added rule units (skilltext.json).
 
 A second coder (a language model working from the category definitions only) labelled every unit
-(CACHE/analysis/main/coder2_labels.json); this compares those labels with the final labels and reports
+(aux/data/coder2_labels.json); this compares those labels with the final labels and reports
 percent agreement, Cohen's kappa (overall and per relied-on group), the confusion matrix and the counts.
 Unit id = "<optimizer>|<benchmark>#<idx>".  Run:  python -m aux.rule_coding.coder2
 """
@@ -9,7 +9,10 @@ import json
 
 import numpy as np
 
+from src import layout
 from src.utils import logger, dataloader
+
+LABELS = layout.ROOT / "aux/data/coder2_labels.json"
 CATS = ["serialize", "parallelize", "limit_read", "ask_stop", "verify", "domain", "format", "other"]
 # Groups the paper relies on; each becomes a binary "in group / not in group" coding.
 GROUPS = {"verify": ["verify"], "serialize": ["serialize"],
@@ -54,7 +57,9 @@ def compare(ids, first, second):
 def compute():
     """All numbers: full set, set without the exposed cell, confusion matrix, counts."""
     final = final_labels()
-    second = json.loads((dataloader.CACHE / "coder2_labels.json").read_text())
+    if not LABELS.exists():
+        raise FileNotFoundError(f"{LABELS} is missing: it holds the second coder's labels, which no step writes")
+    second = json.loads(LABELS.read_text())
     assert set(final) == set(second)
     ids = sorted(final)
     blind = [i for i in ids if not i.startswith(EXPOSED)]
@@ -88,13 +93,13 @@ def record(r):
     extra = "\n".join([
         "### Counts per category", "", cnt, "", "### Units per relied-on group", "", grp, "",
         "### Confusion matrix (rows: final labels, columns: coder 2)", "", conf, "",
-        "### Protocol", "",
+        "### Procedure", "",
         f"Blind second coder. The {n} unit texts were exported without labels and coder 2 (a language model) "
-        "labelled each from the category definitions only (appendix D and section 4.2 of mech_skilltext.md), "
+        "labelled each from the category definitions only (the eight categories of mech_skilltext.md), "
         "without opening the final labels. Exception: the labels of the first cell (gepa tau3-bench, "
         f"{n - r['blind']['n']} units) were shown to coder 2 before coding, so that cell is not blind; "
         f"agreement is reported on all {n} units and on the {r['blind']['n']} blind units. Labels: "
-        "`assets/cache/analysis/main/coder2_labels.json`. Coder 2 is a model, not a human.",
+        "`aux/data/coder2_labels.json`. Coder 2 is a model, not a human.",
         f"Units with different labels: {r['n_disagree']} of {n}."])
     logger.write_record("coder2", "Inter-coder agreement for the eight-category coding of the 337 added rule units.",
                    "Nine learned skills (GEPA, SkillOpt, SkillAdam on tau3-bench, AutoBench, TB2); units from skilltext.json.",

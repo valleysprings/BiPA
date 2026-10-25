@@ -1,18 +1,19 @@
-"""Figure devpertask: what optimizing moves on dev and what it moves on test.
+"""The devpertask figure: what optimizing moves on dev and what it moves on test, task by task.
 
-(a) Aggregated: for each benchmark, the success of the seed and of the returned skill on the dev tasks and on the test tasks, one run each side, from the optimizer's own run (SkillOpt, GEPA; DeepSeek solid
-    lines, GPT-6-Luna dashed).  Lines run from the seed to the returned skill; on dev they rise, on test they stay.
-(b) Per task: share of tasks the seed fails and the returned skill solves (up) and the share it solves and the returned skill fails (down), on dev and on test; black ticks: what a second run of the seed
-    itself flips in each direction (expected over pairs of its runs).
-SkillAdam is left out: it scores 10-task subsets and has no whole-panel dev evaluation of a returned skill.  Luna on TB2 returned the seed.
-Run:  python -m aux.selection_replay.fig_devpertask   (after collect)
+Per optimizer run (SkillOpt, GEPA; both models), the share of tasks the seed fails and the returned skill solves (up) and the share it solves and the
+returned skill fails (down), on dev and on test, one run each side from the optimizer's own run; black ticks: what a second run of the seed itself
+flips in each direction (expected over pairs of its executions, selection.seed_executions). SkillAdam is left out: it scores 10-task subsets and has no whole-panel dev evaluation
+of a returned skill. Luna on TB2 returned the seed.
+Run:  python -m aux.selection_replay.fig_devpertask   (after collect)  -> fig/mech/mech_devpertask.{pdf,svg}, data/mech/mech_devpertask_numbers.json
 """
-import json, os, pickle
+import json, pickle
 import numpy as np
-from aux.selection_replay.style import FONT, INK, MUTED, GRID, BENCH_NAME, setup_mpl  # noqa
-from aux.selection_replay import selection as S
+from aux.selection_replay.selection import seed_executions
+from aux.selection_replay.style import INK, MUTED, GRID, setup_mpl
 
 from src import layout
+from src.utils import logger
+from src.utils.fig import save_figure
 
 OUT = str(layout.OUT / "selection_replay")
 OPTCOL = {"gepa": "#2A9D4B", "skillopt": "#1F6FB5"}
@@ -21,10 +22,8 @@ BENCH = ["tau3-bench", "automationbench", "terminal-bench-2-1"]
 
 
 def seed_noise(bench):
-    dev_files, test_files = S.seed_files(bench)
     out = []
-    for files in (dev_files, test_files):
-        ex = S.executions(files)
+    for ex in seed_executions(bench)[:2]:
         out.append(float(np.mean([k * (n - k) / (n * (n - 1)) for k, n in ((sum(v), len(v)) for v in ex.values()) if n > 1])) * 100)
     return out
 
@@ -35,7 +34,6 @@ def flips(a, b):
 
 
 def main():
-    os.makedirs(OUT, exist_ok=True)
     plt = setup_mpl()
     from matplotlib.lines import Line2D
     from matplotlib.patches import Patch
@@ -45,8 +43,6 @@ def main():
     noise = {b: seed_noise(b) for b in BENCH}
     fig = plt.figure(figsize=(7.1, 2.75))
     gs = GridSpec(1, 1, figure=fig, left=0.075, right=0.99, top=0.88, bottom=0.27)
-    levels = {}
-    # (b) per task
     bx = fig.add_subplot(gs[0, 0])
     order = [d for model in ("deepseek-flash", "gpt-6-luna") for opt in ("skillopt", "gepa") for bench in BENCH for d in data if d["model"] == model and d["opt"] == opt and d["bench"] == bench]
     xt, xl, numbers, grp = [], [], [], {}
@@ -86,9 +82,9 @@ def main():
          Patch(facecolor="#777777", edgecolor="#777777", label="dev (solid)"), Patch(facecolor="white", edgecolor="#777777", hatch="////", label="test (hatched)"),
          Line2D([0], [0], color=INK, lw=0.9, label="a second run of the seed")]
     fig.legend(handles=h, loc="lower center", ncol=5, frameon=False, fontsize=6.4, handlelength=1.5, columnspacing=1.0, bbox_to_anchor=(0.52, 0.0))
-    for ext, kw in (("pdf", {}), ("svg", {}), ("png", {"dpi": 200})):
-        fig.savefig(f"{OUT}/devpertask.{ext}", **kw)
-    json.dump(dict(levels=levels, per_task=numbers, seed_noise_pct_dev_test=noise), open(OUT + "/devpertask_numbers.json", "w"), indent=1)
+    save_figure(fig, "devpertask")
+    logger.DATA.mkdir(parents=True, exist_ok=True)
+    json.dump(dict(per_task=numbers, seed_noise_pct_dev_test=noise), open(logger.DATA / "mech_devpertask_numbers.json", "w"), indent=1)
 
 
 if __name__ == "__main__":

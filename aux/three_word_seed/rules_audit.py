@@ -1,6 +1,6 @@
 """(f) Rule audit of the four RETURNED from-scratch skills (final/SKILL.md), sentence by sentence, with the S0-S3 rubric:
   S0 task-independent good practice (would be correct in any benchmark)
-  S1 a convention of the whole benchmark (its CLI, files, conversation protocol, reporting rules) that names no specific app / tool / field
+  S1 a convention of the whole benchmark (its CLI, files, conversation rules, reporting rules) that names no specific app / tool / field
   S2 names a specific tool, app, service, field or command (and how to use it)
   S3 holds only for one class of tasks or one task instance (domain procedure, concrete facts)
 Collapsed: general = S0; benchmark-wide = S1; specific = S2 + S3.  'literal' marks sentences that contain a benchmark-specific literal (command, file, tool name, API name, domain term).
@@ -27,7 +27,7 @@ L = {
   7: ("S0", 0, "compare checklist with results before ending"), 8: ("S1", 0, "answer every outstanding request before ending the conversation"), 9: ("S1", 0, "end conditions of the conversation"),
   10: ("S2", 1, "names a calculator tool and refund/balance computations"), 11: ("S0", 0, "base calculations on verified values"), 12: ("S0", 0, "match item to exact record, stay in authorised scope"),
   13: ("S0", 0, "preserve unrelated items"), 14: ("S0", 0, "distinguish completed/unavailable/unresolved"), 15: ("S0", 0, "do not proceed if operation over-reaches"),
-  16: ("S1", 0, "guided troubleshooting: one step at a time, wait for the user (customer-service protocol)"), 17: ("S0", 0, "use the result, retest the original issue")},
+  16: ("S1", 0, "guided troubleshooting: one step at a time, wait for the user (customer-service procedure)"), 17: ("S0", 0, "use the result, retest the original issue")},
  "gepa|automationbench": {
   0: ("S1", 0, "complete the workflow with the available tools"), 1: ("S1", 0, "AutoBench is non-interactive: no clarifying questions"), 2: ("S1", 1, "names the AutoBench CLI init command and two config files (benchmark-wide; judges also S1)"),
   3: ("S1", 1, "api_search for endpoints (benchmark-wide CLI; judges S1)"), 4: ("S1", 1, "--params JSON in API mode (benchmark CLI; judges S1)"), 5: ("S0", 0, "read source records and procedures first"),
@@ -39,7 +39,7 @@ L = {
   21: ("S3", 0, "drafts must stay drafts: only email-draft tasks (judges S1)"), 22: ("S0", 0, "no consequential actions policy forbids"), 23: ("S1", 0, "after mutations read back records: statuses, tags, tracking rows, attendees"),
   24: ("S0", 0, "write response alone is not enough"), 25: ("S0", 0, "fix overwritten update and re-verify"), 26: ("S1", 0, "summarise only completed actions"), 27: ("S1", 0, "do not narrate skipped items (grader convention)")},
  "gepa|tau3-bench": {
-  0: ("S2", 1, "names start_conversation"), 1: ("S1", 0, "policy is the source of truth; domains differ"), 2: ("S0", 0, "small sequential steps"), 3: ("S1", 0, "one tool call per step, not combined with a user message (tau3 protocol)"),
+  0: ("S2", 1, "names start_conversation"), 1: ("S1", 0, "policy is the source of truth; domains differ"), 2: ("S0", 0, "small sequential steps"), 3: ("S1", 0, "one tool call per step, not combined with a user message (tau3 rule)"),
   4: ("S1", 0, "identify the user via the task's authentication process"), 5: ("S1", 0, "verification logging (tau3 customer-service procedure, tool not named)"), 6: ("S1", 0, "consult records and knowledge-base guidance first"),
   7: ("S1", 0, "use the exact tool names/arguments/order the KB specifies"), 8: ("S0", 0, "do not invent facts"), 9: ("S0", 0, "resolve the actual request"), 10: ("S0", 0, "inspect all relevant records"),
   11: ("S3", 1, "rewards: missing/correct/excess (banking-knowledge reward tasks)"), 12: ("S1", 0, "state action and consequences, get confirmation before DB-changing action (tau convention)"),

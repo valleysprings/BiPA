@@ -15,10 +15,10 @@ Run:  python -m aux.contamination_and_loading.trigger_fig
 import json
 import math
 import statistics
+from pathlib import Path
 
 from aux.transfer_and_trajectories import plot_style as R
 from aux.headline_numbers.dynamics import known
-from src.layout import relocate
 from src.utils import fig
 from src.utils.dataloader import DS as EXD
 from src.utils.logger import paperout as P
@@ -64,6 +64,9 @@ def gm_ratio(a, b):
 
 
 def delivery():
+    missing = [f"{c}: {d}" for c, d in DELIVERY.items() if not d.is_dir()]
+    if missing:
+        raise SystemExit("delivery cells missing under $BIPA_ASSETS/artifacts:\n  " + "\n  ".join(missing))
     rows = {c: delivery_rows(d) for c, d in DELIVERY.items()}
     out = {}
     for pair, want in EXPECT_DELIVERY.items():
@@ -78,9 +81,11 @@ def delivery():
 # ---------- (b) trigger ----------
 
 def trig_rows(cell):
-    p = json.loads((cell / "trigger-summary.json").read_text())["evaluation_path"]
+    recorded = json.loads((cell / "trigger-summary.json").read_text())["evaluation_path"]
+    p = cell / "results/evaluations/test" / Path(recorded).parent.name / "evaluation.json"
+    assert p.is_file(), (cell, recorded)
     out = {}
-    for ep in json.loads(relocate(p).read_text())["episodes"]:
+    for ep in json.loads(p.read_text())["episodes"]:
         reqs = [r for r in {r["request_id"]: r for r in ep["requests"]}.values() if r["input_tokens"] is not None]
         sd = ep["skill_delivery"]
         out[ep["task_id"]] = {"S": ep["success"], "trig": sd.get("triggered"), "first": sd.get("first_trigger_request"),

@@ -56,11 +56,11 @@ def main():
              "DeepSeek: skillopt/gepa/skilladam/<bench>/native-20261008-https; edges = the 59 canonical dev edges of mech_edges (rebuilt with "
              "`edges.skillopt_edges / gepa_edges / skilladam_edges`, one shared dev panel each; SkillAdam x TB2 excluded as there). Luna: the same builders "
              "on native-20261012, the 62 dev-scored edges of mech_rules_luna (SkillAdam x TB2 excluded). Seed-vs-seed noise: distinct full-panel dev draws "
-             "of the seed among `selection.seed_files` (paper_input: no 1017, no LODO runs). Test: Table 1 (mech_table1, avg@3).", "",
+             "of the seed among `selection.seed_files` (paper_input: no 1017, no LODO runs) and the kept evaluations of `selection.kept_dev`. Test: Table 1 (mech_table1, avg@3).", "",
              "## Method", "",
              "- Per edge, on the shared dev tasks: success difference D = sum over tasks of (child - parent) with paired SE sqrt(n) sd(d); token change "
              "L = mean over tasks of log(X_child / X_parent), X = episode input tokens (DeepSeek `dataloader.task_row`; Luna: distinct completed requests, as Table 1), "
-             "paired SE sd(l)/sqrt(n). Separable = |z| >= 1.96; for success also |D| >= the one-sided 0.05 critical value of aux.selection_replay.selection.critical_value"
+             "paired SE sd(l)/sqrt(n). Separable = |z| >= 1.96; for success also |D| >= the one-sided 0.05 critical value of aux.selection_replay.selection.critical_value "
              "(TB2 9 tasks: 2; tau3 30: 5, 10: 3; AutoBench 30: 4, 10: 3; the DeepSeek values are applied to Luna too).",
              "- D reproduces mech_edges' dQ x n_pair / 100 on all 59 edges; L correlates 0.999 with its dlogX (dlogX keeps only lever-valid tasks).",
              "- Pool rule (GEPA, SkillOpt, SkillAdam x TB2: every version the run scored on its full dev panel, seed included): eligible = versions whose dev "
@@ -103,11 +103,14 @@ def main():
                          f"{p['L']:+.3f}", f"{p['se_L']:.3f}", f"{p['z_L']:+.1f}"])
     lines += [table(["bench", "seed draws", "solved", "tasks", "SD per-task log ratio", "mean log ratio", "SE", "z"], rows), ""]
     sd = D["deepseek-flash"]["by_bench_sd_l"]
+    seed_pairs = [p for n in D["noise"].values() for p in n["pairs"]]
+    separable = sum(abs(p["z_L"]) >= 1.96 for p in seed_pairs)
     lines += [f"Per-task SD of the log token ratio, seed vs seed: tau3 {D['noise']['tau3-bench']['sd_task_log_ratio']:.2f}, AutoBench "
               f"{D['noise']['automationbench']['sd_task_log_ratio']:.2f}, TB2 {D['noise']['terminal-bench-2-1']['sd_task_log_ratio']:.2f} (one pair); "
               f"median over the 59 edges: tau3 {sd['tau3-bench']:.2f}, AutoBench {sd['automationbench']:.2f}, TB2 {sd['terminal-bench-2-1']:.2f}. "
               "The edges' per-task spread equals run-to-run spread on tau3 and AutoBench, so the paired SE of an edge is the run-to-run noise of its mean: "
-              "about 0.05 (tau3) and 0.11 (AutoBench) log points on 30 tasks. 1 of 7 seed pairs is separable on tokens (TB2, +0.31, two runs on different dates); "
+              "about 0.05 (tau3) and 0.11 (AutoBench) log points on 30 tasks. "
+              f"{separable} of {len(seed_pairs)} seed pairs is separable on tokens (TB2, +0.31, two runs on different dates); "
               "the tau3 and AutoBench pairs are within 1.2 SE. Luna has one seed execution per dev task, so no Luna seed-vs-seed pair exists.", ""]
 
     # ---- (b)

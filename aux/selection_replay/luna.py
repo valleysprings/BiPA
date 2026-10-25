@@ -8,9 +8,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from aux.selection_replay.selection import (BENCHES, DRAWS, MODERATE, POWER_GAINS, SEED_VERSION, batch_gain_tail, best_of, check_inputs,
-                                            executions, fit_prior, mid_quantile, outcomes, posterior_mean, replay_power, reseed, seed_files,
-                                            signature, skilladam_accepts, skilladam_null, skilladam_observed, skilladam_reported_gain,
+from aux.selection_replay.selection import (BENCHES, DRAWS, MODERATE, POWER_GAINS, SEED_VERSION, batch_gain_tail, best_of, executions,
+                                            fit_prior, mid_quantile, outcomes, posterior_mean, replay_power, reseed, seed_executions, signature, skilladam_accepts, skilladam_null, skilladam_observed, skilladam_reported_gain,
                                             task_probabilities, verified)
 from src import layout
 from src.analysis.table1 import rep_groups
@@ -19,9 +18,9 @@ from src.utils import dataloader, logger
 # The same replay for the Luna runs of Table 1 (optimizers native-20261012, seed native-20261011), with its own inputs, checks,
 # streams and record.
 #
-# Inputs.  The seed's dev executions are its dev evaluations under the native protocol (run tags native-20261011/12; every optimizer run and
+# Inputs.  The seed's dev executions are its dev evaluations under the native setup (run tags native-20261011/12; every optimizer run and
 # the seed run reuse one cached draw, so each dev task has one execution).  The aborted runs (aborted_dev_files; an earlier task config and
-# cache namespace, stopped at the seed's dev evaluation on unknown outcomes) are not seed draws of this protocol; they are compared in the
+# cache namespace, stopped at the seed's dev evaluation on unknown outcomes) are not seed draws of this setup; they are compared in the
 # record only.  The seed's test executions are the files Table 1 reads (native-seed run + test-reps, repetitions 0-2).
 # Task models.  fitted / moderate as for DeepSeek.  With one execution per dev task a prior-free model built on the seed's executions alone
 # is degenerate (p_v in {0, 1}, so G0 = 0); the prior-free models are therefore estimated under the null: if no candidate differs from the
@@ -41,7 +40,7 @@ LUNA_MODELS = ("fitted", "moderate", "null plug-in", "null Bayesian bootstrap")
 
 
 def luna_seed_files(bench) -> tuple[list, list]:
-    """(dev evaluation files, test evaluation files) of the seed skill under Luna's native protocol; test = the files Table 1 reads."""
+    """(dev evaluation files, test evaluation files) of the seed skill under Luna's native setup; test = the files Table 1 reads."""
     dev_files = sorted(glob.glob(str(LUNA_EXECUTION / f"*/{bench}/native-2026101[12]/results/evaluations/dev/{SEED_VERSION}-*/evaluation.json")))
     seed_run = LUNA_EXECUTION / "native-seed" / bench / LUNA_SEED_RUN
     groups = rep_groups([seed_run, layout.repetition_dir(seed_run), seed_run.parent / "rep-1", seed_run.parent / "rep-2"],
@@ -266,7 +265,7 @@ def record_luna(result):
         "G0 = 0), so the prior-free models are estimated under the null: every dev execution of every version in the benchmark's three "
         "optimizer runs is a seed draw if no candidate differs, and a task's rate is its success share among them (null plug-in) or "
         "Beta(s, n - s) with point masses for unanimous tasks (null Bayesian bootstrap); a candidate that truly differs widens these rates and "
-        "raises P(G0 >= g). Model-free: no second seed dev draw exists under this protocol; under the null the seed draw and a run's K "
+        "raises P(G0 >= g). Model-free: no second seed dev draw exists under this setup; under the null the seed draw and a run's K "
         "candidate scores are exchangeable, and the rank test averages 1[max(others) - one >= g] over the K + 1 choices of baseline. "
         f"{DRAWS} draws per setting, random seed [20261012, benchmark index, model index, 500]. Where g = 0 (TB2, all three returned "
         "the seed) the P columns give P(G0 >= 1), the chance that selection alone would have kept a candidate.",
@@ -302,8 +301,7 @@ def luna_notes(result) -> str:
 def luna():
     """Check the DeepSeek inputs (unchanged), then compute the Luna replay and write its cache and record."""
     for bench, _ in BENCHES:
-        dev_files, test_files = seed_files(bench)
-        check_inputs(bench, executions(dev_files), executions(test_files))
+        seed_executions(bench)
     result = {bench: analyse_luna(bench) for bench, _ in BENCHES}
     dataloader.write_json("selection_luna", result)
     record_luna(result)

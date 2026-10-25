@@ -91,13 +91,20 @@ def delivered_text(run, vid):
     return None, None
 
 
-def first_fingerprints(data, limit=8):
-    """system_fingerprint (or response.model) of the first request of up to `limit` executed episodes."""
+def request_record(evaluation, recorded):
+    """A request record an evaluation names: at its recorded path, else under the evaluation's run directory wherever that run now lives."""
+    run = Path(evaluation).parents[4]
+    head, sep, tail = recorded.partition(f"/{run.name}/")
+    return load(recorded if Path(recorded).exists() or not sep else run / tail)
+
+
+def first_fingerprints(path, data, limit=8):
+    """system_fingerprint (or response.model) of the first request of up to `limit` executed episodes of the evaluation at path."""
     seen = collections.Counter()
     for e in [e for e in data.get("episodes", []) if not e.get("cache_hit")][:limit]:
         for r in e.get("requests", [])[:1]:
             try:
-                resp = load(r["record_path"]).get("response") or {}
+                resp = request_record(path, r["record_path"]).get("response") or {}
             except (OSError, ValueError, KeyError):
                 seen["unreadable"] += 1
                 continue
@@ -109,16 +116,16 @@ def first_fingerprints(data, limit=8):
 
 def run_cell(model, opt, bench):
     run = EXECUTION / model / opt / bench / RUNS[model]
-    protocol, summary = load(run / "native_protocol.json"), load(run / "summary.json")
+    settings, summary = load(run / "native_protocol.json"), load(run / "summary.json")
     for key in ("model", "benchmark", "arm", "harness", "scale"):
-        if summary.get(key) != protocol.get(key):
-            raise ValueError(f"{run}: summary/protocol mismatch on {key}")
-    if protocol.get("protocol") != "native-v1":
+        if summary.get(key) != settings.get(key):
+            raise ValueError(f"{run}: summary and run settings differ on {key}")
+    if settings.get("protocol") != "native-v1":
         raise ValueError(f"{run}: not a frozen native-v1 run")
     if (run / "final/SKILL.md").read_text() != (summary["final_skill"] or ""):
         raise ValueError(f"{run}: final/SKILL.md differs from summary.final_skill")
     seed = SEED_FILE.read_text()
-    dev_rows, test_rows = normalized(protocol["panels"]["sel"]), normalized(protocol["panels"]["test"])
+    dev_rows, test_rows = normalized(settings["panels"]["sel"]), normalized(settings["panels"]["test"])
     dev = {vid: next(((p, d) for p, d in items if full(d, dev_rows)), None) for vid, items in evaluations(run, "dev").items()}
     dev = {vid: item for vid, item in dev.items() if item}
     test = {vid: next(((p, d) for p, d in items if full(d, test_rows)), None) for vid, items in evaluations(run, "test").items()}
@@ -126,7 +133,7 @@ def run_cell(model, opt, bench):
     rounds = load(RESULTS / model / opt / bench / "rounds.json")
     if rounds["run_id"] != RUNS[model]:
         raise ValueError(f"{model}/{opt}/{bench}: results/ rounds.json belongs to {rounds['run_id']}")
-    return run, protocol, summary, seed, dev_rows, test_rows, dev, test, rounds
+    return run, settings, summary, seed, dev_rows, test_rows, dev, test, rounds
 
 
 def dev_score(dev, vid):
@@ -146,7 +153,7 @@ def union_dev(run, vid, dev_rows):
 
 
 def path_of(model, opt, bench, accept_chain=False):
-    run, protocol, summary, seed, dev_rows, test_rows, dev, test, rounds = run_cell(model, opt, bench)
+    run, settings, summary, seed, dev_rows, test_rows, dev, test, rounds = run_cell(model, opt, bench)
     seed_vid, final_text = version(seed), summary["final_skill"]
     final_vid = version(final_text)
     entries = [{"round": 0, "role": "seed", "vid": seed_vid, "text": seed, "dev": dev_score(dev, seed_vid)}]
@@ -182,7 +189,7 @@ def path_of(model, opt, bench, accept_chain=False):
         e["test"] = test.get(e["vid"])
         if e["role"] == "path" and not delivered_text(run, e["vid"])[0]:
             raise ValueError(f"{model}/{opt}/{bench}: no delivered text for path skill {e['vid'][:12]}")
-    return {"model": model, "opt": opt, "bench": bench, "run": run, "protocol": protocol, "dev_rows": dev_rows, "test_rows": test_rows,
+    return {"model": model, "opt": opt, "bench": bench, "run": run, "settings": settings, "dev_rows": dev_rows, "test_rows": test_rows,
             "entries": entries, "strict_dev": strict_dev}
 
 
@@ -198,7 +205,7 @@ def new_model_test(bench, vid, test_rows):
         data = load(path)
         if data.get("version_id") != vid or not full(data, test_rows) or len(known(data["episodes"])) != len(test_rows):
             continue
-        prints = first_fingerprints(data)
+        prints = first_fingerprints(path, data)
         if prints and set(prints) == {FINGERPRINT["new"]}:
             return path
     return None
@@ -353,11 +360,11 @@ def execute(model, cells, items, slots, cache_root):
         if not it["missing"]:
             print(f"skip (complete in {out}): {it['kind']} {e['vid'][:12]} {it['split']}", flush=True)
         else:
-            protocol = cell["protocol"]
-            root = Path(relocate(protocol["cache_root"])).resolve() if cache_root == "frozen" else Path(cache_root).resolve()
+            settings = cell["settings"]
+            root = Path(relocate(settings["cache_root"])).resolve() if cache_root == "frozen" else Path(cache_root).resolve()
             print(f"evaluate {it['kind']} {cell['opt']}/{cell['bench']} {e['vid'][:12]} {it['split']}: {len(it['missing'])} slots, "
                   f"cache {root}", flush=True)
-            target = Cell(protocol["benchmark"], protocol["model"], protocol["harness"], out, slots=slots, cache_root=root)
+            target = Cell(settings["benchmark"], settings["model"], settings["harness"], out, slots=slots, cache_root=root)
             # always the full panel: one evaluation directory per (vid, split) that harness-bench resumes from disk (known slots are
             # kept, the private cache serves finished ones), so done_in() sees everything after an interruption
             evaluate(target, e["text"], [dict(r, repetition=0) for r in it["rows"]], it["split"])
@@ -380,7 +387,7 @@ def main(argv=None):
     parser.add_argument("--no-reuse", action="store_true", help="do not reuse an existing new-model test of a returned skill from another run (e.g. delivery-check, whose harness differs)")
     parser.add_argument("--slots", type=int, default=8)
     parser.add_argument("--cache-root", default=None,
-                        help="default: private ARTIFACTS/path-test/cache/<model>; 'frozen' = the run's protocol cache_root")
+                        help="default: private ARTIFACTS/path-test/cache/<model>; 'frozen' = the run's recorded cache_root")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", default=True)
     mode.add_argument("--execute", action="store_true")

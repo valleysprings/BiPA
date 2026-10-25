@@ -6,7 +6,8 @@ share of turns that carry two or more state-changing calls should fall under a s
 Episodes: Table 1's avg@3 test runs (assets/cache/analysis/table1/table1.json 'files'; supplements merged with table1.merged_episodes), AutoBench,
 DeepSeek-V4.1-Flash and GPT-6-Luna; rows Seed, GEPA, SkillOpt, SkillAdam (No skill as a reference).  Task set per (row vs Seed): Table 1's common set
 (per-task 3-run means with verified outcome and N, X > 0 on both sides); only episodes that enter those means (task_row N, X, success known) are used.
-The script checks that n, rho^calls and rho (input tokens) reproduce table1.json.
+For DeepSeek the script checks that n, rho^calls and rho (input tokens) reproduce table1.json; Luna's Table 1 rows (luna_row) drop provider-failed
+requests and keep the episode, while the Luna task sets here use complete logs only, so there the check is printed only.
 
 Call classification (one executed tool call -> W write / R read / O other), from the AutoBench tool set:
   bash commands that reach the world through automationbench_cli.py:
@@ -256,7 +257,8 @@ def stats(B=4000, seed=20261020):
             rho_calls = math.exp(np.mean([math.log(b[t][0] / a[t][0]) for t in tasks]))
             rho_x = math.exp(np.mean([math.log(b[t][1] / a[t][1]) for t in tasks]))
             check = dict(n=len(tasks), n_table1=ref["n"], rho_calls=rho_calls, rho_calls_table1=ref["rho_inv"], rho_x=rho_x, rho_x_table1=ref["rho_trj"])
-            assert len(tasks) == ref["n"] and abs(rho_calls - ref["rho_inv"]) < 1e-6 and abs(rho_x - ref["rho_trj"]) < 1e-6, check
+            same = len(tasks) == ref["n"] and abs(rho_calls - ref["rho_inv"]) < 1e-6 and abs(rho_x - ref["rho_trj"]) < 1e-6
+            assert same or model == T.LUNA, check
             for variant, local_w, complete, tset in (("main", False, True, tasks), ("local_writes_as_W", True, True, tasks), ("all_recorded_turns", False, False, loose_tasks)):
                 s, o = task_arrays(seed_reps, tset, local_w, complete), task_arrays(own_reps, tset, local_w, complete)
                 point = flat(stats_of(s, o, np.arange(len(tset))))
@@ -270,7 +272,7 @@ def stats(B=4000, seed=20261020):
                 p_up = {k: float(np.mean(np.array(draws[k]) >= 0)) for k in ("d_W2", "d_Wpar", "d_R2", "d_Rpar", "did_par")}
                 out["cells"].append(dict(model=model, row=row, variant=variant, n=len(tset), check=check, point=point, ci=ci, share_draws_ge0=p_up,
                                          turns_seed=int(s["turns"].sum()), turns_skill=int(o["turns"].sum()), eps_seed=int(s["eps"].sum()), eps_skill=int(o["eps"].sum())))
-            print(model, row, "n", len(tasks), "ok", flush=True)
+            print(model, row, "n", len(tasks), "matches Table 1" if same else check, flush=True)
     (OUT / "calls_rw.json").write_text(json.dumps(out, indent=1))
 
 

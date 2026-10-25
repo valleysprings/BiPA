@@ -33,10 +33,8 @@ def load():
                 runs[rep] = {task: (row["success"] is True) for (task, r), row in rows.items() if row["success"] is not None}
                 meta[rep] = {"file": str(f), "mtime": os.path.getmtime(f), "suffix": f.parent.name.split("-")[-1]}
             arms[name] = {"runs": runs, "meta": meta}
-        dev_files, test_files = S.seed_files(bench)
-        # the replay predates the model upgrade (native-20261020-1017) and the LODO runs; keep its inputs
-        dev_files = [f for f in dev_files if "1017" not in f and "lodo" not in f]
-        out[bench] = {"arms": arms, "seed_dev": S.executions(dev_files), "seed_test_exec": S.executions(test_files)}
+        dev, test, _ = S.seed_executions(bench)
+        out[bench] = {"arms": arms, "seed_dev": dev, "seed_test_exec": test}
     pickle.dump(out, open(CACHE, "wb"))
     return out
 

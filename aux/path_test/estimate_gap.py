@@ -1,7 +1,6 @@
 """Maximum-likelihood estimate of the deepseek-flash model-version shift (old aeb564... -> new 1017 e72d3c...) on the seed skill.
 
-Old-model data: the seed's executions that aux/selection_replay/selection.py uses (dev: executions(seed_files(bench)[0]); test: its three
-test runs, seed_files(bench)[1]; checked by check_inputs).  New-model data: the seed calibration runs of run_path_test.py
+Old-model data: the seed's dev and test executions of the selection task model (selection.seed_executions, checked by check_inputs).  New-model data: the seed calibration runs of run_path_test.py
 (out/deepseek-flash/seed__<bench>/results/evaluations/{dev,test}/4fd5ca441c55-*/evaluation.json), plus any --extra-new evaluation files.
 
 Model.  Per benchmark the beta-binomial task model of selection.py is fitted to the old executions (fit_prior on dev+test pooled:
@@ -24,10 +23,11 @@ import sys
 import numpy as np
 from scipy import optimize, special, stats
 
+from aux.path_test import run_path_test as R
 from aux.selection_replay import selection as S
 from src import layout
 
-PATH_TEST = layout.ARTIFACTS / "path-test"
+PATH_TEST = R.PATH_TEST
 os.environ.setdefault("MPLCONFIGDIR", str(layout.OUT / ".mplconfig"))
 
 BENCHES = ("tau3-bench", "automationbench", "terminal-bench-2-1")
@@ -114,7 +114,7 @@ def fingerprints(files, limit=10):
         for e in json.load(open(path))["episodes"][:limit]:
             for r in e.get("requests", [])[:1]:
                 try:
-                    fp = (json.load(open(r["record_path"])).get("response") or {}).get("system_fingerprint")
+                    fp = (R.request_record(path, r["record_path"]).get("response") or {}).get("system_fingerprint")
                 except (OSError, ValueError, KeyError):
                     fp = "unreadable"
                 seen[fp] = seen.get(fp, 0) + 1
@@ -134,9 +134,7 @@ def show(bench, prior, rows_m, rows_p, n_new):
 def real(extra_new):
     status = 0
     for bench in BENCHES:
-        dev_files, test_files = S.seed_files(bench)
-        dev, test = S.executions(dev_files), S.executions(test_files)
-        S.check_inputs(bench, dev, test)
+        dev, test, _ = S.seed_executions(bench)
         a, b = S.fit_prior([(sum(v), len(v)) for v in list(dev.values()) + list(test.values())])
         root = PATH_TEST / "out/deepseek-flash" / f"seed__{bench}/results/evaluations"
         new_files = {s: sorted(glob.glob(str(root / s / f"{SEED}-*/evaluation.json"))) for s in ("dev", "test")}

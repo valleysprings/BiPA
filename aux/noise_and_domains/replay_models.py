@@ -12,9 +12,7 @@ that drop the Beta-prior exchangeability assumption (A2):
                   run as a check that the replay code agrees)
   M3b Bayes boot  per task Dirichlet(1,...,1) weights over its own executions == Beta(s, n - s) (degenerate at 0/n, n/n)
 
-Dev executions are restricted to the replay's inputs: the post-upgrade seed run (native-seed/tau3-bench/native-20261020-1017,
-model fingerprint e72d3c) and the LODO runs (a 27-task dev panel, 5 tasks outside the 30-task panel) are excluded; selection.py's
-glob picks both up.
+The seed's executions are the replay's inputs, selection.seed_executions (checked against selection.PAPER_INPUTS).
 
 Run: python -m aux.noise_and_domains.replay_models
 Writes replay_models.json to OUT/noise_and_domains.
@@ -30,17 +28,10 @@ from aux.selection_replay import selection as S
 from src import layout
 
 OUT = layout.OUT / "noise_and_domains"
-EXCLUDE = ("native-20261020-1017", "lodo")
 DRAWS = S.DRAWS
 QUICK = "--quick" in sys.argv
 if QUICK:
     DRAWS = 20_000
-
-
-def seed_data(bench):
-    dev_files, test_files = S.seed_files(bench)
-    dev_files = [f for f in dev_files if not any(x in f for x in EXCLUDE)]
-    return S.executions(dev_files), S.executions(test_files), dev_files
 
 
 def probabilities(model, dev, prior_fit, mean, draws, rng):
@@ -154,7 +145,7 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     result = {}
     for index, (bench, _) in enumerate(S.BENCHES):
-        dev, test, dev_files = seed_data(bench)
+        dev, test, _ = S.seed_executions(bench)
         n_dev = len(dev)
         pooled = [(sum(v), len(v)) for v in list(dev.values()) + list(test.values())]
         a, b = S.fit_prior(pooled)

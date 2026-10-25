@@ -46,22 +46,22 @@ bipa/
 │   ├── executor.py   # a skill on a list of tasks -> per-task results, through harness-bench
 │   ├── llm.py        # the optimizer's model client
 │   ├── layout.py     # paths, all taken from environment variables
-│   ├── adapters/     # GEPA, SkillOpt, SkillAdam: upstream loops on our batches, executor and model client
+│   ├── adapters/     # GEPA, SkillOpt, SkillAdam: upstream loops on these batches, executor and model client
 │   ├── analysis/     # Table 1, its statistics, the turn slopes and the four-term attribution
 │   └── graph/        # the per-episode bipartite graph
 ├── aux/          # every other figure, number and appendix analysis, one folder per topic (aux/README.md)
 ├── optimizers/   # vendored upstream sources at pinned commits (optimizers/README.md)
 ├── skills/       # the seed and every returned skill (skills/README.md)
 ├── configs/      # tasks.yaml: panels, batches, executor; experiments.yaml: pinned runs and caches
-├── scripts/      # run.sh: sources host.env, then runs python -m src.run
+├── scripts/      # main.sh: the main experiment; aux.sh: every other analysis; run.sh: sources host.env, then runs python
 └── tests/        # offline tests with a fake executor and model
 ```
 
-The seed is `skills/seed/SKILL.md` (`verification-before-completion`, 580 words). Recorded runs live outside the repository, at `$BIPA_ASSETS/artifacts/execution/<model>/<method>/<benchmark>/<run>/`, with method folders `native-seed`, `native-noseed`, `gepa`, `skillopt` and `skilladam`. A run folder holds `native_protocol.json` (panels, batches, cache root, gate), `summary.json`, `final/SKILL.md`, harness-bench's `results/evaluations/<split>/<version>-<panel>/evaluation.json`, and `round-evidence/` (the skill each optimizer round evaluated). Test repetitions of a returned skill go to `execution/<model>/test-reps/<benchmark>__<method>__<run>/`; the seed's are `rep-1` and `rep-2` next to its run.
+The seed is `skills/seed/SKILL.md` (`verification-before-completion`, 580 words). Recorded runs live outside the repository, at `$BIPA_ASSETS/artifacts/execution/<model>/<method>/<benchmark>/<run>/`, with method folders `native-seed`, `native-noseed`, `gepa`, `skillopt` and `skilladam`. A run folder holds the run's settings file (panels, batches, cache root, gate), `summary.json`, `final/SKILL.md`, harness-bench's `results/evaluations/<split>/<version>-<panel>/evaluation.json`, and `round-evidence/` (the skill each optimizer round evaluated). Test repetitions of a returned skill go to `execution/<model>/test-reps/<benchmark>__<method>__<run>/`; the seed's are `rep-1` and `rep-2` next to its run.
 
-## Training protocol
+## How the optimizers are run
 
-All runs use the OpenCode harness at scale `main`, harness-bench's `native-v1` request capture, full trajectories as optimizer feedback, and the cell's own model as both agent and optimizer, behind an OpenAI-compatible gateway. Each optimizer runs its upstream loop on our sample, executor and model client; the settings are in `configs/tasks.yaml` and `src/panels.py`.
+Every run uses the OpenCode harness at scale `main`, harness-bench's request capture (native-v1) and full trajectories as optimizer feedback. The cell's model is both agent and optimizer, behind an OpenAI-compatible gateway. Each optimizer runs its upstream loop on the panels and batches of `src/panels.py`, with the settings in `configs/tasks.yaml`.
 
 | Benchmark | Train | D_sel (dev) | Test |
 |---|---|---|---|
@@ -69,26 +69,27 @@ All runs use the OpenCode harness at scale `main`, harness-bench's `native-v1` r
 | AutomationBench | 160 of 420, stratified by domain | 30 of 60, stratified by domain | all 120 |
 | Terminal-Bench 2.1 (TB2) | all 62 | all 9 | all 18 |
 
+No optimizer selects or edits on test.
+
 | Optimizer | Batch size | T | Note |
 |---|---|---|---|
-| GEPA | 8 | 20 | Upstream uses 3; 8 makes its 20 rounds read the 160 slots once. |
-| SkillOpt | 40 | 4 (TB2: 6, batches 40, 22, 40, 22, 18, 18) | As upstream. |
-| SkillAdam | 10 | 16 | As upstream. |
+| GEPA | 8 | 20 | Upstream uses 3; at 8 its 20 rounds read the 160 slots once. |
+| SkillOpt | 40 | 4 (TB2: 6, batches 40, 22, 40, 22, 18, 18) | Upstream's batch size. |
+| SkillAdam | 10 | 16 | |
 
-- **Test set.** Never used for selection or editing; SkillOpt's upstream loop only logs test scores of its baseline, best and final skills.
-- **160 training slots.** On τ3-bench and AutomationBench every optimizer reads each of the 160 training tasks once, cut into its own seeded stratified folds. On TB2 every optimizer reads one shared stream: three seeded reshuffles of the 62 tasks cut at 160 slots (62 + 62 + 36), where the first 16 tasks of a pass are not among the last 16 of the previous one. GEPA and SkillAdam take consecutive batches, which may span two passes; SkillOpt cuts each pass as upstream cuts an epoch. A task that recurs under an unchanged skill comes from the episode cache, so TB2 has fewer than 160 distinct training rollouts.
-- **Earlier TB2 cut.** The TB2 runs pinned in `configs/experiments.yaml` split each pass into near-equal batches: GEPA 20 batches of 7–8 (156 slots), SkillOpt 5 of 31 (155 slots, one upstream epoch, so its slow update and meta-skill never acted), SkillAdam 18 of 8–9 (160 slots). These batches are stored in `native_protocol.json`, which repetitions, analyses and GEPA or SkillAdam resumes read; the SkillOpt adapter refuses them on resume, because 5 batches do not fill whole epochs.
-- **SkillOpt epochs.** Upstream's slow update and meta-skill act from the second pass over the training tasks. On τ3-bench and AutomationBench the 160 tasks are one epoch, so neither acts. On TB2 each pass is an epoch (3; upstream uses 4), so both act at the ends of epochs 2 and 3; the meta-skill of epoch 2 guides epoch 3, and that of epoch 3 is never read.
-- **Rollouts outside the 160 slots.** SkillAdam's gate rollouts (`arm_episodes` `gate_train`; runs recorded with the dev-batch gate have `gate_dev`, older ones `dev`) and, on TB2, SkillOpt's slow-update and meta-skill rollouts: from epoch 2, 20 tasks per epoch under the previous and the current skill, a seeded draw from all 62 training tasks. `summary.json` `episodes` counts every evaluated episode by split; read training-data counts from `arm_episodes`, which separates these.
-- **Unknown verdicts.** A verdict can be unknown after a provider or infrastructure failure. The executor re-runs unknown verdicts at most twice per evaluation. One still unknown on a training or dev batch aborts the run before scoring, and `--resume` continues from the optimizer's last checkpoint; test scores average over the tasks with a known verdict.
-- **Episode cache.** An episode is stored by (skill text, task, split) under the run's cache root and reused by every run with the same root. Each model has its own root in `configs/experiments.yaml`; a new model release should take a new `--cache-root`. The root is recorded in `native_protocol.json`, and resumes and repetitions read it from there.
-- **Optimizer prompts.** The client fits each prompt to 512k estimated tokens (characters / 2.5). It never cuts system messages and keeps the first 16k characters of the first user message. Cuts are counted in `summary.json` `llm.truncated_calls`. SkillAdam's own context limit resets its editor history but does not bound the current prompt.
+**Training slots.** Every optimizer reads 160 training slots. On τ3-bench and AutomationBench these are the 160 training tasks, each once, in seeded stratified batches. On TB2 all optimizers read one shared stream: three seeded reshuffles of the 62 tasks, cut at 160 slots (62 + 62 + 36). GEPA and SkillAdam take consecutive batches from it, so a batch may span two passes. SkillOpt cuts each pass as upstream cuts an epoch. A task that recurs under an unchanged skill is served from the episode cache. TB2 runs recorded before the shared stream used near-equal batches (GEPA 156 slots, SkillOpt 155 in one epoch, SkillAdam 160), and their batch lists are stored with each run.
 
-**Gates.** All gates require a strict gain. GEPA and SkillOpt select with D_sel:
+**Gates.** Every gate needs a strict gain. GEPA keeps a child that beats its parent on the training batch, and scores each kept child on D_sel to choose the next parent and the returned skill. SkillOpt keeps a candidate that beats the current skill on D_sel. SkillAdam keeps a candidate that beats the current skill on the training batch it was written from, and never reads D_sel. The code in this repository runs only this training-batch gate. The pinned SkillAdam runs (DeepSeek `native-20261008-https`, GPT-6-Luna `native-20261012`) used a dev-batch gate: each step drew min(10, |D_sel|) dev tasks and rolled out the candidate and the current skill on them, so these runs cannot be resumed with this code.
 
-- **GEPA** keeps a child that beats its parent on the training batch; D_sel scores each kept child, and those scores choose the next parent and the returned skill.
-- **SkillOpt** keeps a candidate that beats the current skill on D_sel. On TB2 the slow update enters the working skill without a dev check (upstream's `slow_update_gate_with_selection: false`).
-- **SkillAdam** keeps a candidate that beats the current skill on the training batch it was written from, the published profiles' same-batch validation. It never reads D_sel. `native_protocol.json` and `summary.json` record this as `arm_options` `{"gate": "train-batch"}`. Runs recorded with the dev-batch gate (other `arm_options`, or none) are not resumed by this code.
+**SkillOpt epochs.** Upstream's slow update and meta-skill act from the second epoch. τ3-bench and AutomationBench get one epoch, so neither acts. TB2 gets three epochs (upstream uses 4), and both act at the ends of epochs 2 and 3. The slow update enters the skill without a D_sel check, as in upstream's default.
+
+**Rollouts outside the 160 slots.** SkillAdam's gate re-runs each candidate on its training batch (in the pinned runs, the candidate and the current skill on the dev batch, counted as `dev` in `arm_episodes`), and on TB2 SkillOpt's slow update and meta-skill run 20 training tasks per epoch from epoch 2, under the previous and the current skill. `summary.json` `episodes` counts these too, so read training-data counts from `arm_episodes`.
+
+**Unknown verdicts.** A provider or infrastructure failure leaves a verdict unknown, and the executor re-runs it at most twice. A verdict still unknown on a training or dev batch aborts the run, `--resume` continues it, and test scores average the known verdicts.
+
+**Episode cache.** An episode is stored by skill text, task and split under a cache root, and every run with the same root reuses it. Each model has its own root in `configs/experiments.yaml`, and a new model release needs a new `--cache-root`.
+
+**Optimizer prompts.** The client fits each prompt to 512k estimated tokens (characters / 2.5), keeps system messages and the first 16k characters of the first user message, and counts cuts in `summary.json` `llm.truncated_calls`.
 
 ## Setup
 
@@ -99,22 +100,24 @@ pip install -e ../harness-bench -e optimizers/skillopt -e 'optimizers/skilladam[
     numpy scipy scikit-learn matplotlib openai httpx python-dotenv pyyaml pytest
 pip install --no-deps -e optimizers/gepa
 cp host.env.example host.env    # then edit it
-python -m pytest tests -q       # offline, a few seconds
+python -m pytest tests -q       # offline
 ```
 
-Paths come only from environment variables (`src/layout.py`):
+Paths come from environment variables (`src/layout.py`), the optimizer's endpoint from `src/llm.py`:
 
-- `BIPA_ASSETS` (default `./assets`): `artifacts/` with the recorded runs and `cache/` with the episode and analysis caches.
-- `HARNESS_BENCH_ROOT` (default `../harness-bench`): the harness-bench checkout, with its task registry, benchmark data and `.env`.
-- `BIPA_OUT` (default `./out`): analysis records in `data/mech/` and figures in `fig/mech/`.
-- `BIPA_SEED_FILE` (default `skills/seed/SKILL.md`): the seed; it must be byte-identical to the one the runs used.
-- `BIPA_LEGACY_ROOTS` (default none): `:`-separated roots that paths in older records start with; `layout.relocate` maps their `assets/artifacts` (or `artifacts`) to `$BIPA_ASSETS/artifacts`, `assets/artifacts/cache` to `$BIPA_ASSETS/cache` and `assets/optimizers` to `optimizers/`.
-- `OPENAI_API_KEY_2`: the optimizer's API key, read from harness-bench's `.env` or the environment.
-- `OPENAI_BASE_URL_2`: the optimizer's model endpoint, read the same way.
-- `OPENAI_BASE_URL_2_OPTIMIZER`: when set, replaces the URL for optimizer calls only. The optimizer URL must be `https`; plain `http` is an error.
-- `PYTHON` (default `python`): the interpreter `scripts/run.sh` uses.
+| Variable | Default | What |
+|---|---|---|
+| `BIPA_ASSETS` | `./assets` | `artifacts/` (recorded runs) and `cache/` (episode and analysis caches) |
+| `HARNESS_BENCH_ROOT` | `../harness-bench` | the harness-bench checkout: task registry, benchmark data, `.env` |
+| `BIPA_OUT` | `./out` | analysis records in `data/mech/`, figures in `fig/mech/` |
+| `BIPA_SEED_FILE` | `skills/seed/SKILL.md` | the seed, byte-identical to the one the runs used |
+| `BIPA_LEGACY_ROOTS` | none | `:`-separated roots of the paths in older records; `layout.relocate` maps them into `$BIPA_ASSETS` and `optimizers/` |
+| `OPENAI_API_KEY_2` | harness-bench's `.env` | the optimizer's API key |
+| `OPENAI_BASE_URL_2` | harness-bench's `.env` | the optimizer's endpoint |
+| `OPENAI_BASE_URL_2_OPTIMIZER` | unset | replaces the endpoint for optimizer calls only |
+| `PYTHON` | `python` | the interpreter of `scripts/run.sh` |
 
-The agent's own model calls are configured in harness-bench. Host settings such as proxies go in `host.env`, which `scripts/run.sh` sources before it runs `python -m src.run`.
+The optimizer URL must be `https`; the client refuses plain `http`. The agent's own model calls are configured in harness-bench. Host settings such as proxies go in `host.env`, which `scripts/run.sh` sources before `python -m src.run`.
 
 ## Execution backend
 
@@ -126,33 +129,28 @@ To run elsewhere, pass an `executor` keyword to `harness_bench.eval.run` from `s
 
 ## Reproduction
 
-Run everything from the repository root, either as `python -m src.run ...` in a shell that has sourced `host.env`, or as `scripts/run.sh ...`. `src.run` previews by default: it prints the commands it would run, and `--execute` runs them. Benchmarks are `tau3`, `autob`, `tb2` or their full names; methods are `seed`, `none` (No skill), `gepa`, `skillopt`, `skilladam`. `run` and `repeat` default to the cell's run in `configs/experiments.yaml`, and `--tag NAME` picks another; `transfer` takes the run the analyses read, pinned under `pins` in the same file, unless `--tag` names the source. A started run continues only with `--resume`; `run` on a finished run does nothing.
+Run everything from the repository root. `scripts/main.sh` and `scripts/aux.sh` go through `scripts/run.sh`, which sources `host.env` and runs `python -m src.run`, or any module with `-m MODULE`. Every target of both scripts prints its commands in order and runs nothing; `--execute` runs them, the model calls included, and `--execute --offline` runs only the steps that read the recorded runs. Caches go to `$BIPA_ASSETS/cache/analysis/`, records to `$BIPA_OUT/data/mech/`, figures to `$BIPA_OUT/fig/mech/`.
+
+**Main experiment: `scripts/main.sh`.** `table1` reads the recorded runs only, so `--offline` changes nothing there.
 
 ```bash
-# train every method and control on every benchmark, then the three test repetitions of each final skill
-python -m src.run suite deepseek-flash --execute
-python -m src.run run skillopt tau3 gpt-6-luna --tag my-run --execute          # one cell
-python -m src.run repeat skillopt tau3 deepseek-flash --execute                # avg@3 test repetitions of one run
-python -m src.analysis                                                         # Table 1, its statistics, slopes, four-term attribution
-# transfer: a returned skill evaluated unchanged under another model or on another benchmark, then its repetitions
-python -m src.run transfer skillopt tau3 deepseek-flash --to gpt-6-luna --execute    # -> gpt-6-luna/skillopt/tau3-bench/ood-from-deepseek-flash
-python -m src.run transfer gepa tb2 deepseek-flash --to autob --execute              # -> deepseek-flash/gepa/automationbench/ood-from-bench-terminal-bench-2-1
-python -m src.run transfer seed tau3 deepseek-flash --to gpt-6-luna --execute        # the seed's reference: ood-seed (ood-bench-seed across benchmarks)
-python -m src.run repeat skillopt tau3 gpt-6-luna --tag ood-from-deepseek-flash --execute
+scripts/main.sh train deepseek-flash                 # print the runs: every method and control on every benchmark, then the three test repetitions of each final skill
+scripts/main.sh train deepseek-flash --execute
+scripts/main.sh train gpt-6-luna --benches tau3 --methods skillopt seed --execute
+scripts/main.sh run skillopt tau3 gpt-6-luna --tag my-run --execute            # one cell
+scripts/main.sh repeat skillopt tau3 deepseek-flash --execute                  # avg@3 test repetitions of one run
+scripts/main.sh transfer skillopt tau3 deepseek-flash --to gpt-6-luna --execute  # a returned skill, unchanged, under another model or on another benchmark
+scripts/main.sh table1 --execute                     # Table 1, its paired statistics, the turn slopes, the four-term attribution
 ```
 
-A test slot that ran in all three repetitions but never got a verdict scores 0 (`adjudicated_failures`, never retried); a slot with no episode blocks the average (`collect` in `src/run.py`).
+`train` is `python -m src.run suite`; `run`, `repeat` and `transfer` pass through to `src.run`; `table1` runs the steps of `python -m src.analysis`, the attribution and slopes caches first. Benchmarks are `tau3`, `autob`, `tb2` or their full names; methods are `seed`, `none` (No skill), `gepa`, `skillopt`, `skilladam`. `run` and `repeat` default to the cell's run in `configs/experiments.yaml`, and `--tag NAME` picks another; `transfer` takes the run pinned under `pins` in the same file unless `--tag` names the source, and writes `ood-from-<model>` or `ood-from-bench-<benchmark>` (the seed's reference: `ood-seed`, `ood-bench-seed`). A started run continues only with `--resume`; `run` on a finished run does nothing. A test slot that ran in all three repetitions but never got a verdict scores 0 (`adjudicated_failures`, never retried); a slot with no episode blocks the average (`collect` in `src/run.py`). The analyses resolve every run through the pinned tags; a cell with no pin and several finished runs is an error.
 
-**Analyses.** They resolve every run through the tags pinned in `configs/experiments.yaml`; a cell with no pin and several finished runs is an error. `python -m src.analysis` runs the main result and the method's analyses in dependency order, `--list` prints them, and `python -m src.analysis slopes` runs one module's steps:
+**Other analyses: `scripts/aux.sh`.** One target per folder of `aux/` ([aux/README.md](aux/README.md) lists them and what each reproduces), and `all`. `all` runs the steps of `scripts/main.sh table1`, then every folder, data steps before the figures that read them. With `--execute` a failing step ends its folder, the other folders still run, and a table of each folder's completed steps and failed step closes the run, which exits non-zero if any step failed.
 
-- **Table 1:** `table1` (both models), `stats` (the paired statistics behind it).
-- **Method:** `slopes` (within-task turn slopes of input tokens, output tokens and calls; `draw-input` draws the input-token figure), `attribution` (the four-term split of the change in input tokens).
+```bash
+scripts/aux.sh all                                   # print every step
+scripts/aux.sh all --execute --offline               # run every step that needs no model call
+scripts/aux.sh selection_replay --execute --offline  # one folder
+```
 
-The other figures and numbers run as `python -m aux.<folder>.<module>` after it; each folder's README gives the order:
-
-- **Selection control:** `aux.selection_replay.selection compute|draw` (seed-replay control of the selection rules).
-- **Pooled numbers and transfer:** `aux.headline_numbers.pooled` (pooled success and token ratio over all cells, task coverage), `aux.headline_numbers.transfer` (Luna avg@3 cells, cross-benchmark runs).
-- **Figures:** `aux.figures.teaser compute|draw`, `aux.figures.cumulative` (input tokens read up to each turn, by prompt component).
-- **Rule coding:** `aux.rule_coding.edges build` (parent-to-child edits), then `aux.rule_coding.skilltext compute|record|luna` (rule coding of the added text; `luna` for GPT-6-Luna).
-
-Caches go to `$BIPA_ASSETS/cache/analysis/`, records to `$BIPA_OUT/data/mech/`, figures to `$BIPA_OUT/fig/mech/`. The folders of `aux/` are listed in [aux/README.md](aux/README.md).
+**What needs the executor.** The steps that call the model go through the executor (Execution backend) and run only with `--execute` and without `--offline`: `train`, `run`, `repeat` and `transfer` of `main.sh`, the transfer evaluations and their repetitions in `aux.sh headline_numbers`, and the path-test passes in `aux.sh path_test` (`aux/path_test/launch.sh`). The delivery and trigger runs of `contamination_and_loading` (`run_native`, `run_trigger`) also need the SkillZip runtime, which is not in this repository: `aux.sh contamination_and_loading` lists them and never runs them, and `all` leaves them out with a note. Every other step reads the recorded runs, including the path-test passes under `$BIPA_ASSETS/artifacts/path-test`; it needs the `harness_bench` package but no executor or model, and the contamination check also reads the benchmark task folders under `HARNESS_BENCH_ROOT`.

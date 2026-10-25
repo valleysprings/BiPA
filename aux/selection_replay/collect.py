@@ -85,7 +85,7 @@ def one(model, opt, bench):
     return res
 
 
-if __name__ == "__main__":
+def main():
     os.makedirs(OUT, exist_ok=True)
     data = []
     for model in ("deepseek-flash", "gpt-6-luna"):
@@ -105,3 +105,7 @@ if __name__ == "__main__":
             return sum(1 for k in t if a[k] == 0 and b[k] == 1), sum(1 for k in t if a[k] == 1 and b[k] == 0), len(t)
         dv = flips(d["dev_seed"], d["dev_final"]); ts = flips(d["test_seed"], d["test_final"])
         print("%-14s %-8s %-18s %-26s dev gained/lost %d/%d of %d | test gained/lost %d/%d of %d | amb %s" % (d["model"], d["opt"], d["bench"], d["run"], *dv, *ts, d["amb"]))
+
+
+if __name__ == "__main__":
+    main()
