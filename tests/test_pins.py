@@ -3,7 +3,7 @@ import os
 import pytest
 
 from src import layout, run
-from src.analysis import table1
+from src.analysis import settings as S, table1
 from src.utils import dataloader as C
 
 
@@ -30,12 +30,13 @@ def test_every_cell_is_pinned():
         {(m, k, b) for m in C.MODELS for k in C.METHODS for b in C.BENCHES}
 
 
-def test_table1_reads_the_pinned_runs(tree):
-    assert table1.current_run is C.current_run
+def test_table1_reads_the_pinned_runs(tree, monkeypatch):
+    monkeypatch.setattr(S, "EX", tree)
+    assert table1.S.run is S.run  # Table 1 and every analysis resolve a cell's run the same way: the pins only
     for model in C.MODELS:
         for method in C.METHODS:
             for bench in C.BENCHES:
-                assert table1.current_run(method, model, bench) == tree / model / method / bench / C.PINS[model][method][bench]
+                assert S.run(model, bench, method) == tree / model / method / bench / C.PINS[model][method][bench]
 
 
 def test_deepseek_seed_is_the_recorded_run():

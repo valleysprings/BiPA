@@ -24,19 +24,16 @@ If you haven't run the verification command in this message, you cannot claim it
 ```
 BEFORE claiming any status or expressing satisfaction:
 
-1. IDENTIFY: What authoritative check or read-back proves each requested requirement?
-2. RUN: Perform the relevant check now, or read back the current state using the available tools
-3. READ: Inspect the full result; for multi-part or multi-entity requests, account for every requested item and the complete scope
-4. VERIFY: Does the evidence confirm every requirement in the claim?
-   - For calculated amounts or specific identifiers, verify the inputs and their mapping against authoritative records; a calculator or successful action using the wrong values does not establish correctness.
-   - Before transferring, check whether applicable documented in-scope steps remain. Continue those steps when the user still wants help; transfer when they are exhausted or a governing policy or the user's explicit request calls for handoff.
-   - If NO: State actual status with evidence
+1. IDENTIFY: What command proves this claim?
+   For external or customer-side actions, verify completion in the authoritative system record before claiming they were completed. Before a consequential follow-on update, verify any reported approval or other prerequisite there too; a user report or tool being made available alone does not establish completion or approval.
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code, count failures
+4. VERIFY: Does output confirm the claim?
+   - If NO: State actual status with evidence. Identify and pursue any remaining task-relevant checks or supported fixes, then recheck the user's stated success condition. Do not treat one unsuccessful check or fix as proof that no options remain; transfer only after relevant in-scope options are exhausted.
    - If YES: State claim WITH evidence
 5. ONLY THEN: Make the claim
 
-## Terminal Interactions
-
-When the user signals they are done or the runtime reports that the conversation has ended, stop immediately. Do not make further tool calls or send more messages.
+If verification is unavailable or the check does not pass, report that limitation or result without presenting the task as complete.
 
 Skip any step = lying, not verifying
 ```
@@ -45,7 +42,7 @@ Skip any step = lying, not verifying
 
 | Claim | Requires | Not Sufficient |
 |-------|----------|----------------|
-| Tests pass | Fresh test command output: 0 failures | Previous run, "should pass" |
+| Tests pass | Test command output: 0 failures | Previous run, "should pass" |
 | Linter clean | Linter output: 0 errors | Partial check, extrapolation |
 | Build succeeds | Build command: exit 0 | Linter passing, logs look good |
 | Bug fixed | Test original symptom: passes | Code changed, assumed fixed |

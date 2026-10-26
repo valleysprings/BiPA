@@ -11,9 +11,15 @@ CONFIG = yaml.safe_load((ROOT / "configs/tasks.yaml").read_text(encoding="utf-8"
 BENCHMARKS = CONFIG["benchmarks"]
 
 
+# Every panel and batch is drawn from seeds derived from this salt and the token strings below ("panel-sampling",
+# "train-stream", "train-batches"). The recorded runs fixed them: changing any of them redraws every panel and batch.
+# ("bach" is the harness project the runs were made in.)
+SALT = "bach-training-stream-v1"
+
+
 def _seed(*token):
-    """A sampling seed derived from ``token``; the salt fixes every recorded panel and batch."""
-    text = json.dumps(["bach-training-stream-v1", *token], separators=(",", ":"))
+    """A sampling seed derived from ``token``."""
+    text = json.dumps([SALT, *token], separators=(",", ":"))
     return int(hashlib.sha256(text.encode()).hexdigest()[:16], 16)
 
 

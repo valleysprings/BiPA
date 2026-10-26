@@ -32,6 +32,8 @@ BEFORE claiming any status or expressing satisfaction:
    - If YES: State claim WITH evidence
 5. ONLY THEN: Make the claim
 
+If read-back fails or contradicts a successful write response, treat the change as unverified. Try another authoritative read path or inspect persisted state; repair the change sequentially if appropriate, then verify again. If it remains unconfirmed or is blocked by policy, report it as pending rather than complete. (Use an equivalent read endpoint or persisted-state inspection.)
+
 Skip any step = lying, not verifying
 ```
 
@@ -95,8 +97,6 @@ Skip any step = lying, not verifying
 ```
 ✅ Re-read plan → Create checklist → Verify each → Report gaps or completion
 ❌ "Tests pass, phase complete"
-For requests covering all or recent records, confirm the fetched population is exhaustive (including relevant status filters and pagination). If a broad read fails, use another read path or report the limitation rather than silently proceeding with a narrower set.
-If dates conflict, distinguish historical reporting for an explicitly named period from an action that must occur in the future. For historical reports, use the relevant source data and state the date caveat where relevant. For “next,” “upcoming,” or future scheduling requests, compare candidate dates with the authoritative current date; never book a past window as a future occurrence. If no eligible future window is available, leave the schedule unchanged and report the limitation.
 ```
 
 **Agent delegation:**
@@ -121,9 +121,4 @@ If dates conflict, distinguish historical reporting for an explicitly named peri
 - Implications of success
 - ANY communication suggesting completion/correctness
 
-**Stateful automation writes:**
-``` 
-✅ Run writes to the same service or shared collection serially; afterward, read back the destination and reconcile every requested item. Treat success responses as acknowledgments, not proof that all writes persisted.
-For records with required details or components, verify those details in the destination too; a matching parent record, total, or summary does not prove required line items or child records were saved.
-❌ Parallel writes to shared state based only on successful responses
-```
+For multi-record workflows, parallelize independent reads, but serialize mutations to the same shared persisted state. After each mutation, read back the affected record before proceeding; a successful write response alone does not establish that sibling writes persisted.

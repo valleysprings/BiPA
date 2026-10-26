@@ -1,27 +1,17 @@
 # Auxiliary analyses
 
-The extractors and analyses here read the RECORDED runs under `$BIPA_ASSETS/artifacts/execution`, which were written before the current runtime in `src/`. Runs written by the current runtime carry fewer provenance fields (no per-round UTC stamps, skill or evaluation hashes, completion audits, resume logs or `llm/attempts.jsonl`), so scripts that read those fields work on the recorded runs only; `cost_appendix.optcost` prints n/a for the failed-attempt count when `llm/attempts.jsonl` is absent.
+Every figure and number of the paper outside Table 1, one folder per question. Each module reads the recorded runs through `src/analysis/settings.py` (the pinned run of every cell, the learned skills, the test episodes, resampling), draws with the one figure style of `src/utils/fig` and writes its record with `src.utils.logger.record`. Run a module as `python -m aux.<folder>.<module>`, or a whole folder with `scripts/aux.sh <folder>`; `scripts/aux.sh all` runs `scripts/main.sh table1` first, then the folders in the order below.
 
-Each folder holds the scripts behind one group of the paper's figures and numbers, with a README of its commands. Run them from the repository root as `python -m aux.<folder>.<script>`, after `python -m src.analysis` (Table 1 and the attribution caches they read). They import the experiment and analysis code in `src/`; nothing in `src/` imports them. There are no tests for `aux/`.
+| Folder | What it answers | Records and figures |
+|---|---|---|
+| `tokens` | Where the extra input tokens come from and what they cost: the four-term split under both models, the cost of failed tasks, cached pricing, a compacting harness, optimization cost, the teaser and the per-turn cumulative tokens | mech_attribution3, mech_attribution_luna, mech_failcost, mech_price3, mech_compaction, mech_optcost, mech_bipcum, mech_teaser; teaser2, method, bipcum3, bipcum_main2 |
+| `calls` | What the skills change in tool calls per turn, and the serialized writes | mech_callsperturn, mech_calls_rw, mech_batching; bipwrites3 |
+| `edits` | What the editors write and what the gate keeps: edit lineage, rule categories, kept against rejected edits, acceptance rules, the cost tie-break, the released skills | mech_skilltext, mech_rules_luna, mech_coder2, mech_edges, mech_edges_holm, mech_designev, mech_selrules, mech_tiebreak; implications4, skills2 |
+| `success` | Learned skills against the seed: pooled success and input-token ratio, run-to-run spread, per-domain success | mech_pooled, mech_reruns, mech_domains; reruns3, domains_wide |
+| `selection` | The dev gain that selection alone reports (replay of each dev-gated run), dev-set size, task-model checks, dev against test, the path test | mech_selection, mech_selection_luna, mech_devsize, mech_assumptions, mech_devdyn, mech_priorfit, mech_pathtest; dev2test4, selection, devpertask, priorfit, pathtest |
+| `transfer` | The skills under another model or on another benchmark, coverage and agreement, the contamination check, skill loading | mech_transfer, mech_ood, mech_gains, mech_cheatsheet, mech_trigger; transfer3, gains2, trigger |
+| `three_word_seed` | The runs started from the three-word seed | mech_fromscratch; scratch2 |
 
-`scripts/aux.sh FOLDER` takes one folder's steps in its README's order; `scripts/aux.sh all` takes the steps of `scripts/main.sh table1` (`python -m src.analysis`), then the folders in the order of this table, since a folder reads the caches of the folders above it. What its flags do is in the [README](../README.md#reproduction).
+`data/` holds hand-made inputs: `rule_labels.json` (the category of every added rule unit), `coder2_labels.json` (the second coder's labels), `sentence_labels.json` (the three-word-seed sentence labels), `edges_frozen_rows.json` (edge rows of panels whose request records are missing) and `seed_dev_extra.json` (seed dev executions of earlier runs, pooled by the selection task model).
 
-| Folder | What it supports in the paper |
-|---|---|
-| [rule_coding](rule_coding/README.md) | The edge table, the rule coding of the added text, the second-coder agreement and the released skills |
-| [cost_appendix](cost_appendix/README.md) | Cost under cache pricing, re-billing under a compacted history, optimization cost and the editor prompt lengths |
-| [token_attribution](token_attribution/README.md) | The four-term split (DeepSeek record, GPT-6-Luna version), the cost of failed tasks and the data of the cumulative-tokens figure |
-| [selection_replay](selection_replay/README.md) | The selection replay of both models, the dev/test figure, the selection figure, the dev-set size, the task-by-task flips and the fitted prior |
-| [edit_gate_and_design](edit_gate_and_design/README.md) | Kept against rejected edits, the acceptance rules and the cost tie-break: the numbers of the design principles and their figure |
-| [calls_and_writes](calls_and_writes/README.md) | Tool calls per turn and the serialized writes: the writes sharing a turn, the packing counterfactual, the data of the serialized-writes figure |
-| [noise_and_domains](noise_and_domains/README.md) | Run-to-run noise (the rerun figure), the task-model checks quoted with the selection replay, and per-domain success and its figure |
-| [headline_numbers](headline_numbers/README.md) | The transfer evaluations (they call the model); pooled success and token ratio over all skills, task coverage, and the skills tested on another model or benchmark |
-| [transfer_and_trajectories](transfer_and_trajectories/README.md) | The transfer figure and the gains record and figure (coverage and agreement of a task's runs) |
-| [three_word_seed](three_word_seed/README.md) | The runs started from a three-word seed and their figure |
-| [figures](figures/README.md) | The teaser figure, the method figure, the main-text figure of input tokens read per turn by prompt component, and the figures of the learned skills' split and rules, their per-component token gaps and the serialized writes |
-| [contamination_and_loading](contamination_and_loading/README.md) | The contamination check of the learned skills and the skill-loading figure (always resident against on demand, loading without an instruction) |
-| [path_test](path_test/README.md) | The path test along the tau3 optimization paths on the updated release (its passes call the model), and the release shift |
-
-`data/edges_frozen_rows.json` holds edge rows that `python -m aux.rule_coding.edges build` uses for panels whose request records are missing.
-`data/coder2_labels.json` holds the second coder's label of every added rule unit, which `python -m aux.rule_coding.coder2` compares with the final labels.
-`data/seed_dev_extra.json` holds the seed's dev outcomes and input tokens of runs the assets no longer hold (one per tau3 and AutoBench dev task, with the runs they came from), which the selection task model (`aux.selection_replay.selection.seed_executions`) and the seed-vs-seed token noise floor (`aux.edit_gate_and_design.tiebreak`) add to the recorded ones when those runs are absent.
+The steps that call the model (the transfer evaluations and the path-test passes) run only with `scripts/aux.sh ... --execute` and without `--offline`. The delivery and trigger runs of `transfer/loading.py` used the SkillZip runtime, which is not in this repository; their commands are in that module's docstring.

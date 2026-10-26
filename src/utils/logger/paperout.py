@@ -7,7 +7,7 @@ from src import layout
 from src.utils.logger import md_table as mdtable
 
 FIG, DATA = layout.OUT / "fig", layout.OUT / "data/mech"
-SIDE = layout.CACHE / "analysis/_records"
+SIDE = layout.ANALYSIS / "_records"
 
 # name -> shows: what the record's table or figure shows, files: the outputs, notes: fixed caveats
 SPECS = {

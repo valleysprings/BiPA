@@ -1,12 +1,19 @@
-"""Table 1: test success Q (avg@3) and cost ratios to the Seed row per method and benchmark, both models."""
+"""Table 1: test success Q (avg@3) and cost ratios to the Seed row per method and benchmark, both models.
+
+Q is avg@3: per test run the share of tasks with a verified outcome that succeed, averaged over the three runs; DeepSeek counts
+a task with no verdict in any run as a failure, GPT-6 Luna drops provider-failed requests and scores Q over verified outcomes.
+rho (input tokens), rho^turns and rho^calls (executed tool calls) are geometric means over the common tasks of a task's mean
+over the runs divided by the same mean over the Seed row's runs. A skill equal to the seed text reports the Seed row's runs.
+Bold / underline = best / second Q of a benchmark."""
 import argparse, json
 from pathlib import Path
 
 from src.analysis.common import (accumulate, geo, luna_row, mean_rows, merged_episodes, merged_mean_rows,  # noqa: F401
                                  merged_rows_of, rep_files, rep_groups, rows_of, unresolved_of)
+from src.analysis import settings as S
 from src.layout import repetition_dir
-from src.utils.dataloader import BENCHES, EX, MODELS, SEED_TEXT, current_run, final_skill, out_dir, task_row, vid  # noqa: F401
-from src.utils.logger import paperout as PO
+from src.utils.dataloader import BENCHES, EX, MODELS, SEED_TEXT, final_skill, out_dir, task_row, vid  # noqa: F401
+from src.utils import logger
 
 LUNA = "gpt-6-luna"
 MODEL_TEX = {"deepseek-flash": "DeepSeek-V4.1-Flash", LUNA: "GPT-6 Luna"}
@@ -29,18 +36,40 @@ def adjudicate(reps, allrows, expected):
     return out
 
 
-def cell(model, bench, m, seed_run, seed_reps, ref):
-    run = current_run(m, model, bench)
-    if not run or not (run / "summary.json").is_file():
-        return None
+def row_reader(model):
+    """The per-episode reader of a model's test runs. GPT-6 Luna drops provider-failed requests and keeps a success only for a
+    verified outcome (luna_row); DeepSeek reads every episode with task_row."""
+    return luna_row if model == LUNA else task_row
+
+
+def run_files(run, text):
+    """{repetition: [evaluation.json]} of one skill's test runs: the run's own test evaluations and its test-reps directory."""
+    return rep_groups([run, repetition_dir(run)], vid(text))
+
+
+def seed_files(model, bench):
+    """(the Seed row's run, {repetition: [evaluation.json]}): its run, its test-reps directory, rep-1 and rep-2."""
+    seed_run = S.run(model, bench, "native-seed")
+    dirs = [seed_run, repetition_dir(seed_run), seed_run.parent / "rep-1", seed_run.parent / "rep-2"]
+    return seed_run, rep_groups(dirs, vid(SEED_TEXT))
+
+
+def cell_files(model, bench, m, seed_reps):
+    """(run, final skill, {repetition: [evaluation.json]}) of one row, as the pins give it. A skill equal to the seed text
+    reports the Seed row's runs."""
+    run = S.run(model, bench, m)
     text = final_skill(m, run)
-    as_seed = text == SEED_TEXT or m == "native-seed"
-    own = rep_groups([run, repetition_dir(run)], vid(text))
-    reps = {**own, **seed_reps} if as_seed else own
-    if not reps:
+    own = run_files(run, text)
+    return run, text, ({**own, **seed_reps} if text == SEED_TEXT or m == "native-seed" else own)
+
+
+def cell(model, bench, m, seed_run, seed_reps, ref):
+    got = cell_files(model, bench, m, seed_reps)
+    if not got or not got[2]:
         return None
-    row = luna_row if model == LUNA else task_row
-    allrows, mean = merged_mean_rows(reps, row)
+    run, text, reps = got
+    as_seed = text == SEED_TEXT or m == "native-seed"
+    allrows, mean = merged_mean_rows(reps, row_reader(model))
     kn = [[r for r in rows.values() if r["success"] is not None] for rows in allrows]
     proto = run / "native_protocol.json"
     proto = proto if proto.is_file() else seed_run / "native_protocol.json"
@@ -69,10 +98,8 @@ def rank(qs, q):
 def compute(model="deepseek-flash"):
     res = {}
     for bench in BENCHES:
-        seed_run = current_run("native-seed", model, bench)
-        dirs = [seed_run, repetition_dir(seed_run), seed_run.parent / "rep-1", seed_run.parent / "rep-2"]
-        seed_reps = rep_groups(dirs, vid(SEED_TEXT))
-        ref = merged_mean_rows(seed_reps, luna_row if model == LUNA else task_row)[1]
+        seed_run, seed_reps = seed_files(model, bench)
+        ref = merged_mean_rows(seed_reps, row_reader(model))[1]
         c = {name: cell(model, bench, m, seed_run, seed_reps, ref) for name, m in ROWS}
         qs = [round(v["Q"], 6) for v in c.values() if v and v["avg3_complete"]]
         for v in c.values():
@@ -83,8 +110,8 @@ def compute(model="deepseek-flash"):
 
 
 def record(res):
-    """mech_table1: Table 1 as printed, one block per model; bold / underline = best / second Q of a benchmark."""
-    blocks, cells, seedret = [], [], []
+    """mech_table1: Table 1 as printed, one block per model."""
+    blocks, seedret = [], []
     for model in MODELS:
         turns = model == LUNA  # DeepSeek's rho^turns comes from stats
         cols = ("Q", "rho", "rho^turns", "rho^calls") if turns else ("Q", "rho", "rho^calls")
@@ -99,18 +126,13 @@ def record(res):
                 r += [f"**{q}**" if mark == "best" else f"<u>{q}</u>" if mark == "second" else q, f"{v['rho_trj']:.2f}"]
                 r += ([f"{v['rho_turns']:.2f}"] if turns else []) + [f"{v['rho_inv']:.2f}"]
             rows.append(r)
-        blocks.append(f"**{MODEL_TEX[model]}**\n\n" + PO.mdtable(head, rows))
-        cells += [res[f"{model}|{b}"][n] for b in BENCHES for n, _ in ROWS if res[f"{model}|{b}"][n]]
+        blocks.append(f"**{MODEL_TEX[model]}**\n\n" + logger.md_table(head, rows))
         seedret += [f"{n} on {LABEL[b]} ({MODEL_TEX[model]})" for b in BENCHES for n, _ in ROWS if (res[f"{model}|{b}"][n] or {}).get("returned_seed")]
     txt = ("Q = avg@3 over three test runs; ratios against the Seed skill row on a common task set.\n\n" + "\n\n".join(blocks)
            + "\n\nColumns: rho = `rho_trj` (input tokens), rho^turns = `rho_turns`, rho^calls = `rho_inv` (tool calls). "
            + ("Skills equal to the seed text (" + "; ".join(seedret) + ") report the Seed row's three runs." if seedret
               else "Every row reports its own three runs."))
-    PO.record("mech_table1", "table1", result=txt, source=["src/analysis/table1.py"], commands=["python -m src.analysis.table1"],
-              raw=[c["run_dir"] for c in cells] + [c["test_eval"] for c in cells],
-              notes=["rho = geometric mean per task of (mean over the runs of the metric) / (the same mean over the seed's runs).",
-                     "GPT-6 Luna drops provider-failed requests and scores Q over verified outcomes; DeepSeek counts a task with no "
-                     "verdict in any run as a failure."])
+    logger.record(__spec__.name, "table1", txt, S.runs_text([(model, b, m) for model in MODELS for b in BENCHES for _, m in ROWS]))
 
 
 def main():

@@ -1,21 +1,22 @@
-"""Four-term split of each skill's change in log input tokens against the seed (DeepSeek, Table 1's test runs).
+"""Four-term split of each learned skill's change in log input tokens against the seed, on Table 1's test runs.
 
-compute  -> <cache>/analysis/main/attribution.json: per cell (A) the split on 3-run task means, (B) per run pair,
-            (C) the per-request change of each prefix column, and the Table 1 rho on the same tasks
-attr     -> <cache>/analysis/appc/attr.json: the split on one run per side (the https reruns), read by skilltext
-"""
-import json
-import math
-import sys
+compute  -> <cache>/main/attribution.json: per DeepSeek cell (A) the split on 3-run task means, (B) per run pair, (C) the
+            per-request change of each prefix column, and Table 1's rho on the same tasks
+attr     -> <cache>/appc/attr.json: the split on one run per side (each side's first test run), read by the rule coding
+
+graphs() and split() also serve the token analyses in aux/tokens: the episode graphs of a cell's runs for either model,
+and a cell's usable tasks with the 3-run means of both sides."""
+import functools, json, math, sys
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 
-from src.analysis.common import mean_rows, rep_files, rows_of
-from src.analysis.episodes import episodes, metrics
+from src.analysis import settings as S
+from src.analysis.episodes import metrics
 from src.graph import episode as W
 from src.utils import dataloader as C
 
-MODEL = "deepseek-flash"
+MODEL = S.DEEPSEEK
 OPT = [("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"), ("GEPA", "gepa")]
 BENCH = [("tau3-bench", "tau3"), ("automationbench", "AutoB"), ("terminal-bench-2-1", "TB2")]
 TERMS = ["more_actions", "turn_splitting", "content", "skill_text"]
@@ -23,25 +24,70 @@ TERM_LABEL = dict(more_actions="more actions", turn_splitting="turn-splitting", 
 PREFIX = list(W.FIXED)
 DROPPED = ["no verified outcome / N, X in all six runs", "no graph episode in some run",
            "episode without usable metrics (R<2, no call, no history)", "no positive history on the 3-run mean"]
-# attr: the seed's first run and the https reruns of the optimizers
-SEED_RUN, ATTR_RUN = "native-20261003-trace-final", "native-20261008-https"
 ATTR_NAMES = dict(more_actions="more_actions", turn_splitting="more_requests", content="longer_content", skill_text="longer_skill")
 
 
-def run_files(method, bench):
-    """({rep: evaluation.json} of the skill, the same for the seed), as Table 1 picks them."""
-    seed_run = C.current_run("native-seed", MODEL, bench)
-    seed = rep_files([seed_run, seed_run.parent / "rep-1", seed_run.parent / "rep-2"], C.vid(C.SEED_TEXT))
-    run = C.current_run(method, MODEL, bench)
-    own = rep_files([run, C.EX / MODEL / "test-reps" / f"{bench}__{method}__{run.name}"], C.vid(C.final_skill(method, run)))
-    return own, seed
+def run_files(method, bench, model=MODEL):
+    """({rep: [evaluation.json]} of the skill, the same for the seed), as Table 1 reads them."""
+    return S.cell_files(model, bench, method), S.cell_files(model, bench, "native-seed")
 
 
-def load_runs(files):
-    """{rep: {task: (Episode, metrics)}} and {rep: {task: Table 1 row}}."""
-    eps = {rep: {e.task: (e, metrics(e)) for e in W.load(path)} for rep, path in sorted(files.items())}
-    rows = {rep: {t: r for (t, _), r in rows_of(path).items()} for rep, path in sorted(files.items())}
-    return eps, rows
+def _luna_graph(ep):
+    requests = [r for r in ep["requests"] if r["input_tokens"] is not None]
+    return W._episode((dict(ep, requests=requests), "")) if requests else None
+
+
+def graphs(files, model=MODEL):
+    """{rep: {task: Episode}} of a cell's test runs. DeepSeek: the parse of each file (src.graph.episode.load), the later
+    files of a repetition filling only tasks without an outcome. GPT-6-Luna: the episodes Table 1 merges that have a verified
+    outcome, rebuilt without their provider-failed requests (no usage, retried), so R, N and X are Table 1's Luna counts."""
+    if model != S.LUNA:
+        out = {}
+        for k, fs in sorted(files.items()):
+            got = {}
+            for f in fs:
+                got.update({t: e for t, e in {e.task: e for e in W.load(f)}.items() if t not in got or got[t].success is None})
+            out[k] = got
+        return out
+    items = [(k, t, e) for k, rep in S.episodes(files).items() for t, e in rep.items() if S.known(e)]
+    with ProcessPoolExecutor(24) as pool:
+        built = list(pool.map(_luna_graph, [e for _, _, e in items], chunksize=4))
+    out = {k: {} for k in files}
+    for (k, t, _), g in zip(items, built):
+        if g is not None:
+            out[k][t] = g
+    return out
+
+
+def load_runs(files, model=MODEL):
+    """({rep: {task: (Episode, metrics or None)}}, {rep: {task: Table 1 row}}) of {rep: [evaluation.json]}."""
+    eps = {k: {t: (e, metrics(e)) for t, e in rep.items()} for k, rep in graphs(files, model).items()}
+    return eps, S.rows(files, model)
+
+
+@functools.lru_cache(maxsize=None)
+def side(model, bench, method):
+    """load_runs of one row of Table 1 (an optimizer that returned the seed reads the Seed row's runs)."""
+    return load_runs(S.cell_files(model, bench, method), model)
+
+
+def verified(row):
+    return bool(row) and None not in (row["success"], row["N"], row["X"])
+
+
+def means(rows):
+    """{task: mean N and X over the runs with a verified outcome and both counts}: Table 1's per-task means."""
+    per = {}
+    for rep in rows.values():
+        for t, r in rep.items():
+            if verified(r):
+                per.setdefault(t, []).append(r)
+    return {t: {k: float(np.mean([r[k] for r in v])) for k in ("N", "X")} for t, v in per.items()}
+
+
+def common(ref, own):
+    """Table 1's common task set: both sides averaged, mean N and X above 0."""
+    return [t for t in sorted(ref) if t in own and min(ref[t]["N"], ref[t]["X"], own[t]["N"], own[t]["X"]) > 0]
 
 
 def mean_metrics(per_run):
@@ -58,73 +104,64 @@ def four_terms(pairs):
         return np.array([math.log(b[key] / a[key]) for a, b in pairs])
     dR, dN, dh, dX, dF = d("R"), d("N"), d("h"), d("X"), d("F")
     sF = np.array([(a["sF"] + b["sF"]) / 2 for a, b in pairs])
-    sH = 1 - sF
     Rm = np.array([(a["R"] + b["R"]) / 2 for a, b in pairs])
-    eR = 1 + sH * Rm / (Rm - 1)
-    return dict(more_actions=eR * dN, turn_splitting=-eR * (dN - dR), content=sH * dh, skill_text=sF * dF), dX
+    eR = 1 + (1 - sF) * Rm / (Rm - 1)
+    return dict(more_actions=eR * dN, turn_splitting=-eR * (dN - dR), content=(1 - sF) * dh, skill_text=sF * dF), dX
 
 
 def summarize(terms, dX):
     """Task means of the terms and of the total, the residual, and the largest term."""
-    out = {k: float(v.mean()) for k, v in terms.items()}
-    out["total"] = float(dX.mean())
+    out = {k: float(v.mean()) for k, v in terms.items()} | {"total": float(dX.mean())}
     resid = dX - sum(terms.values())
-    out["residual_mean"] = float(resid.mean())
-    out["residual_max_abs"] = float(np.abs(resid).max())
-    out["largest"] = max(TERMS, key=lambda k: abs(out[k]))
-    return out
+    out |= dict(residual_mean=float(resid.mean()), residual_max_abs=float(np.abs(resid).max()))
+    return out | {"largest": max(TERMS, key=lambda k: abs(out[k]))}
 
 
-def prefix_columns(own_eps, seed_eps, tasks):
-    """Per prefix column, the mean over tasks of the per-request tokens (3-run mean), skill minus seed, and the seed's level."""
-    def level(eps, task, col):
-        return float(np.mean([e.Xrg[:, e.comps.index(col)].mean() if col in e.comps else 0.0
-                              for e in (eps[rep][task][0] for rep in eps)]))
-    return {col: dict(delta=float(np.mean([level(own_eps, t, col) - level(seed_eps, t, col) for t in tasks])),
-                      seed=float(np.mean([level(seed_eps, t, col) for t in tasks]))) for col in PREFIX}
-
-
-def usable_tasks(tasks, own, seed, reps):
-    """The tasks with outcome, N, X, a usable episode in all six runs and positive 3-run history; drop counts by reason."""
-    (own_eps, own_rows), (seed_eps, seed_rows) = own, seed
-    dropped, per_side = dict.fromkeys(DROPPED, 0), {}
+def split(model, bench, method):
+    """One cell: Table 1's common tasks, and the usable ones with the 3-run means of both sides (seed, skill) and the runs
+    averaged. DeepSeek needs a verified outcome, N and X and a usable graph episode in all six runs; GPT-6-Luna averages the
+    runs Table 1 averages and drops a task when one of them has no usable graph episode."""
+    own, seed = side(model, bench, method), side(model, bench, "native-seed")
+    reps = sorted(own[1])
+    seed_means, own_means = means(seed[1]), means(own[1])
+    tasks, usable, dropped = common(seed_means, own_means), {}, dict.fromkeys(DROPPED, 0)
     for t in tasks:
-        if not all(rows[r].get(t) and None not in (rows[r][t]["success"], rows[r][t]["N"], rows[r][t]["X"])
-                   for rows in (own_rows, seed_rows) for r in reps):
+        runs = [[r for r in sorted(rows) if verified(rows[r].get(t))] for _, rows in (seed, own)]
+        if model == MODEL and any(rs != reps for rs in runs):
             dropped[DROPPED[0]] += 1
-        elif not all(t in eps[r] for eps in (own_eps, seed_eps) for r in reps):
+        elif not all(t in eps.get(r, {}) for (eps, _), rs in zip((seed, own), runs) for r in rs):
             dropped[DROPPED[1]] += 1
-        elif not all(eps[r][t][1] for eps in (own_eps, seed_eps) for r in reps):
+        elif not all(eps[r][t][1] for (eps, _), rs in zip((seed, own), runs) for r in rs):
             dropped[DROPPED[2]] += 1
-        elif None in (a := mean_metrics([seed_eps[r][t][1] for r in reps]), b := mean_metrics([own_eps[r][t][1] for r in reps])):
+        elif None in (pair := tuple(mean_metrics([eps[r][t][1] for r in rs]) for (eps, _), rs in zip((seed, own), runs))):
             dropped[DROPPED[3]] += 1
         else:
-            per_side[t] = (a, b)
-    return per_side, dropped
+            usable[t] = dict(pair=pair, runs=runs)
+    log_rho = {t: math.log(own_means[t]["X"] / seed_means[t]["X"]) for t in tasks}
+    return dict(own=own[0], seed=seed[0], rows=(seed[1], own[1]), reps=reps, common=tasks, usable=usable, dropped=dropped, log_rho=log_rho)
+
+
+def prefix_columns(c):
+    """Per prefix column, the mean over tasks of the per-request tokens (mean over the runs), skill minus seed, and the seed's."""
+    def level(eps, runs, task, col):
+        return float(np.mean([e.Xrg[:, e.comps.index(col)].mean() if col in e.comps else 0.0 for e in (eps[r][task][0] for r in runs)]))
+    rows = {col: [(level(c["own"], u["runs"][1], t, col), level(c["seed"], u["runs"][0], t, col)) for t, u in c["usable"].items()]
+            for col in PREFIX}
+    return {col: dict(delta=float(np.mean([a - b for a, b in v])), seed=float(np.mean([b for _, b in v]))) for col, v in rows.items()}
 
 
 def cell(disp, method, bench, short):
-    own_files, seed_files = run_files(method, bench)
-    own, seed = load_runs(own_files), load_runs(seed_files)
-    reps = sorted(own_files)
-    assert reps == [0, 1, 2] and sorted(seed_files) == [0, 1, 2], (method, bench, reps)
-    own_mean, seed_mean = mean_rows(own_files)[1], mean_rows(seed_files)[1]
-
-    def log_rho(t):
-        return math.log(own_mean[(t, 0)]["X"] / seed_mean[(t, 0)]["X"])
-    t1_tasks = [t for (t, _), r in own_mean.items() if (t, 0) in seed_mean
-                and all(x and x > 0 for x in (r["N"], r["X"], seed_mean[(t, 0)]["N"], seed_mean[(t, 0)]["X"]))]
-    t1_log_rho = float(np.mean([log_rho(t) for t in t1_tasks]))
-    per_side, dropped = usable_tasks(t1_tasks, own, seed, reps)
-    usable = list(per_side)
-    A = summarize(*four_terms(list(per_side.values())))
-    B = [dict(run=r, **summarize(*four_terms([(seed[0][r][t][1], own[0][r][t][1]) for t in usable]))) for r in reps]
-    log_rho_usable = float(np.mean([log_rho(t) for t in usable]))
-    print(disp, bench, "n", len(usable), "of", len(t1_tasks), {k: round(v, 3) for k, v in A.items() if k != "largest"}, A["largest"])
-    return dict(method=disp, bench=bench, short=short, run=C.current_run(method, MODEL, bench).name, n=len(usable),
-                n_table1=len(t1_tasks), dropped=dropped, A=A, B=B, same_largest_all_runs=len({b["largest"] for b in B} | {A["largest"]}) == 1,
-                table1_log_rho_usable=log_rho_usable, table1_log_rho_full=t1_log_rho, table1_rho_full=math.exp(t1_log_rho),
-                total_gap_to_table1=A["total"] - log_rho_usable, C=prefix_columns(own[0], seed[0], usable))
+    c = split(MODEL, bench, method)
+    assert c["reps"] == [0, 1, 2], (method, bench, c["reps"])
+    pairs = [u["pair"] for u in c["usable"].values()]
+    A = summarize(*four_terms(pairs))
+    B = [dict(run=r, **summarize(*four_terms([(c["seed"][r][t][1], c["own"][r][t][1]) for t in c["usable"]]))) for r in c["reps"]]
+    full, used = (float(np.mean([c["log_rho"][t] for t in ts])) for ts in (c["common"], c["usable"]))
+    print(disp, bench, "n", len(pairs), "of", len(c["common"]), {k: round(v, 3) for k, v in A.items() if k != "largest"}, A["largest"])
+    return dict(method=disp, bench=bench, short=short, run=S.run(MODEL, bench, method).name, n=len(pairs), n_table1=len(c["common"]),
+                dropped=c["dropped"], A=A, B=B, same_largest_all_runs=len({b["largest"] for b in B} | {A["largest"]}) == 1,
+                table1_log_rho_usable=used, table1_log_rho_full=full, table1_rho_full=math.exp(full), total_gap_to_table1=A["total"] - used,
+                C=prefix_columns(c))
 
 
 def compute():
@@ -132,24 +169,19 @@ def compute():
 
 
 def attr():
-    """The four-term split on one run per side (seed's first run against the https rerun), per skill."""
+    """The four-term split on one run per side (each side's first test run), per DeepSeek skill."""
     skills = []
-    seed_text = C.vid(C.SEED_TEXT)
     for disp, method in OPT:
         for bench, _ in BENCH:
-            seed_run = C.EX / MODEL / "native-seed" / bench / SEED_RUN
-            run = C.EX / MODEL / method / bench / ATTR_RUN
-            version = C.vid(C.final_skill(method, run))
-            seed_rows, own_rows = C.evaluation(seed_run, "test", seed_text)[0], C.evaluation(run, "test", version)[0]
-            common = {t for (t, _), r in own_rows.items() if (s := seed_rows.get((t, 0))) and None not in (r["success"], s["success"])
-                      and all(x and x > 0 for x in (r["N"], r["X"], s["N"], s["X"]))}
-            S, O = episodes(C.eval_file(seed_run, "test", seed_text)), episodes(C.eval_file(run, "test", version))
-            pairs = [(a, b) for t, e in O.items() if t in S and (a := metrics(S[t])) and (b := metrics(e)) and t in common]
+            own_files, seed_files = ({0: files[0]} for files in run_files(method, bench))
+            (own, own_rows), (seed, seed_rows) = load_runs(own_files), load_runs(seed_files)
+            pairs = [(seed[0][t][1], m) for t, (_, m) in own[0].items() if m and seed[0].get(t, (0, None))[1]
+                     and verified(r := own_rows[0].get(t)) and verified(s := seed_rows[0].get(t)) and min(r["N"], r["X"], s["N"], s["X"]) > 0]
             terms, dX = four_terms(pairs)
             seg = {ATTR_NAMES[k]: float(v.mean()) for k, v in terms.items()}
-            skills.append(dict(model=MODEL, bench=bench, method=disp, n=len(pairs), run=run.name, **seg,
+            skills.append(dict(model=MODEL, bench=bench, method=disp, n=len(pairs), run=S.run(MODEL, bench, method).name, **seg,
                                segments_sum=sum(seg.values()), dlogX=float(dX.mean()), ratio=C.gmean(np.exp(dX))))
-    (C.out_dir("appc") / "attr.json").write_text(json.dumps(dict(skills=skills), indent=1))
+    (S.cache("appc") / "attr.json").write_text(json.dumps(dict(skills=skills), indent=1))
 
 
 if __name__ == "__main__":

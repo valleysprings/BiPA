@@ -15,6 +15,8 @@ import numpy as np
 
 from src import layout
 
+# What a tool call does, from its tool name and arguments (classify, bash_class): state-changing actions, lookups,
+# tests, and the shell programs that read or write.
 ACTION = re.compile(r"^(update|cancel|book|exchange|return|modify|transfer|refuel|enable|disable|send_(?!message)|create"
                     r"|delete|reset|pay|add|remove|set)")
 LOOKUP = re.compile(r"^(get|find|search|list|check|lookup)")
@@ -26,13 +28,16 @@ EXT = {"code": "py js ts c h cpp rs go java sh rb", "doc": "md txt rst html pdf"
        "data": "json csv yaml yml xml tsv jsonl toml", "log": "log out err"}
 SINK = {"act", "msg", "write", "edit", "bash.write"}
 CONV = ("start_conversation", "end_conversation", "log_verification", "get_current_time", "get_assistant_tool_schemas")
+# The components of a request's input: the fixed prefix and the context items, split by length at CHARS_PER_TOKEN.
 FIXED = ("system", "tool_schemas", "task", "skill")
 CTX = {f"context:{n}": n for n in ("history", "task", "system", "tool_schemas")}
 CHARS_PER_TOKEN = 4.0
 # The request record and the skill frame are harness-bench's wire format.
 RECORD_SCHEMA = "bach-native-request-record-v1"
 SKILL_FRAME = re.compile(r'<bach-skill path=(\\*")(.+?)\1 sha256=[^>\s]*>.*?</bach-skill>', re.S)
+# keys of a request item that carry no content
 STRUCTURAL = frozenset({"role", "type", "id", "tool_call_id", "call_id", "tool_use_id", "status", "index"})
+# parsed episodes, cached by evaluation file
 CACHE = layout.CACHE / "workload-parse"
 EXTRA_RUN_ROOTS = []  # optional roots holding runs as <arm>/<model>/opencode/<bench>/<run>
 

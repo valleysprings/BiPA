@@ -1,34 +1,56 @@
-# The recorded run of every cell (execution/<model>/<method>/<benchmark>/<tag>) and each model's episode cache
-# (a directory under <BIPA_ASSETS>/cache).
-models:
-  deepseek-flash:
-    run: native-20261008-https
-    seed: native-20261003-trace-final
-    noseed:
-      tau3-bench: native-20261003-timeout-fix
-      automationbench: native-20261003-trace-fix
-      terminal-bench-2-1: native-20261003-trace-fix
-    cache_root: native-20261003-timeout-fix/trace-fix
-  gpt-6-luna:
-    run: native-20261012
-    seed: native-20261011
-    noseed:
-      tau3-bench: native-20261011
-      automationbench: native-20261011
-      terminal-bench-2-1: native-20261011
-    cache_root: luna-native-20261011
+# Which recorded run every analysis reads. A run is the directory execution/<model>/<method>/<benchmark>/<run>.
 
-# The run every analysis reads per cell; edit a tag here to report another run.
+# Each model's episode cache, a directory under $BIPA_ASSETS/cache (src.run).
+models:
+  deepseek-flash: {cache_root: native-20261003-timeout-fix/trace-fix}
+  gpt-6-luna: {cache_root: luna-native-20261011}
+
+# The run of every cell of Table 1: one run for all three benchmarks, or {default: run, <benchmark>: run}.
 pins:
   deepseek-flash:
-    native-noseed: {tau3-bench: native-20261003-timeout-fix, automationbench: native-20261003-trace-fix, terminal-bench-2-1: native-20261003-trace-fix}
-    native-seed: {tau3-bench: native-20261003-trace-final, automationbench: native-20261003-trace-final, terminal-bench-2-1: native-20261003-trace-final}
-    gepa: {tau3-bench: native-20261008-https, automationbench: native-20261008-https, terminal-bench-2-1: native-20261008-https}
-    skillopt: {tau3-bench: native-20261008-https, automationbench: native-20261008-https, terminal-bench-2-1: native-20261008-https}
-    skilladam: {tau3-bench: native-20261008-https, automationbench: native-20261008-https, terminal-bench-2-1: native-20261008-https}
+    native-noseed: {default: native-20261003-trace-fix, tau3-bench: native-20261003-timeout-fix}
+    native-seed: native-20261003-trace-final
+    gepa: native-20261008-https
+    skillopt: native-20261008-https
+    skilladam: native-20261008-https
   gpt-6-luna:
-    native-noseed: {tau3-bench: native-20261011, automationbench: native-20261011, terminal-bench-2-1: native-20261011}
-    native-seed: {tau3-bench: native-20261011, automationbench: native-20261011, terminal-bench-2-1: native-20261011}
-    gepa: {tau3-bench: native-20261012, automationbench: native-20261012, terminal-bench-2-1: native-20261012}
-    skillopt: {tau3-bench: native-20261012, automationbench: native-20261012, terminal-bench-2-1: native-20261012}
-    skilladam: {tau3-bench: native-20261012, automationbench: native-20261012, terminal-bench-2-1: native-20261012}
+    native-noseed: native-20261011
+    native-seed: native-20261011
+    gepa: native-20261012
+    skillopt: {default: native-20261012, terminal-bench-2-1: native-20261025}
+    skilladam: native-20261025
+
+# Runs the analyses read besides Table 1's cells, by name (src.analysis.settings.extra): <method>/<run> under
+# execution/<model>/, for every benchmark or per benchmark.
+aux_runs:
+  # seed dev evaluations pooled by the selection task model
+  seed_dev_pool:
+    deepseek-flash: [native-seed/native-20261003, native-seed/native-20261003-trace-final, gepa/native-20261004-upstream-batch,
+                     skillopt/native-20261004-upstream-batch, gepa/native-20261008-https, skillopt/native-20261008-https,
+                     skilladam/native-20261008-https]
+    gpt-6-luna: [native-seed/native-20261011, gepa/native-20261012, skillopt/native-20261012, skilladam/native-20261012]
+  # aborted GPT-6-Luna SkillOpt runs: their seed dev draw is compared, never pooled
+  aborted_seed_dev:
+    gpt-6-luna: [skillopt/boyue-20261007]
+  # DeepSeek's learned skills under GPT-6-Luna, with the seed beside them
+  transfer_model:
+    gpt-6-luna: {tau3-bench: [native-seed/ood-seed, gepa/ood-from-deepseek-flash, skillopt/ood-from-deepseek-flash,
+                              skilladam/ood-from-deepseek-flash]}
+  # DeepSeek's learned skills on the other benchmark, with the seed beside them
+  transfer_bench:
+    deepseek-flash:
+      automationbench: [native-seed/ood-bench-seed, gepa/ood-from-bench-terminal-bench-2-1,
+                        skillopt/ood-from-bench-terminal-bench-2-1, skilladam/ood-from-bench-terminal-bench-2-1]
+      terminal-bench-2-1: [native-seed/ood-bench-seed, gepa/ood-from-bench-automationbench, skillopt/ood-from-bench-automationbench,
+                           skilladam/ood-from-bench-automationbench]
+  # the three-word seed and the skills learned from it
+  three_word_seed:
+    gpt-6-luna: {automationbench: [native-seed/fromscratch, gepa/fromscratch, skillopt/fromscratch, skilladam/fromscratch],
+                 tau3-bench: [gepa/fromscratch, skillopt/fromscratch]}
+  # skill delivery and loading (SkillZip runtime)
+  delivery:
+    deepseek-flash: {tau3-bench: [delivery-check/seed-guidance, delivery-check/skillopt-guidance, delivery-check/skillopt-native,
+                                  skillzip/native-20261018]}
+  trigger:
+    deepseek-flash: {tau3-bench: [trigger-check/seed, trigger-check/skillopt-tau3, trigger-check/gepa-tau3, trigger-check/gepa-autob],
+                     automationbench: [trigger-check/seed, trigger-check/skillopt-autob, trigger-check/gepa-autob, trigger-check/gepa-tau3]}

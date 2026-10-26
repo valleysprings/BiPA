@@ -1,43 +1,50 @@
-"""Paired statistics of No skill, GEPA, SkillOpt and SkillAdam against the Seed row on Table 1's DeepSeek runs and task sets.
+"""Paired statistics of No skill, GEPA, SkillOpt and SkillAdam against the Seed row on Table 1's DeepSeek-V4.1-Flash runs and
+task sets.
 
-a) cost ratios (X input tokens, N tool calls, R turns) with paired bootstrap intervals; b) success difference, help / harm;
-c) ratios on tasks both sides always solve / always fail; d) seed headroom, run noise and MDE; e) per-run Q;
-f) per-run sign agreement with the avg@3 difference; g) dev gain the run reported against the test difference.
-"""
+a) Cost ratios (X input tokens, N tool calls, R turns) with paired bootstrap intervals. b) Success difference, help and harm.
+c) Ratios on the tasks both sides always solve or always fail. d) Seed headroom, run noise and MDE. e) Q per run.
+f) Per-run sign agreement with the avg@3 difference. g) The dev gain each run reported against its test difference.
+
+Per task, the mean over the three test runs of each side; the common task set and the files of each repetition are Table 1's
+(settings.cell_files). Intervals are percentile intervals over task resamples, all drawn from one sequential generator seeded
+with settings.SEED, so they stay the intervals printed beside Table 1. MDE = (z_0.975 + z_0.80) sqrt(v / n). Turns R = the
+distinct requests of an episode."""
 import json, math
 
 import numpy as np
 from scipy import stats as sps
 
+from src.analysis import settings as S
 from src.analysis import table1 as T
-from src.analysis.common import rep_files, rows_of
 from src.utils import logger
-from src.utils.dataloader import BENCHES, BN, CACHE, EX, SEED_TEXT, current_run, final_skill, vid
 
-MODEL = "deepseek-flash"
+MODEL = S.DEEPSEEK
+BENCHES = ("tau3-bench", "automationbench", "terminal-bench-2-1")
 METHODS = (("No skill", "native-noseed"), ("GEPA", "gepa"), ("SkillOpt", "skillopt"), ("SkillAdam", "skilladam"))
 METRICS = (("X", "input tokens"), ("N", "tool calls"), ("R", "turns"))
-DEV_SIZE = {"tau3-bench": 30, "automationbench": 30, "terminal-bench-2-1": 9}
-N_BOOT = 10000
-SEED = 20261012
 Z = sps.norm.ppf(0.975) + sps.norm.ppf(0.80)
 
 
-def per_task_runs(reps):
+def runs_of(files):
+    """[{task: row}] per repetition of {repetition: [evaluation.json]}, read as Table 1 reads them."""
+    return list(S.rows(files, MODEL).values())
+
+
+def per_task_runs(files):
     """{task: [run rows with a verdict and N, X]}, R = distinct requests."""
     per = {}
-    for _, f in sorted(reps.items()):
-        for (task, _), row in rows_of(f).items():
+    for rows in runs_of(files):
+        for task, row in rows.items():
             if row["success"] is not None and row["N"] is not None and row["X"] is not None:
                 per.setdefault(task, []).append(dict(row, R=row["nreq"]))
     return per
 
 
-def per_task_outcomes(reps):
+def per_task_outcomes(files):
     """{task: [success per run with a verdict]}."""
     per = {}
-    for _, f in sorted(reps.items()):
-        for (task, _), row in rows_of(f).items():
+    for rows in runs_of(files):
+        for task, row in rows.items():
             if row["success"] is not None:
                 per.setdefault(task, []).append(row["success"] is True)
     return per
@@ -54,7 +61,7 @@ def common_tasks(ref, own):
 
 
 def boot_idx(n, rng):
-    return rng.integers(0, n, size=(N_BOOT, n))
+    return rng.integers(0, n, size=(S.N_BOOT, n))
 
 
 def ci(x):
@@ -104,6 +111,11 @@ def survivor_block(ref, own, per_ref, per_own, tasks, rng):
     return {label: {key: geo_ci(ref, own, sub, key, rng) for key, _ in METRICS} for label, sub in groups}
 
 
+def dev_size(bench):
+    """Tasks in the dev panel the optimizers selected on."""
+    return json.loads((S.run(MODEL, bench, "native-seed") / "summary.json").read_text())["panels"]["sel"]
+
+
 def seed_block(per_ref, bench):
     """Seed headroom, run-to-run noise of log X and success, and the MDE at 80% power."""
     runs3 = [t for t in sorted(per_ref) if len(per_ref[t]) == 3]
@@ -114,51 +126,41 @@ def seed_block(per_ref, bench):
     pairs = [(i, j) for i in range(3) for j in range(i + 1, 3)]
     y = np.array([[float(r["success"] is True) for r in per_ref[t]] for t in runs3])
     v1 = float(np.mean([np.mean((y[:, i] - y[:, j]) ** 2) for i, j in pairs]))
+    n_dev = dev_size(bench)
     return {"headroom": {"n_tasks": len(runs3), "zero": counts.count(0), "one_two": counts.count(1) + counts.count(2), "three": counts.count(3)},
             "sd_logX_mean": float(sd.mean()), "sd_logX_median": float(np.median(sd)), "sd_logN_mean": float(sd_calls.mean()),
             "run_geomean_X": gm, "pairwise_max_ratio_X": float(max(max(gm[i], gm[j]) / min(gm[i], gm[j]) for i, j in pairs)),
             "run_success_pct": [float(100 * y[:, i].mean()) for i in range(3)], "var_diff_single_run": v1, "var_diff_avg3": v1 / 3,
-            "n_test_tasks": len(runs3), "mde_avg3_pts": float(100 * Z * math.sqrt(v1 / 3 / len(runs3))), "dev_size": DEV_SIZE[bench],
-            "mde_dev_single_pts": float(100 * Z * math.sqrt(v1 / DEV_SIZE[bench]))}
+            "n_test_tasks": len(runs3), "mde_avg3_pts": float(100 * Z * math.sqrt(v1 / 3 / len(runs3))), "dev_size": n_dev,
+            "mde_dev_single_pts": float(100 * Z * math.sqrt(v1 / n_dev))}
 
 
-def run_counts(reps):
-    """[(successes, verdicts)] per run."""
-    known = [[r for r in rows_of(f).values() if r["success"] is not None] for _, f in sorted(reps.items())]
-    return [(sum(r["success"] is True for r in k), len(k)) for k in known]
-
-
-def run_q(reps):
-    return [100 * s / n for s, n in run_counts(reps)]
-
-
-def table1_q(reps):
-    rates = [s / n for s, n in run_counts(reps)]
-    return 100 * sum(rates) / len(rates)
+def run_q(files):
+    """Q of each run: 100 * solved / verified."""
+    known = [[r for r in rows.values() if r["success"] is not None] for rows in runs_of(files)]
+    return [100 * sum(r["success"] is True for r in k) / len(k) for k in known]
 
 
 def compute():
-    rng = np.random.default_rng(SEED)
+    rng = S.rng()  # the one sequential generator of settings.SEED (module docstring)
     res = {}
     for bench in BENCHES:
-        seed_run = current_run("native-seed", MODEL, bench)
-        seed_reps = rep_files([seed_run, seed_run.parent / "rep-1", seed_run.parent / "rep-2"], vid(SEED_TEXT))
-        per_ref, out_ref = per_task_runs(seed_reps), per_task_outcomes(seed_reps)
-        ref, seed_q = task_means(per_ref), table1_q(seed_reps)
-        cell = {"methods": {}, "runs": {"seed": {str(k): str(v) for k, v in seed_reps.items()}}}
+        seed_files = S.cell_files(MODEL, bench, "native-seed")
+        per_ref, out_ref = per_task_runs(seed_files), per_task_outcomes(seed_files)
+        ref, seed_q = task_means(per_ref), float(np.mean(run_q(seed_files)))
+        cell = {"methods": {}, "runs": {"seed": {str(k): [str(f) for f in v] for k, v in seed_files.items()}}}
         for name, m in METHODS:
-            run = current_run(m, MODEL, bench)
-            reps = rep_files([run, EX / MODEL / "test-reps" / f"{bench}__{m}__{run.name}"], vid(final_skill(m, run)))
-            per_own = per_task_runs(reps)
+            files = S.cell_files(MODEL, bench, m)
+            per_own = per_task_runs(files)
             own = task_means(per_own)
             tasks = common_tasks(ref, own)
-            files = {str(k): str(v) for k, v in sorted(reps.items())}
+            listed = {str(k): [str(f) for f in v] for k, v in sorted(files.items())}
             ratios = {key: ratio_block(ref, own, tasks, key, rng) for key, _ in METRICS}
-            success = success_block(out_ref, per_task_outcomes(reps), seed_q, table1_q(reps), rng)
-            cell["methods"][name] = {"run": run.name, "files": files, "n_common": len(tasks), "run_Q": run_q(reps), "ratios": ratios,
-                                     "success": success, "survivor": survivor_block(ref, own, per_ref, per_own, tasks, rng)}
-            cell["runs"][name] = files
-        cell.update(seed=seed_block(per_ref, bench), seed_Q=seed_q, seed_run_Q=run_q(seed_reps))
+            success = success_block(out_ref, per_task_outcomes(files), seed_q, float(np.mean(run_q(files))), rng)
+            cell["methods"][name] = {"run": S.run(MODEL, bench, m).name, "files": listed, "n_common": len(tasks), "run_Q": run_q(files),
+                                     "ratios": ratios, "success": success, "survivor": survivor_block(ref, own, per_ref, per_own, tasks, rng)}
+            cell["runs"][name] = listed
+        cell.update(seed=seed_block(per_ref, bench), seed_Q=seed_q, seed_run_Q=run_q(seed_files))
         res[bench] = cell
     return res
 
@@ -193,14 +195,15 @@ def dev_to_test(res):
     """Dev gain the SkillOpt and GEPA runs reported, in tasks and points, next to the test avg@3 difference."""
     rows = []
     for b in BENCHES:
+        n_dev = dev_size(b)
         for name, m in METHODS[1:3]:
-            extra = json.loads((current_run(m, MODEL, b) / "summary.json").read_text())["extra"]
+            extra = json.loads((S.run(MODEL, b, m) / "summary.json").read_text())["extra"]
             if m == "skillopt":
                 base, best = extra["baseline_selection_hard"], extra["best_selection_hard"]
             else:
                 base, best = extra["val_scores"][0], extra["val_scores"][extra["best_idx"]]
-            rows.append({"bench": b, "method": name, "dev_size": DEV_SIZE[b], "dev_seed": base, "dev_selected": best,
-                         "dev_gain_tasks": (best - base) * DEV_SIZE[b], "dev_gain_pts": 100 * (best - base),
+            rows.append({"bench": b, "method": name, "dev_size": n_dev, "dev_seed": base, "dev_selected": best,
+                         "dev_gain_tasks": (best - base) * n_dev, "dev_gain_pts": 100 * (best - base),
                          "test_dQ_avg3": res[b]["methods"][name]["success"]["dQ_table1"]})
     return rows
 
@@ -226,7 +229,7 @@ def fci(v, d=2):
 
 
 def markdown(res):
-    md, L = logger.md_table, []
+    md, L, BN = logger.md_table, [], S.BENCH_SHORT
     every = [(b, name) for b in BENCHES for name, _ in METHODS]
     for key, label in METRICS:
         rows = []
@@ -288,16 +291,12 @@ def main():
     rows, bad = check_table1(res)
     sign_rows, summary = sign_agreement(res)
     res.update(_table1_check={"mismatches": bad}, _sign={"rows": sign_rows, "summary": summary}, _dev=dev_to_test(res))
-    CACHE.mkdir(parents=True, exist_ok=True)
-    (CACHE / "stats.json").write_text(json.dumps(res, indent=1))
+    (S.cache("stats") / "stats.json").write_text(json.dumps(res, indent=1))
     check = logger.md_table(["Bench", "Method", "Q T1", "Q here", "rho_trj T1", "rho_trj here", "rho_inv T1", "rho_inv here", "n common T1 / here",
                              "status"], rows)
-    logger.write_record(
-        "stats", "Paired statistics of No skill, GEPA, SkillOpt and SkillAdam against the Seed skill row on DeepSeek-V4.1-Flash.",
-        "Table 1's runs and common task sets (seed: native-seed run + rep-1 + rep-2; methods: their run + test-reps).",
-        "Per task the mean over the three runs of each side. Bootstrap: 10,000 task resamples, seed 20261012, percentile 95% intervals. "
-        "MDE = (z_0.975 + z_0.80) sqrt(v / n). Turns R = distinct requests of an episode.",
-        f"### Table 1 reproduction check\n\n{check}\n\nMismatches: {bad}.\n\n{markdown(res)}", "python -m src.analysis.stats")
+    numbers = (f"Bootstrap: {S.N_BOOT:,} task resamples, seed {S.SEED}, percentile {100 * S.LEVEL:.0f}% intervals.\n\n"
+               f"### Table 1 reproduction check\n\n{check}\n\nMismatches: {bad}.\n\n{markdown(res)}")
+    logger.record(__spec__.name, "stats", numbers, S.runs_text([(MODEL, b, m) for b in BENCHES for m in ("native-seed",) + tuple(m for _, m in METHODS)]))
     print("table1 mismatches:", bad)
 
 

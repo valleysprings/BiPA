@@ -13,16 +13,26 @@ LEGACY_ROOTS = [root for root in os.environ.get("BIPA_LEGACY_ROOTS", "").split(o
 
 ARTIFACTS, CACHE, OPTIMIZERS = ASSETS / "artifacts", ASSETS / "cache", ROOT / "optimizers"
 EXECUTION, RESULTS = ARTIFACTS / "execution", ARTIFACTS / "results"
+# the analyses' intermediate files; a check on another pin set points this at an empty directory
+ANALYSIS = Path(os.environ.get("BIPA_ANALYSIS_CACHE", CACHE / "analysis"))
 
-MODELS = yaml.safe_load((ROOT / "configs/experiments.yaml").read_text(encoding="utf-8"))["models"]
+# each model's episode cache (models), the run of every cell (pins) and the other runs the analyses read (aux_runs);
+# BIPA_EXPERIMENTS names another file, e.g. the pins an earlier version of the paper was computed on
+EXPERIMENTS = Path(os.environ.get("BIPA_EXPERIMENTS", ROOT / "configs/experiments.yaml"))
+_CONFIG = yaml.safe_load(EXPERIMENTS.read_text(encoding="utf-8"))
+BENCHMARK_NAMES = ("tau3-bench", "automationbench", "terminal-bench-2-1")
+MODELS = _CONFIG["models"]
+# {model: {method: {benchmark: run}}}; a pin is one run for every benchmark or {default: run, <benchmark>: run}
+PINS = {model: {method: {bench: pin if isinstance(pin, str) else pin.get(bench, pin.get("default")) for bench in BENCHMARK_NAMES}
+                for method, pin in methods.items()} for model, methods in _CONFIG["pins"].items()}
+AUX_RUNS = _CONFIG.get("aux_runs")  # named runs that no cell pins; read through src.analysis.settings.extra
 METHOD_DIR = {"none": "native-noseed", "noskill": "native-noseed", "seed": "native-seed"}
 
 
 def run_dir(method, bench, model, tag=None):
-    """execution/<model>/<method dir>/<bench>/<tag>; the tag defaults to the cell's recorded run."""
-    spec = MODELS[model]
-    default = spec["seed"] if method == "seed" else spec["noseed"][bench] if method == "none" else spec["run"]
-    return EXECUTION / model / METHOD_DIR.get(method, method) / bench / (tag or default)
+    """execution/<model>/<method dir>/<bench>/<tag>; the tag defaults to the cell's pinned run."""
+    method = METHOD_DIR.get(method, method)
+    return EXECUTION / model / method / bench / (tag or PINS[model][method][bench])
 
 
 def repetition_dir(run):

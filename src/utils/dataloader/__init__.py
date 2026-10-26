@@ -3,7 +3,6 @@ import json, math, os
 from pathlib import Path
 
 import numpy as np  # noqa: F401  (re-exported to the analyses that star-import this module)
-import yaml
 from harness_bench.eval import version_from_files
 from scipy.stats import gmean as _gmean
 
@@ -17,9 +16,9 @@ BN = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "T
 EX = layout.EXECUTION
 DS = EX / "deepseek-flash"
 H = layout.ASSETS.parent  # the directory holding assets/
-CACHE = layout.CACHE / "analysis/main"
+CACHE = layout.ANALYSIS / "main"
 SEED_TEXT = layout.SEED_FILE.read_text()
-PINS = yaml.safe_load((layout.ROOT / "configs/experiments.yaml").read_text(encoding="utf-8"))["pins"]
+PINS = layout.PINS
 
 
 def gmean(values):
@@ -31,7 +30,7 @@ def vid(text):
 
 
 def out_dir(module):
-    d = layout.CACHE / "analysis" / module
+    d = layout.ANALYSIS / module
     d.mkdir(parents=True, exist_ok=True)
     return d
 
@@ -65,7 +64,7 @@ def manifest_reps(bench, row, model="deepseek-flash"):
 
 
 def current_run(method, model, bench):
-    """The run a cell reports: the manifest's, else the one pinned in configs/experiments.yaml, else the cell's only finished run."""
+    """The run a cell reports: the manifest's, else the one pinned in the experiments file, else the cell's only finished run."""
     m = manifest()
     if m:
         c = _cell(m, bench, method)
