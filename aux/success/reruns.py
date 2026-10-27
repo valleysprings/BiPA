@@ -1,5 +1,6 @@
 """Every test run of the seed and of each learned skill, both models: its success and its input tokens against the seed's
-runs, beside the seed's own spread from run to run (Figure mech_reruns3).
+runs, beside the seed's own spread from run to run (Figure mech_reruns3): in the success rows the grey band is the seed's mean plus
+or minus its spread, in the token rows the range of the seed's runs.
 
 A run's success is the share of its tasks with a verified outcome that it solves; the mean of a cell's three runs is Table
 1's Q. A run's input-token ratio is the geometric mean, over its tasks with a verified outcome and input tokens, of its input
@@ -85,15 +86,21 @@ def numbers(cells, summ):
 
 
 def panel(ax, plt, c, row):
-    """Row 0: success; row 1: the input-token ratio, on a log axis."""
+    """Row 0: success, grey band the seed's mean plus or minus its spread (a skill whose mean line lies in it is within the
+    spread); row 1: the input-token ratio on a log axis, a lighter band with dashed edges the range of the seed's runs."""
     from matplotlib.ticker import MaxNLocator
     key, names = ("success", "ratio")[row], list(c)
     seed = c["native-seed"][key]
-    ax.axhspan(min(seed), max(seed), color=F.MID, alpha=0.16, lw=0, zorder=0)
+    if row == 0:
+        spread = round(max(seed), 1) - round(min(seed), 1)  # as summary() prints it
+        band = (np.mean(seed) - spread, np.mean(seed) + spread)
+    else:
+        band = (min(seed), max(seed))
+        for y in band:  # dashed edges, so that a narrow range stays visible and the two bands differ
+            ax.axhline(y, color=F.MID, lw=0.6, ls=(0, (2.5, 1.5)), zorder=1)
+    ax.axhspan(*band, color=F.MID, alpha=0.16 if row == 0 else 0.08, lw=0, zorder=0)
     ax.axhline(np.mean(seed) if row == 0 else gmean(seed), color=F.MID, lw=0.8, zorder=1)
-    if row == 1:
-        ax.axhline(1.0, color=F.INK, lw=0.5, ls=(0, (3, 2)), zorder=1)
-    every = []
+    every = list(band) if row == 0 else []
     for i, m in enumerate(names):
         vals = c[m][key]
         every += vals
@@ -120,15 +127,20 @@ def panel(ax, plt, c, row):
         ax.set_yticks(ticks if len(ticks) <= 5 else ticks[::2] if ticks[0] * 10 % 2 == 0 else ticks[1::2])
         ax.set_yticklabels([f"{t:.1f}x" for t in ax.get_yticks()])
         ax.minorticks_off()
+    missing = [S.ARM_NAME[m] for m in S.OPTIMIZERS if m not in c]
     if len(names) == 1 and row == 0:
         ax.text(0.97, 0.5, "all three optimizers\nreturned the seed:\nno skill rows", transform=ax.transAxes, ha="right", va="center",
                 fontsize=7, color=F.DARK, linespacing=1.25, bbox=dict(fc="white", ec="none", alpha=0.9, pad=2), zorder=5)
+    elif missing and row == 0:
+        ax.text((len(names) + 3) / 2, 0.5, ", ".join(missing) + ":\nreturned the seed", transform=ax.get_xaxis_transform(), ha="center",
+                va="center", fontsize=7, color=F.DARK, linespacing=1.25, bbox=dict(fc="white", ec="none", alpha=0.9, pad=2), zorder=5)
 
 
 def draw(cells):
+    from matplotlib.colors import to_rgba
     plt = F.pyplot(7.5, title=8, tick=7, legend=7.5)
-    fig, A = plt.subplots(5, 3, figsize=(6.3, 5.4), gridspec_kw=dict(height_ratios=[1, 1, 0.42, 1, 1], hspace=0.2, wspace=0.3,
-                                                                     left=0.085, right=0.995, bottom=0.075, top=0.9))
+    fig, A = plt.subplots(5, 3, figsize=(6.3, 5.6), gridspec_kw=dict(height_ratios=[1, 1, 0.42, 1, 1], hspace=0.2, wspace=0.3,
+                                                                     left=0.085, right=0.995, bottom=0.072, top=0.876))
     for ax in A[2]:
         ax.set_visible(False)
     axs = np.array([A[0], A[1], A[3], A[4]])
@@ -141,17 +153,19 @@ def draw(cells):
         axs[2 * g + 1, 0].set_ylabel("input tokens / seed")
         top = axs[2 * g, 0].get_position().y1
         fig.text(0.085, top + 0.035, S.MODEL_NAME[model], fontsize=F.HEAD, fontweight="bold", ha="left", va="bottom")
-        fig.text(0.995, top + 0.035, "input-token row: bars and grey line are geometric means", fontsize=7.5, color=F.DARK,
-                 ha="right", va="bottom")
         if g:
             fig.add_artist(plt.Line2D([0.02, 0.995], [top + 0.057] * 2, color=F.LIGHT, lw=0.5, transform=fig.transFigure))
-    handles = [plt.Line2D([], [], marker="o", ls="", color=F.ARM["native-seed"], ms=4.5), plt.Rectangle((0, 0), 1, 1, fc=F.MID, alpha=0.16, lw=0),
-               plt.Line2D([], [], ls="-", color=F.MID, lw=1.2)]
+    handles = [plt.Line2D([], [], marker="o", ls="", color=F.ARM["native-seed"], ms=4.5)]
     handles += [plt.Line2D([], [], marker=F.MARKER[m], ls="", color=F.ARM[m], ms=4.5) for m in S.OPTIMIZERS]
-    handles += [plt.Line2D([], [], ls="-", color=F.DARK, lw=1.6)]
-    labels = ["seed run", "seed: range of its 3 runs", "seed mean", "GEPA run", "SkillOpt run", "SkillAdam run", "mean of a skill's runs"]
-    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.53, 1.0), frameon=False, ncol=7, handlelength=1.2,
+    handles += [plt.Line2D([], [], ls="-", color=F.MUTED, lw=1.6), plt.Line2D([], [], ls="-", color=F.MID, lw=1.2)]
+    labels = ["seed run", "GEPA run", "SkillOpt run", "SkillAdam run", "mean of a skill's runs (in its color)", "seed mean"]
+    fig.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.53, 1.0), frameon=False, ncol=6, handlelength=1.2,
                columnspacing=1.0, handletextpad=0.4, fontsize=7)
+    band = plt.Rectangle((0, 0), 1, 1, fc=F.MID, alpha=0.16, lw=0)
+    outlined = plt.Rectangle((0, 0), 1, 1, fc=to_rgba(F.MID, 0.08), ec=F.MID, lw=0.6, ls=(0, (2.5, 1.5)))
+    fig.legend([band, outlined], ["success rows: seed mean ± its spread (highest − lowest run)", "token rows: range of the seed's runs"],
+               loc="upper center", bbox_to_anchor=(0.53, 0.968), frameon=False, ncol=2, handlelength=1.2, columnspacing=1.6,
+               handletextpad=0.4, fontsize=7)
     F.save_figure(fig, "reruns3", width=F.TEXT_W)
 
 

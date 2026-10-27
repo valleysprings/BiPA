@@ -13,9 +13,10 @@ the gains the runs reported.
 
 mech_devpertask: inside each SkillOpt and GEPA run that returned a learned skill, which evaluated the seed and the
 returned skill once each on the whole dev set and on the test set, the share of tasks the seed fails and the returned
-skill solves (up) and the reverse (down); verified outcomes only. Ticks: the share a second run of the seed flips in
-each direction, the mean over tasks of k(n - k) / (n(n - 1)) for a task solved k of n times in the seed's executions.
-SkillAdam scores no returned skill on the whole dev set.
+skill solves (up) and the reverse (down); verified outcomes only. Triangles beside each bar: the same shares between two
+of the seed's own runs under the same model, the mean over tasks of k(n - k) / (n(n - 1)) for a task solved k of n times in the seed's
+executions; GPT-6-Luna's seed has one dev execution per task, so its dev bars have none. SkillAdam scores its candidates
+on batches (10 dev tasks under DeepSeek-V4.1-Flash, the whole 9 on TB2; training batches under GPT-6-Luna) and is left out.
 
 mech_priorfit: the share of tasks the seed solves in none, some or all of its executions, dev and test, against the
 share the beta-binomial prior fitted to them expects, each task with its own number of executions."""
@@ -192,10 +193,11 @@ def per_task():
                 final = S.version(S.skill(model, bench, opt))
                 side = {split: [outcomes(run, split, v, panels[key]) for v in (S.SEED_VERSION, final)] for split, key in (("dev", "sel"), ("test", "test"))}
                 rows.append(dict(model=model, opt=opt, bench=bench, dev=flips(*side["dev"]), test=flips(*side["test"])))
-    noise = {}
-    for bench in ORDER:
-        dev, test, _ = T.seed_executions(DS, bench)
-        noise[bench] = [100 * float(np.mean([k * (n - k) / (n * (n - 1)) for k, n in ((sum(v), len(v)) for v in ex.values()) if n > 1])) for ex in (dev, test)]
+    noise = {}  # {(model, bench): [dev, test]}, None where the seed has one execution per task
+    for model, bench in dict.fromkeys((d["model"], d["bench"]) for d in rows):
+        dev, test, _ = T.seed_executions(model, bench)
+        noise[model, bench] = [(100 * float(np.mean(f)) if f else None) for f in
+                               ([k * (n - k) / (n * (n - 1)) for k, n in ((sum(v), len(v)) for v in ex.values()) if n > 1] for ex in (dev, test))]
     return rows, noise
 
 
@@ -209,17 +211,17 @@ def devpertask(rows, noise):
     for d in rows:
         x += 0.9 if prev not in (None, d["model"]) else 0.0
         prev, c = d["model"], F.ARM[d["opt"]]
-        for off, split, ref in ((-0.2, "dev", noise[d["bench"]][0]), (0.2, "test", noise[d["bench"]][1])):
+        for off, split, ref in ((-0.2, "dev", noise[d["model"], d["bench"]][0]), (0.2, "test", noise[d["model"], d["bench"]][1])):
             f = d[split]
             for v in (100 * f["gained"] / f["n"], -100 * f["lost"] / f["n"]):
                 bx.bar(x + off, v, width=0.34, color=c if split == "dev" else "white", edgecolor=c, lw=0.9, zorder=3, hatch="////" if split == "test" else None)
-            for v in (ref, -ref):
-                bx.plot([x + off - 0.19, x + off + 0.19], [v, v], color=F.INK, lw=0.8, zorder=5)
+            for v in ((ref, -ref) if ref is not None else ()):  # beside the bar's outer side, pointing at it
+                bx.plot(x + off + (0.245 if split == "test" else -0.245), v, marker="<" if split == "test" else ">", markersize=3.2, color=F.INK, lw=0, zorder=5)
         xt.append(x)
         groups[d["model"], d["opt"]].append(x)
-        x += 1.0
+        x += 1.12
     bx.axhline(0, color=F.INK, lw=0.6)
-    bx.set_xticks(xt, [F.BENCH_TICK[d["bench"]] for d in rows], fontsize=6.8)
+    bx.set_xticks(xt, [F.BENCH_LABEL[d["bench"]] for d in rows], fontsize=6.8)
     bx.tick_params(axis="x", pad=1.5, length=0)
     bx.tick_params(axis="y", pad=1.5)
     bx.set_ylabel("share of tasks, %", fontsize=F.TEXT, labelpad=2)
@@ -230,10 +232,10 @@ def devpertask(rows, noise):
     for model in (DS, LUNA):
         xs = [x for (m, _), v in groups.items() if m == model for x in v]
         bx.text((min(xs) + max(xs)) / 2, 22.5, S.MODEL_NAME[model], ha="center", fontsize=7.2, color=F.MUTED)
-    bx.set_title("Per task: newly solved (up) and newly failed (down), dev and test", fontsize=F.TITLE, loc="left", pad=4, fontweight="bold")
+    bx.set_title("Tasks the returned skill newly solves (up) and newly fails (down), against the seed", fontsize=F.TITLE, loc="left", pad=4, fontweight="bold")
     handles = [Patch(facecolor=F.ARM[o], edgecolor=F.ARM[o], label=S.ARM_NAME[o]) for o in ("gepa", "skillopt")] + [
-        Patch(facecolor=F.MID, edgecolor=F.MID, label="dev (solid)"), Patch(facecolor="white", edgecolor=F.MID, hatch="////", label="test (hatched)"),
-        Line2D([0], [0], color=F.INK, lw=0.9, label="a second run of the seed")]
+        Patch(facecolor=F.MID, edgecolor=F.MID, label="solid: dev set"), Patch(facecolor="white", edgecolor=F.MID, hatch="////", label="hatched: test set"),
+        Line2D([0], [0], color=F.INK, lw=0, marker="<", markersize=3.2, label="one seed run against another")]
     fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, fontsize=6.4, handlelength=1.5, columnspacing=1.0, bbox_to_anchor=(0.52, 0.0))
     F.save_figure(fig, "devpertask")
 
@@ -261,17 +263,15 @@ def priorfit():
                                   (w / 2, "test", dict(color="white", edgecolor=F.SPLIT["test"], hatch="////", lw=0.9))):
             n = len(dev if split == "dev" else test)
             ax.bar(xs + off, [100 * c / n for c in got[split][0]], width=w, label=f"{split} tasks", zorder=3, **style)
-            ax.scatter(xs + off, [100 * e / n for e in got[split][1]], marker="D", s=13, color=F.INK, zorder=5, label="fitted prior" if split == "dev" else None)
+            ax.scatter(xs + off, [100 * e / n for e in got[split][1]], marker="D", s=13, color=F.INK, zorder=5, label="expected by the fitted prior" if split == "dev" else None)
         ax.set_xticks(xs, ["in no run", "in some runs", "in all runs"])
         ax.set_xlabel("task solved", labelpad=2)
         ax.set_title(f"{F.BENCH_LABEL[bench]}   (a, b) = ({a:.2f}, {b:.2f})", fontsize=7.6, loc="left", pad=3, fontweight="bold")
         runs = sorted({len(v) for v in dev.values()})
-        ax.text(0.03, 0.93, f"dev: {len(dev)} tasks, {'/'.join(map(str, runs))} runs each\ntest: {len(test)} tasks, 3 runs each", transform=ax.transAxes,
-                ha="left", va="top", fontsize=5.8, color=F.MUTED, linespacing=1.15)
         frame(ax, "y")
         res[bench] = dict(a=a, b=b, dev_tasks=len(dev), runs=runs, test_tasks=len(test), dev=got["dev"], test=got["test"])
     axes[0].set_ylabel("share of tasks, %", labelpad=2)
-    axes[0].legend(frameon=False, fontsize=6.4, loc="upper left", handlelength=1.4, bbox_to_anchor=(0.0, 0.80))
+    axes[0].legend(frameon=False, fontsize=6.4, loc="upper left", handlelength=1.4, bbox_to_anchor=(0.0, 1.0))
     fig.tight_layout(w_pad=0.8)
     F.save_figure(fig, "priorfit")
     return res
@@ -300,7 +300,8 @@ def record_devdyn(num, rows, noise):
         + f"\n\nOver the {len(t)} skills: dev {tot['dev'][0]} gained and {tot['dev'][1]} lost of {tot['dev'][2]} ({pct['dev'][0]:.1f}% and {pct['dev'][1]:.1f}%); "
           f"test {tot['test'][0]} and {tot['test'][1]} of {tot['test'][2]} ({pct['test'][0]:.1f}% and {pct['test'][1]:.1f}%). Without GPT-6-Luna on AutoBench: "
           f"dev {out['dev'][0]:.1f}% and {out['dev'][1]:.1f}%, test {out['test'][0]:.1f}% and {out['test'][1]:.1f}%. A second run of the seed flips, dev / test: "
-          + ", ".join(f"{F.BENCH_TICK[b]} {d:.1f}% / {s:.1f}%" for b, (d, s) in noise.items()) + "."])
+          + ", ".join(f"{F.BENCH_TICK[b]} {d:.1f}% / {s:.1f}%" for (m, b), (d, s) in noise.items() if m == DS) + "; GPT-6-Luna, test only (one seed "
+          "dev execution per task): " + ", ".join(f"{F.BENCH_TICK[b]} {s:.1f}%" for (m, b), (_, s) in noise.items() if m == LUNA) + "."])
     cells = [(m, b, o) for m in (DS, LUNA) for b in ORDER for o in S.OPTIMIZERS if m == DS or o != "skilladam"]
     record(__spec__.name, "devdyn", numbers, S.runs_text(cells),
            what="Figure 4 and the per-task comparison: each DeepSeek-V4.1-Flash run's reported dev gain against the replay with unchanged "

@@ -2,7 +2,8 @@ import os
 
 import pytest
 
-from src import layout, run
+from src import run
+from src.utils import layout
 from src.analysis import settings as S, table1
 from src.utils import dataloader as C
 

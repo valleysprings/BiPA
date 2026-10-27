@@ -15,7 +15,7 @@ from collections import defaultdict
 import numpy as np
 
 from src.analysis import settings as S
-from src.analysis.attribution import side
+from aux.tokens.split import side
 from src.utils import fig as style
 from src.utils.logger import md_table, record
 
@@ -143,7 +143,7 @@ def draw_bipcum3(cells):
                 ax.set_ylim(lo - 0.05 * (hi - lo), hi + 0.22 * (hi - lo))
                 ends, sign = (o["learned_end"] - o["seed_end"]) / 1000, True
                 ax.text(0.03, 0.97, "%s, %s%%" % (kfmt(ends.sum()), pfmt(100 * ends.sum() / (o["seed_end"].sum() / 1000))), transform=ax.transAxes,
-                        fontsize=6.8, va="top", ha="left", color=style.ARM[opt], fontweight="bold")
+                        fontsize=6.8, va="top", ha="left", color=style.INK, fontweight="bold")
             axn.set(xlim=(0, 1), ylim=(0, 1))
             axn.axis("off")
             for n, j in enumerate(range(3, -1, -1)):
@@ -161,8 +161,9 @@ def draw_bipcum3(cells):
                 ax.set_yticklabels([])
             if ri == 0:
                 ax.set_title("Seed" if opt is None else S.ARM_NAME[opt] + " − seed", fontsize=8, fontweight="bold", loc="left", pad=3,
-                             color=style.INK if opt is None else style.ARM[opt])
-    fig.text(0.065, 0.985, "y axes: input tokens read so far per task", fontsize=7, color=style.MUTED, ha="left", va="top")
+                             color=style.INK)
+    fig.text(0.065, 0.985, "y axes: input tokens read so far per task;   numbers beside each panel: each component at the end of the episode",
+             fontsize=7, color=style.MUTED, ha="left", va="top")
     for m in models:
         fig.text(0.012, MODEL_Y[m], S.MODEL_NAME[m], rotation=90, va="center", fontsize=8.5, fontweight="bold", color=style.INK)
     handles = [Patch(color=style.COMPONENT[g], label=LABEL[g]) for g in GROUPS] + [Line2D([0], [0], color=style.INK, lw=1.0, label="total gap to the seed")]

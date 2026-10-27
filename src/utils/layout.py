@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ASSETS = Path(os.environ.get("BIPA_ASSETS", ROOT / "assets"))
 HARNESS_BENCH = Path(os.environ.get("HARNESS_BENCH_ROOT", ROOT.parent / "harness-bench"))
 OUT = Path(os.environ.get("BIPA_OUT", ROOT / "out"))

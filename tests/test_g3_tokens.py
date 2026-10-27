@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 from aux.tokens import accounting, attribution, cumulative
-from src.analysis.attribution import four_terms
+from aux.tokens.split import four_terms
 from src.graph.episode import Episode
 
 

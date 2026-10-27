@@ -6,7 +6,7 @@
 #   scripts/main.sh run|repeat|transfer ARGS... [--execute]
 #       one cell, as python -m src.run run|repeat|transfer
 #   scripts/main.sh table1 [--execute]
-#       Table 1, its paired statistics, the turn slopes and the four-term attribution (python -m src.analysis)
+#       Table 1 for both models, including rho_turns (python -m src.analysis.table1)
 #
 # Without --execute a target prints what it would run.
 #
@@ -37,12 +37,10 @@ case "$target" in
                 *) usage 2 ;;
             esac
         done
-        for module in attribution slopes stats table1; do  # the graph and attribution caches first
-            if (( execute )); then
-                "${PYTHON:-python}" -m src.analysis "$module"
-            else
-                echo "python -m src.analysis $module"
-            fi
-        done ;;
+        if (( execute )); then
+            "${PYTHON:-python}" -m src.analysis.table1
+        else
+            echo "python -m src.analysis.table1"
+        fi ;;
     *) usage 2 ;;
 esac

@@ -18,7 +18,7 @@ def stub_run(monkeypatch, tmp_path):
     seen = SimpleNamespace(adapted=[], evaluated=[], rounds=[])
     monkeypatch.setattr(run, "run_dir", lambda method, bench, model, tag=None: tmp_path / method / bench / (tag or "t"))
     monkeypatch.setattr(run, "CACHE", tmp_path / "cache")
-    monkeypatch.setattr("src.llm.LLM", lambda model, out: SimpleNamespace(usage={"calls": 2}))
+    monkeypatch.setattr("src.utils.llm.LLM", lambda model, out: SimpleNamespace(usage={"calls": 2}))
     monkeypatch.setattr(run, "panels", lambda bench, scale: {"train": ["a"], "sel": ["b"], "test": ["c", "d"]})
     monkeypatch.setattr(run, "batches", lambda bench, scale, method: [["a"]])
     monkeypatch.setattr(run, "record_round", lambda out, **record: seen.rounds.append(record))

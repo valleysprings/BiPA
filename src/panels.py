@@ -1,26 +1,14 @@
-"""Task panels and training batches (configs/tasks.yaml), sampled from harness-bench's registry with seeded splits."""
-import collections, functools, hashlib, json, math, random, re, warnings
+"""Task panels and training batches (configs/tasks.yaml), sampled from harness-bench's registry with frozen seeds."""
+import collections, functools, math, random, re, warnings
 
 import yaml
 from harness_bench.eval import registry, registry_panel
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 
-from src.layout import HARNESS_BENCH, ROOT
+from src.utils.layout import HARNESS_BENCH, ROOT
 
 CONFIG = yaml.safe_load((ROOT / "configs/tasks.yaml").read_text(encoding="utf-8"))
 BENCHMARKS = CONFIG["benchmarks"]
-
-
-# Every panel and batch is drawn from seeds derived from this salt and the token strings below ("panel-sampling",
-# "train-stream", "train-batches"). The recorded runs fixed them: changing any of them redraws every panel and batch.
-# ("bach" is the harness project the runs were made in.)
-SALT = "bach-training-stream-v1"
-
-
-def _seed(*token):
-    """A sampling seed derived from ``token``."""
-    text = json.dumps([SALT, *token], separators=(",", ":"))
-    return int(hashlib.sha256(text.encode()).hexdigest()[:16], 16)
 
 
 def _strata(task_ids, pattern):
@@ -56,12 +44,14 @@ def shard(rows, size, seed, strata):
     return [[ordered[index]["task_id"] for index in sorted(fold)] for fold in folds]
 
 
-def plan_passes(tasks, passes, seed, budget, window):
+def plan_passes(tasks, passes, seeds, budget, window):
     """``passes`` seeded reshuffles of the tasks cut at ``budget`` slots; each pass starts with tasks that were not
     among the last ``window`` of the previous one, so no ``window`` consecutive slots repeat a task."""
+    if len(seeds) != passes:
+        raise ValueError(f"expected {passes} pass seeds, got {len(seeds)}")
     planned = []
-    for index in range(passes):
-        order = random.Random(_seed("train-stream", seed, index)).sample(sorted(tasks), len(tasks))
+    for seed in seeds:
+        order = random.Random(seed).sample(sorted(tasks), len(tasks))
         if planned:
             head = [task for task in order if task not in planned[-1][-window:]][:window]
             order = head + [task for task in order if task not in head]
@@ -91,13 +81,14 @@ def chunk_passes(passes, size):
 @functools.cache
 def _panels(benchmark, scale):
     spec = BENCHMARKS[benchmark]["scales"][scale]
+    seeds = BENCHMARKS[benchmark]["sampling_seeds"]
     rows = {split: registry_panel(benchmark, split, str(HARNESS_BENCH))
             for split in registry(str(HARNESS_BENCH))["tasks"][benchmark]["panels"]}
     strata = spec["panel_sampling"].get("strata")
     for split, cap in spec["panel_caps"].items():
-        rows[split] = (sample(rows[split], cap, _seed("panel-sampling", benchmark, split, "subset"), strata)
+        rows[split] = (sample(rows[split], cap, seeds[split], strata)
                        if spec["panel_sampling"].get(split) == "stratified" else rows[split][:cap])
-    rows["sel"] = sample(rows["dev"], spec["sel"], _seed("panel-sampling", benchmark, "dev", "selection"), strata)
+    rows["sel"] = sample(rows["dev"], spec["sel"], seeds["selection"], strata)
     return rows
 
 
@@ -113,16 +104,17 @@ def batches(benchmark, scale="main", method="default"):
     One pass (tau3, AutomationBench): stratified folds of the train panel. Several passes (TB2): one stream shared by
     every method; its no-repeat window is the largest batch size of the methods that slice it."""
     spec = BENCHMARKS[benchmark]["scales"][scale]
+    seeds = BENCHMARKS[benchmark]["sampling_seeds"]
     sizes = spec["batch_size"] if isinstance(spec["batch_size"], dict) else {"default": spec["batch_size"]}
-    size, seed, train = sizes.get(method, sizes["default"]), _seed("panel-sampling", benchmark, "train", "batches"), \
-        _panels(benchmark, scale)["train"]
+    size, train = sizes.get(method, sizes["default"]), _panels(benchmark, scale)["train"]
     if spec["rounds"] > 1:
         aligned = spec.get("pass_aligned", [])
         window = max(value for key, value in sizes.items() if key not in aligned)
-        passes = plan_passes([row["task_id"] for row in train], spec["rounds"], seed, spec["train_episodes"], window)
+        passes = plan_passes([row["task_id"] for row in train], spec["rounds"], seeds["stream"],
+                             spec["train_episodes"], window)
         return (chunk_passes if method in aligned else slice_stream)(passes, size)
     kept, total = [], 0
-    for batch in shard(train, size, _seed("train-batches", seed, 0), spec["panel_sampling"].get("strata")):
+    for batch in shard(train, size, seeds["shard"], spec["panel_sampling"].get("strata")):
         if total + len(batch) > spec.get("train_episodes", math.inf):
             break
         kept.append(batch)

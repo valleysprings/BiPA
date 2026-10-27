@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 
 lineage = pytest.importorskip("aux.edits.lineage")

@@ -1,6 +1,7 @@
 # Panels, training batches and executor settings; task lists come from harness-bench's registry.
 #   panel_caps      tasks kept per split: a stratified sample (panel_sampling, strata = regex group 1), else the prefix
 #   sel             |D_sel|, a stratified sample of the capped dev panel
+#   sampling_seeds  frozen seeds of the recorded panels and training streams; changing them redraws the protocol
 #   batch_size      per optimizer; 'default' for the others
 #   train_episodes  train slots every optimizer reads (160 at main: T = 20 GEPA, 16 SkillAdam, 4 SkillOpt, 6 on TB2)
 #   rounds          passes over the train panel; with several (TB2), every optimizer reads one shared stream of
@@ -13,6 +14,10 @@ benchmarks:
   tau3-bench:
     alias: tau3
     timeout_seconds: 21600
+    sampling_seeds:
+      train: 10813381990582382958
+      selection: 2246124020438412066
+      shard: 9434421958348325873
     scales:
       smoke: {rounds: 1, panel_sampling: {}, panel_caps: {train: 4, dev: 2, test: 2}, batch_size: 2, sel: 2}
       main: {rounds: 1, panel_sampling: {train: stratified, strata: '^tau3-([a-z_]+?)-'},
@@ -22,6 +27,10 @@ benchmarks:
   automationbench:
     alias: autob
     timeout_seconds: 21600
+    sampling_seeds:
+      train: 6610545947198125537
+      selection: 7889526022885630656
+      shard: 9244740810025691425
     scales:
       smoke: {rounds: 1, panel_sampling: {}, panel_caps: {train: 4, dev: 2, test: 2}, batch_size: 2, sel: 2}
       main: {rounds: 1, panel_sampling: {train: stratified, strata: '^([a-z]+)-'},
@@ -31,6 +40,11 @@ benchmarks:
   terminal-bench-2-1:
     alias: tb2
     timeout_seconds: 57600
+    sampling_seeds:
+      train: 17002639744390961199
+      selection: 8010796614242686179
+      shard: 299665536638574377
+      stream: [11620970917227779077, 3022460147638198739, 14740251349200141342]
     scales:
       smoke: {rounds: 1, panel_sampling: {}, panel_caps: {train: 4, dev: 2, test: 2}, batch_size: 2, sel: 2}
       main: {rounds: 3, train_episodes: 160, panel_sampling: {train: stratified}, panel_caps: {train: 62, dev: 9, test: 18},

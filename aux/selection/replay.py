@@ -3,7 +3,7 @@ reported: the replay of dev selection for DeepSeek-V4.1-Flash (mech_selection) a
 it changes with the size of the dev set (mech_devsize), and how much it rests on the task model (mech_assumptions).
 
 Inputs. The seed's distinct dev executions are the seed dev pool of the experiments file (aux_runs seed_dev_pool, plus
-DeepSeek's kept executions in aux/data/seed_dev_extra.json); its test executions are the files of Table 1's Seed row.
+DeepSeek's kept executions in aux/selection/data/seed_dev_extra.json); its test executions are the files of Table 1's Seed row.
 What each run recorded comes from its summary.json (SkillOpt also from skillopt/history.json): candidates scored K,
 starting score, candidate scores and reported gain g. Only dev-gated runs are replayed (settings.dev_gated): a SkillAdam
 run that gated its edits on the training batch reports no dev gain.

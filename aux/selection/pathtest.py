@@ -38,7 +38,7 @@ import numpy as np
 from scipy import optimize, special, stats
 
 from aux.selection import taskmodel as T
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 from src.utils import fig as F
 from src.utils.logger import md_table, record
@@ -123,7 +123,7 @@ def plan(model, new_release):
 
 
 def launch(model, items, slots):
-    from src.executor import Cell, evaluate
+    from src.utils.executor import Cell, evaluate
     from src.run import ENV
     os.environ.update(ENV)  # the capture protocol is part of the episode cache key
     for p, e, split, out, rows, missing in items:
@@ -248,14 +248,15 @@ def draw(ds):
         ax.scatter(x - dx, dev, s=22, marker="o", facecolor=c, edgecolor=c, lw=0.8, zorder=4)
         for i, v in zip(x, dev):
             ax.text(i - dx, v + 1.0, f"+{v:.1f}", ha="center", va="bottom", fontsize=6.8, color=c)
-        ax.errorbar(x + dx, dif, yerr=[r["se"] for r in rows], fmt="none", ecolor=c, elinewidth=0.8, capsize=1.8, capthick=0.8, zorder=3)
+        ax.errorbar(x + dx, dif, yerr=[r["se"] for r in rows], fmt="none", ecolor=c, elinewidth=0.9, capsize=3.0, capthick=0.9, zorder=3)
         ax.scatter(x + dx, dif, s=22, marker="o", facecolor="white", edgecolor=c, lw=1.0, zorder=4)
         for i, r in zip(x, rows):
             y = 5 * math.floor(r["diff"] / 5) + 2.5  # the middle of the grid gap that holds the point
-            ax.annotate(f"+{r['diff']:.1f}", (i + dx, y), xytext=(5, 0.5), textcoords="offset points", ha="left", va="bottom", fontsize=6.8, color=c)
-            ax.annotate(f"{r['gained']}/{r['lost']}", (i + dx, y), xytext=(5, -0.5), textcoords="offset points", ha="left", va="top", fontsize=6.8, color=F.INK)
+            # test labels in italic grey, so they do not read as the dev gains (upright, in the optimizer's color)
+            ax.annotate(f"+{r['diff']:.1f}", (i + dx, y), xytext=(5, 0.5), textcoords="offset points", ha="left", va="bottom", fontsize=6.8, color=F.MUTED, fontstyle="italic")
+            ax.annotate(f"{r['gained']} gained, {r['lost']} lost", (i + dx, y), xytext=(5, -0.5), textcoords="offset points", ha="left", va="top", fontsize=6.8, color=F.MUTED, fontstyle="italic")
         ax.set_xticks(x, [f"round {r['round']}" + (", returned" if r["returned"] else "") for r in rows])
-        ax.set(xlim=(-0.45, len(rows) - 0.4), ylim=(-5, 20.5), yticks=[0, 5, 10, 15])
+        ax.set(xlim=(-0.45, len(rows) - 0.05), ylim=(-5, 20.5), yticks=[0, 5, 10, 15])
         ax.grid(axis="y", color=F.GRID, lw=0.4)
         ax.set_axisbelow(True)
         F.despine(ax)
@@ -263,11 +264,15 @@ def draw(ds):
         climb = 100 * (rows[-1]["dev_solved"] - rows[0]["dev_solved"]) / rows[0]["n_dev"]
         within = max(abs(d - dif[0]) for d in dif)
         titles[p["opt"]] = f"{S.ARM_NAME[p['opt']]}: dev gain climbs {climb:.1f} points,\ntest difference stays within {within:.1f} points of its first value"
-        ax.set_title(titles[p["opt"]], loc="left", color=F.INK, pad=4, linespacing=1.15)
+        first = f"round {rows[0]['round']}"  # the first kept skill; the paper's words for the same two numbers
+        ax.set_title(f"{S.ARM_NAME[p['opt']]}: from {first} on, dev gain climbs {climb:.1f} points,\n"
+                     f"test difference stays within {within:.1f} points of its {first.replace(' ', '-')} value", loc="left", color=F.INK, pad=4, linespacing=1.15)
     axes[0].set_ylabel("points", labelpad=2)
-    handles = [Line2D([], [], color=F.INK, lw=1.1, marker="o", ms=4, mfc=F.INK, mec=F.INK), Line2D([], [], color="none", marker="o", ms=4, mfc="white", mec=F.INK)]
-    fig.legend(handles, ["reported dev gain, over the starting score", r"test difference to the seed rerun, $\pm$1 SE, and tasks gained/lost"],
-               loc="upper center", bbox_to_anchor=(0.53, 1.0), ncol=2, frameon=False, handlelength=2.2, columnspacing=2.0, handletextpad=0.5)
+    test = axes[0].errorbar([np.nan], [np.nan], yerr=[1], fmt="o", ms=4, mfc="white", mec=F.INK, mew=1.0, ecolor=F.INK, elinewidth=0.9, capsize=3.0, capthick=0.9)
+    handles = [Line2D([], [], color=F.INK, lw=1.1, marker="o", ms=4, mfc=F.INK, mec=F.INK), test]
+    legend = fig.legend(handles, ["reported dev gain over the starting score", "test difference to the seed rerun"],
+                        loc="upper center", bbox_to_anchor=(0.53, 1.0), ncol=2, frameon=False, handlelength=2.2, columnspacing=2.0, handletextpad=0.5)
+    legend.get_texts()[1].set(color=F.MUTED, fontstyle="italic")  # as the test labels
     F.save_figure(fig, "pathtest")
     return titles
 

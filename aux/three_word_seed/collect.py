@@ -7,8 +7,8 @@ skill it returned. They are set against Table 1's GPT-6-Luna cells, whose optimi
 skill's evaluations are found by its version (settings.version of its text), and test runs are read as Table 1 reads them.
 Words are whitespace tokens of the whole skill file, front matter included. A sentence is a piece of the skill's body
 (front matter and headings removed) that ends in . ! ? or ; and has at least three words; each carries one reader's label in
-sentence_labels.json: S0 good practice anywhere, S1 a convention of the whole benchmark, S2 names a specific tool, app,
-field or command, S3 holds for one class of tasks; S2 and S3 are particular to a benchmark."""
+aux/three_word_seed/data/sentence_labels.json: S0 good practice anywhere, S1 a convention of the whole benchmark, S2 names
+a specific tool, app, field or command, S3 holds for one class of tasks; S2 and S3 are particular to a benchmark."""
 import json, re
 from pathlib import Path
 
@@ -17,7 +17,7 @@ from src.analysis import settings as S
 
 BENCHES = ("automationbench", "tau3-bench")
 OPTIMIZERS = ("skillopt", "gepa")
-LABELS = Path(__file__).parents[1] / "data" / "sentence_labels.json"
+LABELS = Path(__file__).parent / "data" / "sentence_labels.json"
 SPLIT = re.compile(r"(?<=[.!?;])\s+(?=[A-Z0-9`\"'(*\-])")
 
 

@@ -50,7 +50,7 @@ def draw(eps, cells):
                 axa.plot([t - 0.3, t + 0.3], [y0 + 0.45] * 2, color=F.MUTED, lw=0.7, solid_capstyle="butt")
         axa.text(-0.25, yc[m], label[m][0], ha="right", va="center", fontsize=F.TEXT, fontweight="bold", color=label[m][1], clip_on=False)
         axa.text(0.55, y0 + band + 0.2, f"{e['nturn']} turns, {e['N']} calls", ha="left", va="bottom", fontsize=F.SMALL)
-        axa.text(nmax + 0.5, y0 + band + 0.2, f"writes sharing a turn: {e['Wp']} of {e['W']}    reads: {e['Rp']} of {e['R']}",
+        axa.text(nmax + 0.5, y0 + band + 0.2, f"sharing a turn: {e['Wp']} of {e['W']} writes, {e['Rp']} of {e['R']} reads",
                  ha="right", va="bottom", fontsize=F.SMALL)
         axa.axhline(y0 - 0.02, color=F.GRID, lw=0.5, zorder=1)
     axa.set(xlim=(0.45, nmax + 0.55), ylim=(ylo, ytop), yticks=[], xticks=[1, 5, 10, 15, 20])
@@ -64,7 +64,6 @@ def draw(eps, cells):
     title = lambda x, y, text: fig.text(x / width, y / height, text, fontsize=F.TITLE, fontweight="bold", ha="left", va="center")
     title(0.04, height - 0.13, "(a) One task, DeepSeek: learned skills issue writes one per turn")
     # (b) every episode, both models
-    full = {model: max(c["n"] for c in cells if c["model"] == model) for model in (S.DEEPSEEK, S.LUNA)}
     for j, (what, name, color) in enumerate(SHARE):
         ax = ax_in(4.36 + j, 0.36, 0.78, 2.42)
         for m in ROWS + ("native-noseed",):
@@ -72,10 +71,8 @@ def draw(eps, cells):
             ax.axhline(y, color=F.GRID, lw=0.5, zorder=1)
             for model, dy, style in ((S.DEEPSEEK, 0.1, dict(ms=4.6, mfc=color, mec="white", mew=0.4)),
                                      (S.LUNA, -0.75, dict(ms=3.8, mfc="white", mec=color, mew=0.9))):
-                value, n = share(cells, model, m, what)
+                value, _ = share(cells, model, m, what)
                 ax.plot([value], [y + dy], marker=F.MODEL_MARKER[model]["marker"], ls="", zorder=4, clip_on=False, **style)
-                if model == S.LUNA and n != full[model] and what == "Wpar":
-                    ax.text(103, y + dy, f"{n} tasks", fontsize=F.TINY, color=F.MUTED, ha="right", va="center")
             if m in eps:
                 e = eps[m]
                 ax.plot([100 * (e["Wp"] / e["W"] if what == "Wpar" else e["Rp"] / e["R"])], [y + 0.95], marker="x", ms=4.4, mec=F.INK,
@@ -92,8 +89,8 @@ def draw(eps, cells):
     title(3.98, height - 0.28, "cut writes sharing a turn; reads stay grouped")
     keys = [Line2D([0], [0], marker="o", ls="", ms=4.6, mfc=F.MUTED, mec="white", label="DeepSeek"),
             Line2D([0], [0], marker="D", ls="", ms=3.8, mfc="white", mec=F.MUTED, mew=0.9, label="Luna"),
-            Line2D([0], [0], marker="x", ls="", ms=4.4, mec=F.INK, mew=0.9, label="episode in (a)")]
-    fig.legend(handles=keys, loc="lower center", bbox_to_anchor=(5.25 / width, 0.0), ncol=3, frameon=False, handletextpad=0.2,
+            Line2D([0], [0], marker="x", ls="", ms=4.4, mec=F.INK, mew=0.9, label="that row's episode in (a)")]
+    fig.legend(handles=keys, loc="lower center", bbox_to_anchor=(5.1 / width, 0.0), ncol=3, frameon=False, handletextpad=0.2,
                columnspacing=0.8, borderaxespad=0.1)
     F.save_figure(fig, "bipwrites3")
     plt.close(fig)

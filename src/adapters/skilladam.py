@@ -5,7 +5,6 @@ from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
 
-from harness_bench.eval.traces import SKILL_FRAME
 from skilladam.core.acceptance_gate import AcceptanceGate, ImprovementRule
 from skilladam.core.case_sampler import IterationCases
 from skilladam.core.feedback_loop import CheckpointStore, EditBudgetConfig, FeedbackLoop, FeedbackLoopConfig
@@ -21,8 +20,9 @@ from skilladam.methods.skilladam import SkillAdamRunner, _skill_hash, _validate_
 from skilladam.methods.skilladam_prompts import CORE_PROMPTS_DIR, BenchmarkPromptContext, IterationGeneration
 from skilladam.types import BenchmarkCase, MetricResult, RolloutResult, UsageRecord
 
-from src import executor
-from src.llm import GatewayRejected
+from src.utils import executor
+from src.utils.llm import GatewayRejected
+from src.utils.skill_frame import SKILL_FRAME
 
 PROMPTS = Path(__file__).resolve().parents[1] / "prompts/skilladam"
 # max/min_iterations are set to T; 99 consecutive failures means no early stop
@@ -98,7 +98,8 @@ class Runner(SkillAdamRunner):
         for case in cases:
             messages, hard = rows[case.case_id]["messages"], float(rows[case.case_id]["success"])
             task = next((m["content"] for m in messages if m["role"] == "user"), "")
-            case.payload["task"] = case.payload.get("task") or SKILL_FRAME.sub(r"\1(the evaluated skill)\3", task)
+            case.payload["task"] = case.payload.get("task") or SKILL_FRAME.sub(
+                r"\g<open>(the evaluated skill)\g<close>", task)
             answer = next((m["content"] for m in reversed(messages) if m["role"] == "assistant" and m["content"]), "")
             metric = MetricResult(primary=hard, metrics={"hard": hard}, case_metrics={case.case_id: {"hard": hard}})
             evaluated.append(CaseEvaluation(case.case_id, RolloutResult(case.case_id, answer, messages), metric))

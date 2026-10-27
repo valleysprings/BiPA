@@ -3,7 +3,7 @@ calls a turn carries and which of them only read (mech_callsperturn), whether th
 one per turn while reads stay grouped (mech_calls_rw), and how much of each skill's token tax would go if it kept the
 seed's calls per turn (mech_batching). Accounting on recorded episodes; nothing is re-run.
 
-Calls per turn (DeepSeek, three benchmarks). Each cell uses the task set of the four-term split (src.analysis.attribution):
+Calls per turn (DeepSeek, three benchmarks). Each cell uses the task set of the four-term split (aux.tokens.split):
 Table 1's common tasks with a verified outcome, N and X in all six runs and a usable graph episode with positive history.
 A side pools its three runs; the seed row is the seed on that cell's tasks. A turn is a model request and its calls the
 calls the harness executed (checked against the graph episode); m = calls / turns, m_task the mean of the episodes' own m.
@@ -31,7 +31,7 @@ import collections, functools, itertools, json, math
 import numpy as np
 
 from aux.calls import classify as C
-from src.analysis import attribution as A
+from aux.tokens import split as A
 from src.analysis import settings as S
 from src.utils.dataloader import BENCHES, MODELS, task_row
 from src.utils.logger import md_table, record

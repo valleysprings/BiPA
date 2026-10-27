@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from src import layout
+from src.utils import layout
 
 classify = pytest.importorskip("aux.calls.classify")
 old_rw = pytest.importorskip("aux.calls_and_writes.calls_rw", reason="the old modules are gone after integration")

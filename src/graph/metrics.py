@@ -1,14 +1,9 @@
 """Per-episode quantities read off the graph episodes, and the within-task slope fit."""
 import collections
-import json
-from pathlib import Path
 
 import numpy as np
 
 from src.graph import episode as W
-
-BENCH = [("tau3-bench", r"$\tau^3$-bench", r"$\tau^3$-bench"), ("automationbench", "AutoBench", "AutoBench"),
-         ("terminal-bench-2-1", "TB2", "TB2")]
 
 
 def metrics(ep):
@@ -24,23 +19,6 @@ def metrics(ep):
     sF = ep.R * F / X
     return dict(R=ep.R, N=ep.N, X=X, F=F, h=history / (ep.R * (ep.R - 1) / 2), m=ep.N / ep.R, sF=sF,
                 eR=1 + (1 - sF) * ep.R / (ep.R - 1), succ=ep.success)
-
-
-def episodes(path):
-    return {e.task: e for e in W.load(path)}
-
-
-def output_totals(path):
-    """{task: output tokens over the distinct requests of its episode}; the last episode of a task wins."""
-    out = {}
-    for e in json.loads(Path(path).read_text())["episodes"]:
-        seen, total = set(), 0
-        for r in e["requests"]:
-            if r["request_id"] not in seen:
-                seen.add(r["request_id"])
-                total += r.get("output_tokens") or 0
-        out[e["task_id"]] = float(total)
-    return out
 
 
 def fe_reg(items):

@@ -12,7 +12,7 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 
 from src.analysis import settings as S
-from src.analysis.episodes import metrics
+from src.graph.metrics import metrics
 from src.graph import episode as W
 from src.utils import dataloader as C
 

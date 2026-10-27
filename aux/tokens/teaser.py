@@ -1,16 +1,16 @@
 """The teaser figure (Figure 1): one AutoBench test task that the seed and SkillOpt's skill both solve under DeepSeek, each
 drawn as its episode graph, and the four-term split of the pair's change in log input tokens as a waterfall.
 
-The episodes are each side's first test run (src.analysis.attribution reads them). A panel's turns are dots, its tool
+The episodes are each side's first test run (aux.tokens.split reads them). A panel's turns are dots, its tool
 calls arrows from a turn to the tool group it called, and its context edges, drawn where a turn reads tokens of a group,
-are as wide as those tokens. Panel (c) is the split of src.analysis.attribution on this one pair of episodes, each step a
+are as wide as those tokens. Panel (c) is the split of aux.tokens.split on this one pair of episodes, each step a
 factor exp(term) on a log axis from the seed's input tokens to the skill's."""
 import math
 
 import numpy as np
 
 from src.analysis import settings as S
-from src.analysis.attribution import four_terms, side
+from aux.tokens.split import four_terms, side
 from src.utils import fig as style
 from src.utils.logger import md_table, record
 
@@ -195,7 +195,7 @@ def main():
     x_b = x_a + width_a + 0.08
     x_c = x_b + width_b + 0.08
     draw_episode(ax, p["seed"], x_a, width_a, spacing, "(a) Hand-written seed")
-    draw_episode(ax, p[SKILL], x_b, width_b, spacing, f"(b) Success-only optimizer ({S.ARM_NAME[SKILL]})")
+    draw_episode(ax, p[SKILL], x_b, width_b, spacing, f"(b) Learned skill ({S.ARM_NAME[SKILL]})")
     draw_waterfall(ax, p["seed"]["X"], p[SKILL]["X"], terms, x_c, FIG_W - 0.02 - x_c)
     draw_legend(ax, (x_a + x_b + width_b) / 2, FOOTER_Y)
     style.save_figure(fig, "teaser2")

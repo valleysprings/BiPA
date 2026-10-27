@@ -25,7 +25,7 @@ from src.utils.logger import md_table, record
 
 ORDER = ("terminal-bench-2-1", "tau3-bench", "automationbench")  # the main table's order
 SEED, NOSKILL = "native-seed", "native-noseed"
-MOVES = (("up", "success\nup"), ("same", "success\nsame"), ("down", "success\ndown"))
+MOVES = (("up", "success\nrose"), ("same", "success\nunchanged"), ("down", "success\nfell"))
 WORDS = "zero one two three four five six seven eight nine ten".split()
 
 
@@ -127,13 +127,13 @@ def label(pair):
     return f"{S.MODEL_SHORT[pair['model']]} {S.BENCH_SHORT[pair['bench']]}"
 
 
-def draw(pairs, totals, p_seed, agree, odds):
+def draw(pairs, totals, p_seed, agree):
     """(a) tasks only one side solves (up: the newer side, down: the reference), per pair and summed; (b) share of tasks whose
-    episodes agree more, by how success moved, with the odds ratio."""
+    episodes agree more, by how success moved."""
     plt = fig.pyplot(7, title=7.8, label=7.5, tick=7.2, legend=7.2)
     num = 6.8
     figure, (axa, axb) = plt.subplots(1, 2, figsize=(fig.TEXT_W, 2.35), gridspec_kw=dict(width_ratios=[1.5, 1], wspace=0.2))
-    figure.subplots_adjust(left=0.06, right=0.995, bottom=0.255, top=0.905)
+    figure.subplots_adjust(left=0.075, right=0.995, bottom=0.255, top=0.905)
     xs = list(range(len(pairs))) + [len(pairs) + 0.5]
     groups = [(label(p), p["seed"], p["learned"]) for p in pairs] + [("total", *totals)]
     width, gap_total = 0.38, 0.42  # a wider gap in the total group, so the p label clears the next bar
@@ -162,11 +162,11 @@ def draw(pairs, totals, p_seed, agree, odds):
     axa.set_ylim(-88, 82)
     axa.set_yticks([-60, -30, 0, 30, 60])
     axa.set_yticklabels(["60", "30", "0", "30", "60"])
-    axa.set_ylabel("tasks", labelpad=1)
-    axa.text(-0.58, 81, "solved only by the seed / learned skill", ha="left", va="top", fontsize=num, color=fig.DARK)
-    axa.text(-0.58, -87, "solved only by no skill / the seed", ha="left", va="bottom", fontsize=num, color=fig.DARK)
+    axa.set_ylabel("tasks (learned skills:\nsummed over optimizers)", labelpad=1, linespacing=1.1)
+    axa.text(-0.58, 81, "gained: covered only by the skill", ha="left", va="top", fontsize=num, color=fig.DARK)
+    axa.text(-0.58, -87, "lost: covered only by the reference", ha="left", va="bottom", fontsize=num, color=fig.DARK)
     axa.set_xlim(-0.62, xs[-1] + 0.7)
-    axa.set_title("(a) tasks solved in some run by one side only", loc="left")
+    axa.set_title("(a) tasks covered by one side only", loc="left")
     sides = (("seed", fig.ARM[SEED]), ("learned", fig.LEARNED))
     for j, (name, color) in enumerate(sides):
         for g, (k, _) in enumerate(MOVES):
@@ -174,18 +174,15 @@ def draw(pairs, totals, p_seed, agree, odds):
             x = g + (j - 0.5) * 0.36
             axb.bar(x, share, width=0.32, color=color, edgecolor="white", linewidth=0.4)
             axb.text(x, 3, f"{agreeing}/{n}", ha="center", va="bottom", fontsize=num, color="white", rotation=90)
-        y = 87 - 9 * j
-        axb.plot(1.0, y, marker="s", ms=3.6, color=color, lw=0, clip_on=False)
-        axb.text(1.1, y, f"{odds[name][0]:.2f}", ha="left", va="center", fontsize=num)
     axb.axhline(50, color=fig.DARK, lw=0.6, ls=":")
-    axb.text(0.9, 97, "odds ratio, up vs same", ha="left", va="center", fontsize=num, color=fig.DARK)
     axb.set_xticks(range(len(MOVES)))
     axb.set_xticklabels([m[1] for m in MOVES])
     axb.tick_params(axis="x", length=0, pad=2)
     axb.set_xlim(-0.5, 2.5)
     axb.set_ylim(0, 100)
+    axb.set_yticks([0, 25, 50, 75, 100])
     axb.set_ylabel("share of tasks (%)", labelpad=1)
-    axb.set_title("(b) tasks whose episodes agree more", loc="left")
+    axb.set_title("(b) episodes agree more than under the reference", loc="left")
     for ax in (axa, axb):
         fig.despine(ax)
         ax.tick_params(length=2, pad=1)
@@ -207,7 +204,7 @@ def main():
                "learned": [x for p in pairs for o in S.OPTIMIZERS if o in p["contrasts"] for x in p["contrasts"][o][1]]}
     agree = {k: moves(v) for k, v in triples.items()}
     odds = {k: odds_ratio(v) for k, v in triples.items()}
-    draw(pairs, totals, sign_p(*totals[0]), agree, odds)
+    draw(pairs, totals, sign_p(*totals[0]), agree)
 
     pair = lambda v: f"{v[0]} / {v[1]}"
     rows_a = [[label(p), pair(p["seed"]), *(pair(p["contrasts"][o][0]) if o in p["contrasts"] else "-" for o in S.OPTIMIZERS),

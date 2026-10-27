@@ -209,14 +209,15 @@ def dev_to_test(res):
 
 
 def check_table1(res):
-    """Q, rho_trj, rho_inv and n of every row against table1.compute."""
+    """Q, rho_trj, rho_turns, rho_inv and n of every row against table1.compute."""
     t1, rows, bad = T.compute(MODEL), [], 0
     for b in BENCHES:
         for name, _ in METHODS:
             ref, mine = t1[f"{MODEL}|{b}"][name], res[b]["methods"][name]
-            x, n = mine["ratios"]["X"]["rho_geo"], mine["ratios"]["N"]["rho_geo"]
+            x, n, r = (mine["ratios"][key]["rho_geo"] for key in ("X", "N", "R"))
             oks = [f"{ref['Q']:.1f}" == f"{mine['success']['Q_own']:.1f}",
                    f"{ref['rho_trj']:.2f}" == f"{x:.2f}" and abs(ref["rho_trj"] - x) < 1e-9,
+                   f"{ref['rho_turns']:.2f}" == f"{r:.2f}" and abs(ref["rho_turns"] - r) < 1e-9,
                    f"{ref['rho_inv']:.2f}" == f"{n:.2f}" and abs(ref["rho_inv"] - n) < 1e-9, ref["n"] == mine["n_common"]]
             bad += oks.count(False)
             rows.append([b, name, f"{ref['Q']:.3f}", f"{mine['success']['Q_own']:.3f}", f"{ref['rho_trj']:.4f}", f"{x:.4f}",

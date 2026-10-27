@@ -4,7 +4,7 @@ Every figure draws with these. A colour or marker a figure needs and this module
 A figure keeps its own size, layout and text sizes (pass them to pyplot); everything else comes from here. Each colour has
 one meaning across the paper: the optimizers keep the colours of the main-text figures, the token components and call
 kinds the Okabe-Ito hues of the teaser and of Figure 5."""
-from src import layout
+from src.utils import layout
 from src.utils.dataloader import CACHE
 
 FIG = layout.OUT / "fig/mech"

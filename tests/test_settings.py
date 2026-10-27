@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import yaml
 
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 from src.analysis import table1 as T
 from src.utils import dataloader as C
@@ -29,7 +29,7 @@ def test_experiments_file_from_the_environment(tmp_path):
     config["pins"]["gpt-6-luna"]["skilladam"] = {"default": "native-20261025", "tau3-bench": "native-test"}
     alt = tmp_path / "experiments.yaml"
     alt.write_text(yaml.safe_dump(config))
-    code = "from src.utils import dataloader as C; from src import layout; print(C.PINS['gpt-6-luna']['skilladam']['tau3-bench'], layout.ANALYSIS)"
+    code = "from src.utils import dataloader as C; from src.utils import layout; print(C.PINS['gpt-6-luna']['skilladam']['tau3-bench'], layout.ANALYSIS)"
     env = dict(os.environ, BIPA_EXPERIMENTS=str(alt), BIPA_ANALYSIS_CACHE=str(tmp_path / "analysis"))
     out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, check=True).stdout.split()
     assert out == ["native-test", str(tmp_path / "analysis")]
@@ -74,12 +74,14 @@ def test_dev_gate_is_read_from_the_run():
 
 @recorded
 def test_cell_files_are_table1s():
+    expected_turns = {S.DEEPSEEK: 1.1829647669868675, S.LUNA: 1.0}
     for model, method in ((S.DEEPSEEK, "gepa"), (S.LUNA, "gepa")):
         seed_run, seed_reps = T.seed_files(model, "terminal-bench-2-1")
         ref = T.merged_mean_rows(seed_reps, T.row_reader(model))[1]
         cell = T.cell(model, "terminal-bench-2-1", method, seed_run, seed_reps, ref)
         files = S.cell_files(model, "terminal-bench-2-1", method)
         assert cell["files"] == {k: [str(f) for f in fs] for k, fs in sorted(files.items())}
+        assert cell["rho_turns"] == pytest.approx(expected_turns[model])
     assert S.returned_seed(S.LUNA, "terminal-bench-2-1", "gepa")
     assert S.cell_files(S.LUNA, "terminal-bench-2-1", "gepa") == S.cell_files(S.LUNA, "terminal-bench-2-1", "native-seed")
     rows = S.cell_rows(S.LUNA, "terminal-bench-2-1", "native-seed")
@@ -103,6 +105,15 @@ def test_a_manifest_is_refused(tmp_path):
     env = dict(os.environ, BIPA_MANIFEST=str(tmp_path / "m.json"))
     got = subprocess.run([sys.executable, "-c", "from src.analysis import settings"], cwd=ROOT, env=env, capture_output=True, text=True)
     assert got.returncode != 0 and "BIPA_MANIFEST" in got.stderr
+
+
+def test_task_readers_expose_turns_for_both_models():
+    episode = {"success": True, "capture": {"invocations_complete": True, "requests_complete": True},
+               "requests": [{"request_id": "a", "input_tokens": 3}, {"request_id": "a", "input_tokens": 3},
+                            {"request_id": "b", "input_tokens": 5}]}
+    for model in C.MODELS:
+        row = T.row_reader(model)(episode)
+        assert row["R"] == row["nreq"] == 2
 
 
 def test_task_helpers():

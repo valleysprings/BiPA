@@ -6,14 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import skillopt
-from harness_bench.eval.traces import SKILL_FRAME
 from skillopt.config import flatten_config, load_config
 from skillopt.datasets.base import BaseDataLoader, BatchSpec
 from skillopt.engine.trainer import ReflACTTrainer
 from skillopt.envs.base import EnvAdapter
 from skillopt.model import openai_compatible_backend as transport
 
-from src import executor
+from src.utils import executor
+from src.utils.skill_frame import SKILL_FRAME
 
 SPLITS = {"train": "train", "valid_seen": "dev", "valid_unseen": "test"}  # upstream split -> executor split
 KEYS = ("baseline_selection_hard", "best_selection_hard", "final_selection_hard", "best_step", "best_origin",

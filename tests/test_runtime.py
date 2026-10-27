@@ -6,7 +6,8 @@ import httpx
 import openai
 import pytest
 
-from src import executor, layout, llm, run
+from src import run
+from src.utils import executor, layout, llm
 
 PANELS_AND_BATCHES = "8c4b5f8cdbd4ea88c308641a1df15645e9fab8d2b3544ea8ac4239e08bccd087"  # the recorded runs' ids
 LLM = llm.LLM

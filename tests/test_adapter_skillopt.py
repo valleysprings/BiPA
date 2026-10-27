@@ -114,7 +114,7 @@ def test_upstream_trainer_runs_three_epochs(tmp_path):
     from skillopt.engine import trainer
     from src.panels import chunk_passes, plan_passes
     tasks = [f"t{i}" for i in range(5)]
-    planned = chunk_passes(plan_passes(tasks, 3, 7, 13, 1), 4)
+    planned = chunk_passes(plan_passes(tasks, 3, [7, 8, 9], 13, 1), 4)
     root = tmp_path / "skillopt"
     root.mkdir()
     (root / "seed.md").write_text("seed")

@@ -6,8 +6,8 @@ from itertools import accumulate
 
 from gepa.gepa_launcher import EngineConfig, GEPAConfig, ReflectionConfig, optimize_anything
 
-from src import executor
-from src.executor import SEED, evaluate
+from src.utils import executor
+from src.utils.executor import SEED, evaluate
 
 OBJECTIVE = (
     "Improve this agent skill: a Markdown procedure file given to an LLM agent harness as guidance while it solves "

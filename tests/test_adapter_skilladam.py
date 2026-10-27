@@ -26,7 +26,7 @@ class Executor:
         return [{"id": task, "evaluation_path": f"evals/{len(text)}/evaluation.json", "verifier": None,
                  "success": None if any(m in text and t == task for m, t in self.unknown) else i < good,
                  "messages": [{"role": "system", "content": "sys"},
-                              {"role": "user", "content": f"task {task} <bach-skill>{text}</bach-skill>"},
+                              {"role": "user", "content": f"task {task} <bipa-skill>{text}</bipa-skill>"},
                               {"role": "assistant", "content": "done"}]} for i, task in enumerate(ids)]
 
     def record(self, root, *, arm, step, role, skill_text, evaluation_path):
@@ -62,6 +62,12 @@ def run(tmp_path, monkeypatch):
         cell = SimpleNamespace(benchmark="tau3-bench", model="offline", root=tmp_path)
         return arm.run(cell, {"sel": ["v1", "v2"]}, BATCHES, llm, tmp_path)
     return go
+
+
+def test_generic_skill_namespace():
+    task = "do <legacy-skill>body</legacy-skill>"
+    got = arm.SKILL_FRAME.sub(r"\g<open>(the evaluated skill)\g<close>", task)
+    assert got == "do <legacy-skill>(the evaluated skill)</legacy-skill>"
 
 
 def test_training_batch_gate(run, tmp_path):

@@ -83,7 +83,7 @@ def name(c):
     if c["skill"] == "seed":
         return "seed"
     method, source = c["skill"]
-    return S.ARM_NAME[method] + ("" if source == c["bench"] else f"\nof {fig.BENCH_TICK[source]}")
+    return S.ARM_NAME[method] + ("" if source == c["bench"] else f"'s\n{fig.BENCH_TICK[source]} skill")
 
 
 def off(c):
@@ -92,49 +92,45 @@ def off(c):
 
 def draw(delivery, trigger):
     """(a) SkillOpt's rho over the seed by route, and the on-demand overhead; (b) share of episodes that load the skill, with
-    loaded/total and the median first-load turn, and rho against the seed cell on top."""
+    loaded/total."""
     plt = fig.pyplot(7, tick=6.5)
     figure, (axa, axb) = plt.subplots(1, 2, figsize=(fig.TEXT_W, 2.0), gridspec_kw=dict(width_ratios=[0.8, 1.6], wspace=0.17))
-    figure.subplots_adjust(left=0.065, right=0.995, bottom=0.3, top=0.86)
+    figure.subplots_adjust(left=0.065, right=0.995, bottom=0.3, top=0.9)
     xs = (0, 1.15, 2.65, 3.8)
     colors = (fig.ARM["skillopt"], fig.ARM["skillopt"], fig.ARM["native-seed"], fig.ARM["skillopt"])
-    for i, (x, (_, _, rho, *_), color) in enumerate(zip(xs, delivery, colors)):  # the on-demand overhead bars drawn lighter
-        axa.bar(x, rho - 1, bottom=1, width=0.66, color=color, alpha=0.45 if i >= 2 else 1, edgecolor="white", linewidth=0.4)
-        axa.text(x, rho + 0.006, f"{rho:.3f}", ha="center", va="bottom", fontsize=5.8)
+    for x, (_, _, rho, *_), color in zip(xs, delivery, colors):  # color: the numerator's skill, as in (b)
+        axa.bar(x, rho - 1, bottom=1, width=0.66, color=color, edgecolor="white", linewidth=0.4)
+        axa.text(x, rho + 0.006, f"{rho:.3f}", ha="center", va="bottom", fontsize=fig.TINY)
     axa.axhline(1, color=fig.DARK, lw=0.6)
     axa.set_xticks(xs)
     axa.set_xticklabels(("always\nresident", "on\ndemand", "seed", "SkillOpt"))
     for x0, x1, text in ((xs[0], xs[1], "SkillOpt / seed"), (xs[2], xs[3], "on demand /\nalways resident")):
         axa.plot([x0 - 0.4, x1 + 0.4], [-0.25, -0.25], transform=axa.get_xaxis_transform(), color=fig.MID, lw=0.5, clip_on=False)
-        axa.text((x0 + x1) / 2, -0.28, text, transform=axa.get_xaxis_transform(), ha="center", va="top", fontsize=6.2)
+        axa.text((x0 + x1) / 2, -0.28, text, transform=axa.get_xaxis_transform(), ha="center", va="top", fontsize=fig.TINY)
     axa.set_ylim(0.98, 1.29)
     axa.set_yticks([1.0, 1.1, 1.2])
     axa.set_xlim(-0.55, 4.35)
     axa.set_ylabel(r"input-token ratio $\rho$", labelpad=1)
-    axa.set_title(f"(a) delivery route, {fig.BENCH_TICK[TAU]}", loc="left", pad=13)
+    axa.set_title(f"(a) with an activation instruction, {fig.BENCH_TICK[TAU]}", loc="left", pad=6)
     split = sum(c["bench"] == TAU for c in trigger)
     xs = [i + (0.6 if i >= split else 0) for i in range(len(trigger))]
     for x, c in zip(xs, trigger):
         color = fig.ARM["native-seed" if c["skill"] == "seed" else c["skill"][0]]
         share = 100 * c["loaded"] / c["n"]
         axb.bar(x, share, width=0.62, color="white" if off(c) else color, edgecolor=color, linewidth=0.9 if off(c) else 0.4)
-        top = f"turn {c['median']}" if c["median"] is not None else "never"
-        axb.text(x, share + 2, f"{c['loaded']}/{c['n']}\n{top}", ha="center", va="bottom", fontsize=5.6, linespacing=1.05)
-        axb.text(x, 1.05, f"{c['rho']:.2f}", transform=axb.get_xaxis_transform(), ha="center", va="bottom", fontsize=5.8)
-    axb.text(-0.62, 1.05, r"$\rho$ vs seed", transform=axb.get_xaxis_transform(), ha="right", va="bottom", fontsize=5.8,
-             color=fig.DARK)
+        axb.text(x, share + 2, f"{c['loaded']}/{c['n']}", ha="center", va="bottom", fontsize=fig.TINY)
     axb.set_xticks(xs)
     axb.set_xticklabels([name(c) for c in trigger])
     for lo, hi, bench in ((0, split - 1, TAU), (split, len(xs) - 1, AUTOB)):
         axis = axb.get_xaxis_transform()
         axb.plot([xs[lo] - 0.35, xs[hi] + 0.35], [-0.25, -0.25], transform=axis, color=fig.MID, lw=0.5, clip_on=False)
         axb.text((xs[lo] + xs[hi]) / 2, -0.28, f"{fig.BENCH_TICK[bench]} ({trigger[lo]['n']} tasks)", transform=axis, ha="center",
-                 va="top", fontsize=6.2)
+                 va="top", fontsize=fig.TINY)
     axb.axvline((xs[split - 1] + xs[split]) / 2, color=fig.LIGHT, lw=0.6, ls=":")
     axb.set_xlim(-0.5, xs[-1] + 0.5)
     axb.set_ylim(0, 100)
     axb.set_ylabel("episodes loading (%)", labelpad=1)
-    axb.set_title("(b) on demand without an activation instruction", loc="left", pad=13)
+    axb.set_title("(b) on demand, without an activation instruction", loc="left", pad=6)
     for ax in (axa, axb):
         fig.despine(ax)
         ax.tick_params(length=2, pad=1)

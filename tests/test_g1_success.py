@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from src import layout
+from src.utils import layout
 
 ROOT = Path(__file__).resolve().parents[1]
 reruns = pytest.importorskip("aux.success.reruns")

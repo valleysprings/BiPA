@@ -11,7 +11,7 @@ agent's turns are held fixed, so this is the accounting effect of compaction onl
 tool schemas, task, skill text) is always paid; its history H = X - F is cut to what the last k turns added (a window) or
 to at most C tokens (a cap). Tasks: Table 1's common tasks with a graph episode in all six runs. rho is the geometric mean
 over tasks of the 3-run means, skill against seed, the same policy on both sides; rho_turns the same on turns; the slope is
-fitted within tasks on the six episodes of each task (src.analysis.episodes.fe_reg). The window-1 intervals resample tasks.
+fitted within tasks on the six episodes of each task (src.graph.metrics.fe_reg). The window-1 intervals resample tasks.
 
 mech_optcost: the optimizer's own model calls of every pinned optimizer run of both models (llm/call-*.json): tokens, the
 calls whose prompt the client cut to its context limit (the request holds the client's cut marker; summary.json's count
@@ -26,8 +26,8 @@ from statistics import median
 import numpy as np
 
 from src.analysis import settings as S
-from src.analysis.attribution import OPT, split
-from src.analysis.episodes import fe_reg
+from aux.tokens.split import OPT, split
+from src.graph.metrics import fe_reg
 from src.graph import episode as W
 from src.utils.dataloader import BENCHES, gmean, task_row
 from src.utils.fig import BENCH_LABEL
@@ -44,7 +44,7 @@ SHORT = S.BENCH_SHORT
 
 
 def skills():
-    """(name, method, bench) of the DeepSeek learned skills, optimizer by optimizer as src.analysis.attribution orders them."""
+    """(name, method, bench) of the DeepSeek learned skills, optimizer by optimizer as aux.tokens.split orders them."""
     learned = set(S.learned([MODEL]))
     return [(d, m, b) for d, m in OPT for b in BENCHES if (MODEL, b, m) in learned]
 

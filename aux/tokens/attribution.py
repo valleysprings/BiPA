@@ -1,7 +1,7 @@
 """Where a learned skill's extra input tokens come from: the four-term split of its change in log input tokens against
 the seed under both models, and the same split on the tasks both solve or both fail.
 
-The split (src.analysis.attribution) is per task, on the means of R, N, X and the prefix F over the test runs of each
+The split (aux.tokens.split) is per task, on the means of R, N, X and the prefix F over the test runs of each
 side (DeepSeek: all three runs; GPT-6-Luna: the runs Table 1 averages): more actions e_R dlogN, turn-splitting
 -e_R dlog(N/R), content per turn s_H dlogh and skill text s_F dlogF, with midpoint shares and the exact
 e_R = 1 + s_H R / (R - 1). A task is usable when every averaged run has a graph episode with R >= 2, an executed call and
@@ -11,7 +11,7 @@ run pair (run k of the skill against run k of the seed, k = 0, 1, 2) and gives t
 Shares of the summed log-token increase over a set of skills sum the per-skill task means (task-weighted: every task of
 every skill); gross shares sum each term's absolute size. Intervals resample the tasks of a benchmark with replacement,
 one draw set per model and benchmark, shared by every skill of that benchmark (they share the seed); each skill averages
-its per-task terms over the drawn tasks it uses. The Luna turn slopes are fitted within tasks (src.analysis.episodes.fe_reg)
+its per-task terms over the drawn tasks it uses. The Luna turn slopes are fitted within tasks (src.graph.metrics.fe_reg)
 on the first test run of the seed and of each learned skill, as mech_slopes is for DeepSeek, and on all runs; a task with
 one episode carries no within-task information and drops out.
 
@@ -25,9 +25,9 @@ import json, math
 import numpy as np
 
 from src.analysis import settings as S
-from src.analysis.attribution import OPT, TERM_LABEL, TERMS, four_terms, side, split, summarize
-from src.analysis.episodes import fe_reg
-from src.analysis.slopes import output_tokens
+from aux.tokens.split import OPT, TERM_LABEL, TERMS, four_terms, side, split, summarize
+from src.graph.metrics import fe_reg
+from aux.tokens.slopes import output_tokens
 from src.utils.logger import md_table, record
 
 SHORT = S.BENCH_SHORT
@@ -72,7 +72,7 @@ def attribution3():
 # ---- the split under both models, the shares of the summed increase and their intervals
 
 def order(c):
-    """Optimizer, then benchmark, as src.analysis.attribution orders its cells."""
+    """Optimizer, then benchmark, as aux.tokens.split orders its cells."""
     return [d for d, _ in OPT].index(c["method"]), list(SHORT).index(c["bench"])
 
 

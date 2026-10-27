@@ -8,13 +8,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_kept_seed_dev_executions_are_labelled_neutrally():
-    kept = json.loads((ROOT / "aux/data/seed_dev_extra.json").read_text())
+    kept = json.loads((ROOT / "aux/selection/data/seed_dev_extra.json").read_text())
     text = json.dumps(kept)
-    assert "bach" not in text and "ours/" not in text
+    assert "ours/" not in text
+    assert kept["runs"] == {
+        f"earlier/{bench}/seed-dev-1": [f"earlier/{bench}/seed-dev-{i}" for i in (1, 2, 3)]
+        for bench in ("tau3-bench", "automationbench")}
     assert len(kept["executions"]) == 59
     assert Counter(e[0] for e in kept["executions"]) == {"tau3-bench": 30, "automationbench": 29}
-    for _, _, outcome, run, _ in kept["executions"]:
-        assert outcome in (0, 1) and run in kept["runs"] and run in kept["runs"][run]
+    for bench, _, outcome, run, _ in kept["executions"]:
+        assert outcome in (0, 1) and run == f"earlier/{bench}/seed-dev-1"
 
 
 def test_release_shift_is_zero_when_nothing_changed():

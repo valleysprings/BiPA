@@ -4,12 +4,12 @@ skills.
 A rule (unit) is one added bullet, numbered item, table row or example line, with wrapped lines joined to the line they
 continue; a line is added when the whole-line diff against the seed inserts or replaces it. Front matter, headings, fences
 and table separators are structure and are not coded. Every unit was read by hand, and its category comes from
-aux/data/rule_labels.json by model and text. A keyword pass proposes a category (the first of serialize, parallelize,
+aux/edits/data/rule_labels.json by model and text. A keyword pass proposes a category (the first of serialize, parallelize,
 limit_read, ask_stop, verify, domain, format whose pattern matches, else other); a unit without a label stops the run with
 its proposal, to be read and added to the file. Size is counted in whitespace-separated words and whole lines.
 
 The second coder, a language model given only the category definitions, labelled every DeepSeek unit
-(aux/data/coder2_labels.json, keyed <optimizer>|<benchmark>#<unit index>). It saw the labels of GEPA's tau3-bench skill
+(aux/edits/data/coder2_labels.json, keyed <optimizer>|<benchmark>#<unit index>). It saw the labels of GEPA's tau3-bench skill
 before coding, so agreement is also reported without that skill. Agreement is the share of equal labels and Cohen's kappa,
 over the eight categories and, for each group of categories the paper relies on, over in-group or not.
 
@@ -21,14 +21,14 @@ import collections, difflib, json, re
 import numpy as np
 
 from aux.edits import lineage as L
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 from src.utils.dataloader import BENCHES, SEED_TEXT
 from src.utils.fig import BENCH_LABEL
 from src.utils.logger import md_table, record
 
-LABELS = layout.ROOT / "aux/data/rule_labels.json"
-CODER2 = layout.ROOT / "aux/data/coder2_labels.json"
+LABELS = layout.ROOT / "aux/edits/data/rule_labels.json"
+CODER2 = layout.ROOT / "aux/edits/data/coder2_labels.json"
 CATS = ("serialize", "parallelize", "limit_read", "ask_stop", "verify", "domain", "format", "other")
 GROUPS = {"verify": ["verify"], "serialize": ["serialize"], "limit_read + parallelize": ["limit_read", "parallelize"]}
 EXPOSED = "gepa|tau3-bench#"  # the skill whose labels the second coder saw

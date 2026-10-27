@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import yaml
 
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 from src.utils import dataloader as C
 

@@ -10,8 +10,8 @@ from collections import Counter
 
 from harness_bench.eval import version_from_files
 
-from src.executor import SEED, Cell, evaluate, record_round
-from src.layout import CACHE, EXECUTION, METHOD_DIR, MODELS, ROOT, relocate, repetition_dir, run_dir
+from src.utils.executor import SEED, Cell, evaluate, record_round
+from src.utils.layout import CACHE, EXECUTION, METHOD_DIR, MODELS, ROOT, relocate, repetition_dir, run_dir
 from src.panels import BENCHMARKS, batches, panels
 
 METHODS = ("seed", "none", "skillopt", "gepa", "skilladam")
@@ -87,7 +87,7 @@ def train(args, out):
     cache = cache_root(args, out)
     llm, result = None, {"final_skill": None if args.method == "none" else SEED, "episodes": {}, "extra": {}}
     if args.method not in ("seed", "none"):
-        from src.llm import LLM
+        from src.utils.llm import LLM
         llm = LLM(args.model, out)  # first: a refused endpoint leaves no started run
     spec = protocol(args, out, cache)
     sample, schedule = spec["panels"], spec["batches"]

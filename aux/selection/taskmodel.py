@@ -17,11 +17,11 @@ from pathlib import Path
 
 import numpy as np
 
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 
 MODERATE = 4.0  # prior strength of the moderate model
-KEPT_DEV = layout.ROOT / "aux/data/seed_dev_extra.json"
+KEPT_DEV = layout.ROOT / "aux/selection/data/seed_dev_extra.json"
 
 
 # ---- the seed's executions

@@ -154,8 +154,8 @@ def draw(res, rho, n):
     plt = fig.pyplot(8, tick=7.5)
     from matplotlib.transforms import blended_transform_factory as blend
     keys = list(res["dq"])
-    heads = [("Skill in its own setting", [k for k in keys if k[0] == "own"]),
-             ("Skill transferred", [k for k in keys if k[0] != "own"])]
+    heads = [("Run where it was learned", [k for k in keys if k[0] == "own"]),
+             ("Transferred (learned → run)", [k for k in keys if k[0] != "own"])]
     y, rows, ys = 0.0, [], []
     for b, (head, items) in enumerate(heads):
         y -= 0.55 if b else 0
@@ -165,7 +165,7 @@ def draw(res, rho, n):
             rows.append((y, k))
             y -= 1.0
     figure, (axq, axr) = plt.subplots(1, 2, figsize=(fig.TEXT_W, 2.75), sharey=True, gridspec_kw=dict(wspace=0.08))
-    figure.subplots_adjust(left=0.265, right=0.985, bottom=0.125, top=0.76)
+    figure.subplots_adjust(left=0.29, right=0.985, bottom=0.125, top=0.76)
     sep = (rows[len(heads[0][1]) - 1][0] + ys[1][0]) / 2
     dodge = dict(zip(OPT, (0.22, 0.0, -0.22)))
     for ax, ref, value in ((axq, 0.0, lambda k, o: res["dq"][k][o][0]), (axr, 1.0, lambda k, o: rho[k][o])):
@@ -183,19 +183,20 @@ def draw(res, rho, n):
         ax.tick_params(axis="x", pad=1.5)
     axq.set_ylim(y + 0.45, ys[0][0] + 0.45)
     axq.set_yticks([yy for yy, _ in rows])
-    axq.set_yticklabels([setting(k) for _, k in rows], fontsize=8)
+    once = lambda k: k[0] == "transferred" and k[1][1] != S.LUNA  # moved to the other benchmark: one test run
+    axq.set_yticklabels([setting(k) + (" (1 run)" if once(k) else "") for _, k in rows], fontsize=8)
     for yy, head in ys:
         axq.text(0.012, yy, head, transform=blend(figure.transFigure, axq.transData), ha="left",
                  va="center", fontweight="bold")
     axq.set_xlim(-12.5, 4.5)
     axq.set_xticks([-10, -5, 0])
     axq.set_xticklabels(["$-$10", "$-$5", "0"])
-    axq.set_xlabel("test difference to the seed (points)", labelpad=2)
+    axq.set_xlabel("test success minus the seed's (points)", labelpad=2)
     axr.set_xlim(0.94, 1.56)
     axr.set_xticks([1.0, 1.2, 1.4])
-    axr.set_xlabel("input tokens / seed", labelpad=2)
-    axq.set_title("(a) Skills score below the seed in their own\nsetting ({} of {}) and transferred ({} of {})".format(
-        *n["own"], *n["transferred"]), loc="left", pad=11, linespacing=1.15)
+    axr.set_xlabel(r"input-token ratio $\rho$ to the seed", labelpad=2)
+    axq.set_title("(a) {} of {} transferred skills score\nbelow the seed".format(*n["transferred"]), loc="left", pad=11,
+                  linespacing=1.15)
     axr.set_title("(b) Most of the extra input tokens travel\nwith the skill", loc="left", pad=11, linespacing=1.15)
     handles = [plt.Line2D([], [], marker=fig.MARKER[o], color=fig.ARM[o], markeredgecolor="white", markeredgewidth=0.4, lw=0,
                           ms=5, label=S.ARM_NAME[o]) for o in OPT]

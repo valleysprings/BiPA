@@ -5,7 +5,7 @@ from pathlib import Path
 from harness_bench.eval import NATIVE_V1_POLICY, run, verifier_detail, version_from_files
 from harness_bench.eval.traces import chat_messages, trajectory_text
 
-from src.layout import CACHE, HARNESS_BENCH, SEED_FILE, relocate
+from src.utils.layout import CACHE, HARNESS_BENCH, SEED_FILE, relocate
 from src.panels import BENCHMARKS, CONFIG
 
 SEED = SEED_FILE.read_text(encoding="utf-8")

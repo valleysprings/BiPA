@@ -11,19 +11,19 @@ Per skill: the share of its word n-grams (lowercased alphanumerics; five, eight 
 dev task ids it names; the paths and the long numbers it shares with the answer corpus, specific when they occur in the
 answers of only a few dev tasks (wider ones are environment conventions); and its command lines found verbatim in the
 answers. The seed is the control. Every rule unit the editors added to the nine DeepSeek skills (the coded units of
-aux/data/rule_labels.json, found in each skill's text) is tagged task-specific when it names a dev task or carries a
+aux/edits/data/rule_labels.json, found in each skill's text) is tagged task-specific when it names a dev task or carries a
 specific path, a specific number or an eight-word run of the answers; every tagged unit is quoted for reading by hand. The
 verdict's thresholds are heuristic: strong when a skill names a dev task, has more than ten specific hits, or shares more
 than two percent of its eight-word runs (five percent of its five-word runs) with the answers; weak when there is any
 specific hit or tagged unit, or more than twice the seed's eight-word share; none otherwise."""
 import functools, json, re
 
-from src import layout
+from src.utils import layout
 from src.analysis import settings as S
 from src.utils.logger import md_table, record
 
 TASKS = layout.HARNESS_BENCH / "assets/benchmarks"
-LABELS = layout.ROOT / "aux/data/rule_labels.json"
+LABELS = layout.ROOT / "aux/edits/data/rule_labels.json"
 BINARY = {".whl", ".pyc", ".png", ".jpg", ".jpeg", ".gif", ".so", ".zip", ".gz", ".pdf", ".ico", ".lock", ".wasm"}
 MAX_BYTES = 5_000_000
 SPECIFIC = 3  # a path or number in the answers of at most this many dev tasks is specific to them

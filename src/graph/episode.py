@@ -13,7 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
-from src import layout
+from src.utils import layout
+from src.utils.skill_frame import SKILL_FRAME
 
 # What a tool call does, from its tool name and arguments (classify, bash_class): state-changing actions, lookups,
 # tests, and the shell programs that read or write.
@@ -32,9 +33,8 @@ CONV = ("start_conversation", "end_conversation", "log_verification", "get_curre
 FIXED = ("system", "tool_schemas", "task", "skill")
 CTX = {f"context:{n}": n for n in ("history", "task", "system", "tool_schemas")}
 CHARS_PER_TOKEN = 4.0
-# The request record and the skill frame are harness-bench's wire format.
-RECORD_SCHEMA = "bach-native-request-record-v1"
-SKILL_FRAME = re.compile(r'<bach-skill path=(\\*")(.+?)\1 sha256=[^>\s]*>.*?</bach-skill>', re.S)
+# Native request records and skill frames use namespaced wire formats.
+RECORD_SCHEMA = re.compile(r"[A-Za-z0-9_.-]+-native-request-record-v1")
 # keys of a request item that carry no content
 STRUCTURAL = frozenset({"role", "type", "id", "tool_call_id", "call_id", "tool_use_id", "status", "index"})
 # parsed episodes, cached by evaluation file
@@ -109,12 +109,13 @@ def _parse_request(request):
     def add(key, value):
         for text in _texts(value):
             pos = 0
-            for m in [*SKILL_FRAME.finditer(text), None]:
+            frames = [m for m in SKILL_FRAME.finditer(text) if m.group("path") is not None]
+            for m in [*frames, None]:
                 end = m.start() if m else len(text)
                 if text[pos:end]:
                     weights[key] = weights.get(key, 0.0) + len(text[pos:end]) / CHARS_PER_TOKEN
                 if m:
-                    skill = ("component", "skill:" + m.group(2).replace('\\"', '"'))
+                    skill = ("component", "skill:" + m.group("path").replace('\\"', '"'))
                     weights[skill] = weights.get(skill, 0.0) + len(m.group(0)) / CHARS_PER_TOKEN
                     pos = m.end()
 
@@ -176,7 +177,8 @@ def _parse_record(path, stamp):
             record = json.load(f)
     except (OSError, ValueError):
         return None
-    request = record.get("request") if isinstance(record, dict) and record.get("schema") == RECORD_SCHEMA else None
+    schema = record.get("schema") if isinstance(record, dict) else None
+    request = record.get("request") if isinstance(schema, str) and RECORD_SCHEMA.fullmatch(schema) else None
     return _parse_request(request) if isinstance(request, dict) and isinstance(request.get("input"), (list, str)) else None
 
 

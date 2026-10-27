@@ -49,6 +49,10 @@ table1() {
 }
 
 tokens() {
+    step aux.tokens.split compute
+    step aux.tokens.split attr
+    step aux.tokens.slopes compute
+    step aux.tokens.slopes draw-input
     for module in attribution accounting cumulative teaser method; do step "aux.tokens.$module"; done
 }
 
@@ -62,6 +66,7 @@ edits() {
 }
 
 success() {
+    step aux.success.stats
     for module in reruns pooled domains; do step "aux.success.$module"; done
 }
 

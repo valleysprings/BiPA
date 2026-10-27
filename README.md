@@ -32,15 +32,20 @@ Success is judged separately: avg@3 test repetitions against the seed, and a rep
 
 ```
 bipa/
-├── src/          # experiments and main-text analyses (code map: src/README.md)
+├── src/          # experiments, Table 1 and shared analysis/graph utilities (code map: src/README.md)
 │   ├── run.py        # entry point: run, repeat, transfer, suite
 │   ├── panels.py     # task panels and training batches
-│   ├── executor.py   # a skill on a list of tasks -> per-task results, through harness-bench
-│   ├── llm.py        # the optimizer's model client
-│   ├── layout.py     # paths, all taken from environment variables
 │   ├── adapters/     # GEPA, SkillOpt, SkillAdam: upstream loops on these batches, executor and model client
-│   ├── analysis/     # Table 1, its statistics, the turn slopes, the four-term attribution; settings.py: what every analysis reads
-│   └── graph/        # the per-episode bipartite graph
+│   ├── analysis/     # Table 1; settings.py and common.py: settings and readers shared with aux
+│   ├── graph/        # per-episode bipartite graphs, metrics and within-task slope fits
+│   └── utils/        # shared execution, analysis and figure helpers
+│       ├── executor.py    # a skill on a list of tasks -> per-task results, through harness-bench
+│       ├── llm.py         # the optimizer's model client
+│       ├── layout.py      # paths, all taken from environment variables
+│       ├── dataloader.py  # evaluation readers and analysis cache
+│       ├── fig.py         # the one figure style and save_figure
+│       ├── logger.py      # the one analysis-record format
+│       └── skill_frame.py # namespaced skill-frame matching
 ├── aux/          # every other figure and number, one folder per question (aux/README.md)
 ├── optimizers/   # vendored upstream sources at pinned commits (optimizers/README.md)
 ├── skills/       # the seed and every returned skill (skills/README.md)
@@ -63,7 +68,7 @@ cp host.env.example host.env    # then edit it
 python -m pytest tests -q       # offline
 ```
 
-Paths come from environment variables (`src/layout.py`), the optimizer's endpoint from `src/llm.py`:
+Paths come from environment variables (`src/utils/layout.py`), the optimizer's endpoint from `src/utils/llm.py`:
 
 | Variable | Default | What |
 |---|---|---|
@@ -81,11 +86,11 @@ The agent's own model calls are configured in harness-bench. Host settings such 
 
 ## Execution backend
 
-BiPA does not run agents itself. Every episode (one task, one skill text, one repetition) goes through `src/executor.py`, which calls `harness_bench.eval.run` and reads back, per task, a verdict (true, false, or unknown for provider and infrastructure failures, which never count as failures), every model request with its exact provider input-token count, its tool calls, and a record that the skill text reached the model input. Unknown outcomes are re-run at most twice.
+BiPA does not run agents itself. Every episode (one task, one skill text, one repetition) goes through `src/utils/executor.py`, which calls `harness_bench.eval.run` and reads back, per task, a verdict (true, false, or unknown for provider and infrastructure failures, which never count as failures), every model request with its exact provider input-token count, its tool calls, and a record that the skill text reached the model input. Unknown outcomes are re-run at most twice.
 
 Our runs used harness-bench, a wrapper around Harbor that runs each episode in a container on a sandbox service. It is not released, so the commands that call the model (`--execute` of `run`, `repeat`, `transfer`, `suite`) do not work from a fresh clone. The analyses read only recorded episodes and need no executor, model or network.
 
-To run elsewhere, pass an `executor` keyword to `harness_bench.eval.run` from `settings()` in `src/executor.py`: an object with `run(version, panel, split, output_dir, attempt)`, which returns the evaluation record, and `cached_episodes(version, rows, split)`. Harbor's `docker` switch is rejected for these benchmarks (AutomationBench needs a network-less grading container, Terminal-Bench 2.1 89 prebuilt images, τ3-bench a tool-server sidecar, a grading service and model routes for a user simulator and a judge). Episodes from another executor are a different measurement, so give them their own `--cache-root`.
+To run elsewhere, pass an `executor` keyword to `harness_bench.eval.run` from `settings()` in `src/utils/executor.py`: an object with `run(version, panel, split, output_dir, attempt)`, which returns the evaluation record, and `cached_episodes(version, rows, split)`. Harbor's `docker` switch is rejected for these benchmarks (AutomationBench needs a network-less grading container, Terminal-Bench 2.1 89 prebuilt images, τ3-bench a tool-server sidecar, a grading service and model routes for a user simulator and a judge). Episodes from another executor are a different measurement, so give them their own `--cache-root`.
 
 ## Reproduction
 
@@ -98,8 +103,10 @@ scripts/main.sh train deepseek-flash --execute                                  
 scripts/main.sh run skillopt tau3 gpt-6-luna --tag my-run --execute            # one cell
 scripts/main.sh repeat skillopt tau3 deepseek-flash --execute                  # avg@3 test repetitions of one run
 scripts/main.sh transfer skillopt tau3 deepseek-flash --to gpt-6-luna --execute  # a returned skill under another model or on another benchmark
-scripts/main.sh table1 --execute                                                # Table 1, its statistics, the turn slopes, the attribution
+scripts/main.sh table1 --execute                                                # Table 1 for both models, including rho_turns
 ```
+
+`table1` runs only `python -m src.analysis.table1`. Use `scripts/aux.sh success` for its paired statistics, and `scripts/aux.sh tokens` for the turn slopes and four-term attribution.
 
 Benchmarks are `tau3`, `autob`, `tb2`; methods are `seed`, `none` (No skill), `gepa`, `skillopt`, `skilladam`. Each cell reads the run pinned for it in `configs/experiments.yaml`; `--tag NAME` picks another. A started run continues only with `--resume`.
 

@@ -37,8 +37,8 @@ def test_tb2_is_one_stream_shared_by_every_optimizer():
 
 def test_stream_functions():
     tasks = [f"t{i}" for i in range(10)]
-    passes = plan_passes(tasks, 3, 1, 25, 4)
-    assert [len(p) for p in passes] == [10, 10, 5] and plan_passes(tasks, 3, 2, 25, 4) != passes
+    passes = plan_passes(tasks, 3, [1, 2, 3], 25, 4)
+    assert [len(p) for p in passes] == [10, 10, 5] and plan_passes(tasks, 3, [4, 5, 6], 25, 4) != passes
     stream = sum(passes, [])
     assert all(len(set(stream[i:i + 4])) == 4 for i in range(len(stream) - 3))
     assert slice_stream(passes, 4) == [stream[i:i + 4] for i in range(0, 24, 4)]

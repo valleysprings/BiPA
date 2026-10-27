@@ -2,8 +2,8 @@
 and the prefix share of the same episodes, and the input-token figure.
 
 Episodes: the first test run of the seed and of each learned skill, one episode per skill and task. Slope: the slope of
-log y on log turns R with task fixed effects (src.analysis.episodes.fe_reg), with its standard error. Turn elasticity e_R
-of each episode, from its turns and its history share s_H (src.analysis.episodes.metrics). Prefix share s_F = R F / X, the
+log y on log turns R with task fixed effects (src.graph.metrics.fe_reg), with its standard error. Turn elasticity e_R
+of each episode, from its turns and its history share s_H (src.graph.metrics.metrics). Prefix share s_F = R F / X, the
 part of an episode's input tokens that the fixed prefix (system prompt, tool schemas, task, skill text) makes up: its
 median over the episodes, its token-weighted mean (sum of R F over sum of X), and the share of the input tokens that the
 longest tenth of the episodes (by input tokens) reads.
@@ -15,8 +15,8 @@ import json, sys
 import numpy as np
 
 from src.analysis import settings as S
-from src.analysis.attribution import graphs
-from src.analysis.episodes import fe_reg, metrics
+from aux.tokens.split import graphs
+from src.graph.metrics import fe_reg, metrics
 from src.utils import dataloader as C
 from src.utils import fig as style
 from src.utils.logger import md_table, record

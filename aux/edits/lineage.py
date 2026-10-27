@@ -11,7 +11,7 @@ equals what the checkpoint recorded. A version is the skill text delivered to th
 The edge table holds one record per DeepSeek edit and shared panel with at least MIN_TERM_TASKS tasks: the mean per-task
 change in log input tokens split into more actions, turn-splitting, content per turn and skill text (with the residual
 that closes the identity), the change in success, and the characters the edit adds and removes with the keyword tags of
-the added text. Panels whose request records were deleted take their per-task rows from aux/data/edges_frozen_rows.json.
+the added text. Panels whose request records were deleted take their per-task rows from aux/edits/data/edges_frozen_rows.json.
 SkillAdam on Terminal-Bench 2.1 is left out of every count of edits: two versions of that run match the same patch, so
 the parent of its edits is ambiguous in the logs.
 
@@ -23,11 +23,12 @@ import numpy as np
 
 from src.analysis import settings as S
 from src.graph import episode as GE
-from src.layout import ROOT
+from src.utils.layout import ROOT
+from src.utils.skill_frame import SKILL_FRAME
 from src.utils.dataloader import BENCHES, SEED_TEXT
 
 TABLE = "edges_table.json"
-FROZEN_ROWS = ROOT / "aux/data/edges_frozen_rows.json"
+FROZEN_ROWS = ROOT / "aux/edits/data/edges_frozen_rows.json"
 EXCLUDED = ("skilladam", "terminal-bench-2-1")
 METHODS = ("skillopt", "gepa", "skilladam")
 MIN_TERM_TASKS = 3
@@ -90,8 +91,10 @@ def delivered_texts(run):
     texts = {}
     for guidance in (run / "results/skills/deliveries/evaluations").glob("*/*/guidance.md"):
         raw = guidance.read_text()
-        framed = re.match(r"<bach-skill [^>]*>\n(.*)\n</bach-skill>\s*$", raw, re.S)
-        texts[guidance.parent.name.split("-")[0]] = framed.group(1) if framed else raw
+        framed = SKILL_FRAME.fullmatch(raw.rstrip())
+        body = framed.group("body") if framed else ""
+        texts[guidance.parent.name.split("-")[0]] = body[1:-1] \
+            if body.startswith("\n") and body.endswith("\n") else raw
     return texts
 
 

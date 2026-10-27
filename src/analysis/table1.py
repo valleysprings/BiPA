@@ -11,7 +11,7 @@ from pathlib import Path
 from src.analysis.common import (accumulate, geo, luna_row, mean_rows, merged_episodes, merged_mean_rows,  # noqa: F401
                                  merged_rows_of, rep_files, rep_groups, rows_of, unresolved_of)
 from src.analysis import settings as S
-from src.layout import repetition_dir
+from src.utils.layout import repetition_dir
 from src.utils.dataloader import BENCHES, EX, MODELS, SEED_TEXT, final_skill, out_dir, task_row, vid  # noqa: F401
 from src.utils import logger
 
@@ -85,7 +85,7 @@ def cell(model, bench, m, seed_run, seed_reps, ref):
         {t for t, _ in rows} == expected and all(t in kt or t in adj for t in expected) for rows, kt in zip(allrows, known))
     if d["avg3_complete"] and model != LUNA:  # a task with no verdict in any run counts as a failure
         d["Q"] = 100 * sum(sum(r["success"] is True for r in rows.values()) for rows in allrows) / (len(expected) * len(allrows))
-    d["n"], rr = geo(mean, ref, turns=model == LUNA)
+    d["n"], rr = geo(mean, ref, turns=True)
     d.update(rr)
     return d
 
@@ -113,8 +113,7 @@ def record(res):
     """mech_table1: Table 1 as printed, one block per model."""
     blocks, seedret = [], []
     for model in MODELS:
-        turns = model == LUNA  # DeepSeek's rho^turns comes from stats
-        cols = ("Q", "rho", "rho^turns", "rho^calls") if turns else ("Q", "rho", "rho^calls")
+        cols = ("Q", "rho", "rho^turns", "rho^calls")
         head = ["Method"] + [f"{LABEL[b]} {c}" for b in TEX_BENCHES for c in cols]
         rows = []
         for n, _ in ROWS:
@@ -124,7 +123,7 @@ def record(res):
                 mark = rank([round(res[f"{model}|{b}"][x]["Q"], 6) for x, _ in ROWS], v["Q"])
                 q = f"{v['Q']:.1f}"
                 r += [f"**{q}**" if mark == "best" else f"<u>{q}</u>" if mark == "second" else q, f"{v['rho_trj']:.2f}"]
-                r += ([f"{v['rho_turns']:.2f}"] if turns else []) + [f"{v['rho_inv']:.2f}"]
+                r += [f"{v['rho_turns']:.2f}", f"{v['rho_inv']:.2f}"]
             rows.append(r)
         blocks.append(f"**{MODEL_TEX[model]}**\n\n" + logger.md_table(head, rows))
         seedret += [f"{n} on {LABEL[b]} ({MODEL_TEX[model]})" for b in BENCHES for n, _ in ROWS if (res[f"{model}|{b}"][n] or {}).get("returned_seed")]
@@ -150,7 +149,7 @@ def main():
         print(k)
         for n, v in c.items():
             if v:
-                print(n, json.dumps({key: v[key] for key in ("Q", "reps", "avg3_complete", "known", "rho", "rho_inv", "rho_trj", "n")}))
+                print(n, json.dumps({key: v[key] for key in ("Q", "reps", "avg3_complete", "known", "rho", "rho_inv", "rho_trj", "rho_turns", "n")}))
 
 
 if __name__ == "__main__":

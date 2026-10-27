@@ -2,20 +2,16 @@
 import json, math, os
 from pathlib import Path
 
-import numpy as np  # noqa: F401  (re-exported to the analyses that star-import this module)
 from harness_bench.eval import version_from_files
 from scipy.stats import gmean as _gmean
 
-from src import layout
+from src.utils import layout
 
 MODELS = ("deepseek-flash", "gpt-6-luna")
 BENCHES = ("tau3-bench", "automationbench", "terminal-bench-2-1")
 METHODS = ("native-noseed", "native-seed", "gepa", "skillopt", "skilladam")
-OPTIMIZERS = {"GEPA": "gepa", "SkillOpt": "skillopt", "SkillAdam": "skilladam"}
 BN = {"tau3-bench": "tau3", "automationbench": "AutoB", "terminal-bench-2-1": "TB2"}
 EX = layout.EXECUTION
-DS = EX / "deepseek-flash"
-H = layout.ASSETS.parent  # the directory holding assets/
 CACHE = layout.ANALYSIS / "main"
 SEED_TEXT = layout.SEED_FILE.read_text()
 PINS = layout.PINS
@@ -53,16 +49,6 @@ def _cell(m, bench, row):
     return c if c and c["status"] == "complete" else None
 
 
-def manifest_reps(bench, row, model="deepseek-flash"):
-    """{repetition: evaluation.json} the manifest pins for a row, None while its cell is pending."""
-    m = manifest()
-    c = _cell(m, bench, row)
-    if not c or model != m["model"]:
-        return None
-    c = _cell(m, bench, c["executions_from"]) if c.get("executions_from") else c
-    return {int(r): Path(e["file"]) for r, e in c["executions"].items()} if c else None
-
-
 def current_run(method, model, bench):
     """The run a cell reports: the manifest's, else the one pinned in the experiments file, else the cell's only finished run."""
     m = manifest()
@@ -90,17 +76,13 @@ def only_run(method, model, bench):
     return runs[0] if runs else None
 
 
-def eval_file(run, split, version):
-    fs = [f for f in (run / "results/evaluations" / split).glob("*/evaluation.json") if f.parent.name.startswith(version[:12])]
-    return max(fs, key=lambda f: f.stat().st_mtime) if fs else None
-
-
 def _count(v):
     return isinstance(v, (int, float)) and math.isfinite(v) and v >= 0
 
 
 def task_row(ep):
-    """success, executed calls N, input tokens X, c = N + X / 1000 and requests of one episode; N, X None when not captured."""
+    """success, executed calls N, input tokens X, c = N + X / 1000 and request/turn counts nreq and R of one episode;
+    N, X None when not captured."""
     cap, seen, reqs = ep.get("capture") or {}, set(), []
     for r in ep.get("requests", []):
         if r["request_id"] not in seen:
@@ -113,20 +95,7 @@ def task_row(ep):
     ok = cap.get("requests_complete") is True and all(_count(r["input_tokens"]) for r in reqs)
     x = sum(r["input_tokens"] for r in reqs) if ok else None
     return {"success": ep.get("success"), "N": n, "X": x,
-            "c": n + x / 1000 if n is not None and x is not None else None, "nreq": len(reqs)}
-
-
-def evaluation(run, split, version):
-    """({(task, repetition): task_row} over the panel, file, parsed evaluation.json), or None."""
-    f = eval_file(run, split, version)
-    if not f:
-        return None
-    d = json.loads(f.read_text())
-    eps = {}
-    for e in d["episodes"]:
-        eps.setdefault((e["task_id"], e.get("repetition", 0)), e)
-    keys = [(t["task_id"], t.get("repetition", 0)) for t in d["panel"]]
-    return {k: task_row(eps.get(k, {})) for k in keys}, f, d
+            "c": n + x / 1000 if n is not None and x is not None else None, "nreq": len(reqs), "R": len(reqs)}
 
 
 def final_skill(method, run):
@@ -135,13 +104,3 @@ def final_skill(method, run):
     if method == "native-seed":
         return SEED_TEXT
     return json.loads((run / "summary.json").read_text())["final_skill"]
-
-
-def returned_skills(model, bench, names=OPTIMIZERS):
-    """{display name: (run, final skill)} of the finished optimizers of a cell that returned a skill other than the seed."""
-    out = {}
-    for disp, meth in names.items():
-        run = current_run(meth, model, bench)
-        if run and (run / "summary.json").is_file() and (t := final_skill(meth, run)) != SEED_TEXT:
-            out[disp] = (run, t)
-    return out

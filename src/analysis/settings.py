@@ -8,13 +8,13 @@ per repetition and the same rule for a verified outcome.
 Random draws. One stream per draw set: the resamples (or task-model draws) that a group of statistics is computed from
 are drawn once, from rng(key), and every statistic of the group is computed on those same draws, so comparisons within the
 group (rules a-d on one p, every skill of a benchmark on one task resample) are paired. Different draw sets use different
-keys, so changing one cell or the order of the work moves no other number. The one exception is src.analysis.stats (the
+keys, so changing one cell or the order of the work moves no other number. The one exception is aux.success.stats (the
 intervals beside Table 1), which keeps its single sequential generator with the same SEED and N_BOOT."""
 import functools, json, os, zlib
 
 import numpy as np
 
-from src import layout
+from src.utils import layout
 from src.analysis.common import merged_episodes, merged_rows_of
 from src.utils.dataloader import BENCHES, BN, EX, MODELS, SEED_TEXT, final_skill, out_dir, vid
 
@@ -149,7 +149,7 @@ def episodes(files):
 
 def rows(files, model):
     """{repetition: {task: row}} by Table 1's reader for the model. A row holds success (None without a verified outcome),
-    executed calls N, input tokens X (None when not fully captured), c and nreq (the turns)."""
+    executed calls N, input tokens X (None when not fully captured), c and the distinct-request counts nreq and R (turns)."""
     from src.analysis import table1
     reader = table1.row_reader(model)
     return {k: {t: r for (t, _), r in merged_rows_of(fs, reader).items()} for k, fs in sorted(files.items())}
