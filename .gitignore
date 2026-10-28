@@ -9,4 +9,5 @@ host.env
 .scratch/
 .trash/
 out/
-assets/
+assets/*
+!assets/fig/
